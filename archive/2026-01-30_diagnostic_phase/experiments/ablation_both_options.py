@@ -19,6 +19,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.rcParams['mathtext.fontset'] = 'cm'  # Use Computer Modern font for math
+matplotlib.rcParams['font.family'] = 'serif'
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm

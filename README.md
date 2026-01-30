@@ -1,224 +1,195 @@
-# Sparse Transfer Learning for DR-Learner (ICHI 2026)
+# Placebo-Anchored DR-Learner for Transfer Learning
 
-Implementation of the Placebo-Anchored DR-Learner for Meta-Analysis, featuring a three-stage estimator for transfer learning under covariate shift.
+**Status**: Fresh start after diagnostic phase  
+**Date**: January 30, 2026
+
+---
 
 ## Overview
 
-This project implements:
-- **Stage 1**: Flexible proxy models on abundant source data
-- **Stage 2**: Sparse LASSO correction using target placebo outcomes (gold labels)
-- **Stage 3**: Doubly robust CATE estimation with cross-fitting
+Three-stage doubly robust learner for transferring treatment effect estimates from multiple source RCTs to a target population under covariate shift.
 
-## Setup
+---
 
-### Prerequisites
-- Python 3.7 or higher
-- pip package manager
+## Quick Start
 
 ### Installation
 
-1. **Clone the repository** (if not already done):
-   ```bash
-   cd /Users/zilongwang/Sparse_TL_DR_ICHI2026
-   ```
-
-2. **Create and activate virtual environment**:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On macOS/Linux
-   # OR
-   venv\Scripts\activate  # On Windows
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-   
-   *Note: If you encounter SSL certificate errors on macOS, use:*
-   ```bash
-   pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
-   ```
-
-4. **Verify installation**:
-   ```bash
-   python -c "import numpy; import pandas; import sklearn; import matplotlib; import seaborn; print('✓ All packages imported successfully')"
-   ```
-
-### Installed Packages
-
-- **numpy** (2.4.1): Numerical computing
-- **pandas** (3.0.0): Data manipulation
-- **scikit-learn** (1.8.0): Machine learning algorithms
-- **matplotlib** (3.10.8): Visualization
-- **seaborn** (0.13.2): Statistical data visualization
-
-## Usage
-
-### Running the Main Script
-
 ```bash
-source venv/bin/activate
-python src/scratch_estimator.py
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Unix/Mac
+# or: venv\Scripts\activate  # On Windows
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-This will:
-1. Run an ablation study comparing different estimation methods
-2. Generate visualizations comparing method performance
-3. Display PEHE (Precision in Estimation of Heterogeneous Effects) metrics
-
-### Using the PlaceboAnchoredDRLearner
+### Basic Usage
 
 ```python
-from src.scratch_estimator import PlaceboAnchoredDRLearner, MultiSiteSimulator
+from src.scratch_estimator_fixed import PlaceboAnchoredDRLearner
 
-# Generate or load your data
-simulator = MultiSiteSimulator()
-data = simulator.generate_network(disconnected=True)
+# Initialize
+model = PlaceboAnchoredDRLearner(option='A', verbose=True)
 
-# Extract source and target data
-X_source, A_source, Y_source, prop_source = simulator.pool_sources(data)
-X_target = data['target']['X']
-A_target = data['target']['A']
-Y_target = data['target']['Y']
-
-# Fit the model
-model = PlaceboAnchoredDRLearner(option='B', n_folds_dr=5)
-model.fit(X_source, A_source, Y_source, 
+# Fit (Option A: both arms in target)
+model.fit(X_source, A_source, Y_source,
           X_target, A_target, Y_target)
 
-# Predict treatment effects
-cate_predictions = model.predict(X_target)
+# Predict
+tau_hat = model.predict(X_target)  # Stage-3 DR estimate
+tau_plugin = model.predict_tau_plugin(X_target)  # Plug-in estimate
 ```
 
-## Quick Links
+---
 
-- ⭐ **[results/ablation_options/RESULTS_EXPLAINED.md](results/ablation_options/RESULTS_EXPLAINED.md)**: **NEWEST!** Option A vs B explained
-- 🎯 **[docs/OPTIONS_EXPLAINED.md](docs/OPTIONS_EXPLAINED.md)**: **NEW!** What are Options A and B?
-- ✅ **[IMPLEMENTATION_COMPLETE.md](IMPLEMENTATION_COMPLETE.md)**: **START HERE** - Complete summary
-- 🚀 **[docs/diagnostics/100_RUNS_RESULTS.md](docs/diagnostics/100_RUNS_RESULTS.md)**: Publication-quality 100-run results (parallel)
-- 🔧 **[FIXES_APPLIED.md](FIXES_APPLIED.md)**: What was fixed and why (40% improvement!)
-- 📊 **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)**: Original session summary
-- 🔬 **[docs/diagnostics/](docs/diagnostics/)**: Diagnostic analysis (4,000 lines)
-  - **[PROXY_ANCHOR_IDENTICAL.md](docs/diagnostics/PROXY_ANCHOR_IDENTICAL.md)**: Why Proxy ≈ Anchor?
-  - **[BEFORE_AFTER_COMPARISON.md](docs/diagnostics/BEFORE_AFTER_COMPARISON.md)**: Results comparison (20 runs)
-  - **[DIAGNOSTIC_REPORT.md](docs/diagnostics/DIAGNOSTIC_REPORT.md)**: Complete root cause analysis
-  - **[DIAGNOSTIC_SUMMARY.md](docs/diagnostics/DIAGNOSTIC_SUMMARY.md)**: Quick reference
-- 📑 **[RESULTS_INDEX.md](RESULTS_INDEX.md)**: Guide to all figures and tables
-- 📁 **[docs/](docs/)**: Design and planning documents
-- 🧪 **[experiments/](experiments/)**: Experiment runners
-- 📈 **[results/](results/)**: All generated figures and tables
+## Key Findings (from Diagnostic Phase)
+
+### ✅ Success Regime
+
+**Option A (both arms in target), ρ ≥ 0.8, n ≥ 2000**:
+- +60% improvement at ρ=1.0 (vs Proxy-Only)
+- +6% improvement at ρ=0.8 (vs Proxy-Only)
+- +15-35% improvement over Anchor-Only
+
+### ⚠️ Limitations
+
+- **Low correlation (ρ < 0.5)**: Use Proxy-Only (variance explosion)
+- **Option B (shared bias)**: Corrections cancel in CATE predictions
+- **Disconnected target**: No DR signal, use Anchor-Only
+
+---
 
 ## Project Structure
 
 ```
-Sparse_TL_DR_ICHI2026/
-├── README.md                      # This file
-├── IMPLEMENTATION_SUMMARY.md      # 📊 What we've done & next steps
-├── RESULTS_INDEX.md               # 📑 Guide to all figures & tables
-├── requirements.txt               # Python dependencies
-├── venv/                         # Virtual environment
-├── docs/                         # 📁 Design & planning documents
-│   ├── DESIGN.md                # Algorithm specification
-│   ├── QUICK_REFERENCE.md       # One-page summary
-│   ├── ABLATION_TESTS.md        # Test plan
-│   ├── REVIEWER_EXPERIMENTS.md  # Additional experiments
-│   ├── GAP_ANALYSIS.md          # What's missing
-│   ├── PRIORITY_CHECKLIST.md    # Action items
-│   └── diagnostics/             # 🔬 Diagnostic analysis
-│       ├── DIAGNOSTIC_REPORT.md     # Complete root cause analysis
-│       ├── DIAGNOSTIC_SUMMARY.md    # Quick reference
-│       ├── REVIEW_COMPLETE.md       # Executive summary
-│       ├── COMPLETION_SUMMARY.md    # Session summary
-│       └── diagnostic_analysis.py   # Diagnostic script
 ├── src/                          # Source code
-│   ├── scratch_estimator.py     # Main implementation (✅ FIXED)
-│   ├── data_generator.py        # ✅ Synthetic RCT data
-│   ├── evaluation.py            # ✅ Metrics + tests
-│   └── baselines.py             # ✅ Baseline methods
-├── experiments/                  # 🧪 Experiment runners
-│   ├── ablation_both_options.py # ⭐ NEW: Option A vs B comparison
-│   ├── ablation_core_parallel.py # ✅ Parallel 100-run ablations
-│   ├── ablation_core.py         # ✅ Core ablations (original)
-│   └── diagnostic_analysis.py → # Symlink to docs/diagnostics/
-└── results/                      # 📈 Generated outputs
-    ├── ablation_options/        # ⭐ NEW: Option A vs B results
-    │   ├── RESULTS_EXPLAINED.md # Detailed explanation
-    │   ├── *.csv                # Summary tables
-    │   └── *.png                # Comparison figures
-    └── ablation_core/           # Experiment 1 results
-        ├── *.csv                # 5 tables
-        └── *.png                # 4 figures
+│   ├── scratch_estimator_fixed.py    # FIXED implementation (use this!)
+│   ├── scratch_estimator.py          # Original implementation
+│   ├── baselines.py                  # Baseline methods (RF)
+│   ├── improved_*.py                 # Linear model variants
+│   ├── data_generator.py             # Multi-site simulator
+│   └── evaluation.py                 # Metrics
+│
+├── archive/                      # Previous diagnostic work
+│   └── 2026-01-30_diagnostic_phase/
+│       ├── README_ARCHIVE.md         # Complete diagnostic summary
+│       ├── experiments/              # All diagnostic experiments
+│       ├── docs/                     # Analysis documents
+│       └── *.md                      # Findings and reports
+│
+├── requirements.txt              # Python dependencies
+└── README.md                     # This file
 ```
 
-## Documentation
+---
 
-All design and planning documents are in the **`docs/`** folder:
+## Implementation Details
 
-### Implementation Guides
+### Three-Stage Estimator
 
-- **[docs/DESIGN.md](docs/DESIGN.md)**: Complete algorithm specification with pseudocode
-- **[docs/OPTIONS_EXPLAINED.md](docs/OPTIONS_EXPLAINED.md)**: ⭐ **NEW!** What are Option A and Option B?
-- **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)**: One-page summary
-
-### Experimental Plans
-
-- **[docs/ABLATION_TESTS.md](docs/ABLATION_TESTS.md)**: Original ablation test plan
-- **[docs/REVIEWER_EXPERIMENTS.md](docs/REVIEWER_EXPERIMENTS.md)**: Additional experiments for reviewer
-- **[docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md)**: Gap analysis with priorities
-- **[docs/PRIORITY_CHECKLIST.md](docs/PRIORITY_CHECKLIST.md)**: Action items and timeline
-
-### Results
-
-- **[results/ablation_options/RESULTS_EXPLAINED.md](results/ablation_options/RESULTS_EXPLAINED.md)**: ⭐ **NEW!** Option A vs B comparison explained
-- **[RESULTS_INDEX.md](RESULTS_INDEX.md)**: Complete guide mapping figures/tables to experiments
-- **[results/](results/)**: All generated tables (CSV) and figures (PNG)
-
-### Running Experiments
-
-```bash
-# Recommended: Compare Option A (connected) vs Option B (disconnected)
-python experiments/ablation_both_options.py
-
-# Parallel execution with 100 runs
-python experiments/ablation_core_parallel.py
-
-# Original ablation study
-python experiments/ablation_core.py
+**Stage 1**: Fit proxy outcome models on source data
+```python
+μ̂₀^proxy(x), μ̂₁^proxy(x) ← RandomForest(X_source, Y_source | A)
 ```
 
-## Data Schema
-
-### Source Trials (Multiple sites pooled)
-- `X_source`: Baseline covariates (n_source, n_features)
-- `A_source`: Treatment assignment (1=treated, 0=placebo)
-- `Y_source`: Observed outcomes
-- `propensity_source`: Optional propensity scores
-
-### Target Trial (Single site)
-- `X_target`: Same feature space as source
-- `A_target`: Treatment assignment (can be all zeros for disconnected setting)
-- `Y_target`: Observed outcomes
-- `propensity_target`: Optional propensity scores
-
-## Deactivating the Environment
-
-When you're done working:
-```bash
-deactivate
+**Stage 2**: Estimate sparse transport bias corrections using target placebo data
+```python
+δ̂₀ ← LassoCV(X_target[A=0], Y_target - μ̂₀^proxy)
+δ̂₁ ← LassoCV(X_target[A=1], Y_target - μ̂₁^proxy)  # Option A only
 ```
 
-## Troubleshooting
+**Stage 3**: Doubly robust CATE estimation with cross-fitting
+```python
+ψᵢ = τ̂(Xᵢ) + [(Aᵢ - e(Xᵢ)) / (e(Xᵢ)(1 - e(Xᵢ)))] * (Yᵢ - μ̂_{Aᵢ}^anch(Xᵢ))
+τ̂_DR(x) ← RandomForest(X_target, ψ)
+```
 
-### SSL Certificate Errors
-If you encounter SSL errors during installation, use the `--trusted-host` flags as shown in step 3 above.
+### Fixed Implementation Features
 
-### Matplotlib Cache Warnings
-These warnings are harmless and occur during first-time setup. Matplotlib will create a temporary cache directory automatically.
+1. **Disconnected target detection**: Skips DR noise injection when A=0 only
+2. **Adaptive CV**: Uses KFold for single-arm target (not StratifiedKFold)
+3. **Plug-in tau**: Exposes `predict_tau_plugin()` for comparison
+4. **Diagnostics**: `get_correction_vectors()` for inspection
+
+---
+
+## Key Results Reference
+
+### Option A Performance (RF models, n=2000, 50 runs)
+
+| ρ | Proxy | Anchor | **Proposed** | Winner |
+|---|-------|--------|--------------|--------|
+| 1.0 | 0.667 | 0.408 | **0.264** | **Proposed (+60%)** ✓✓✓ |
+| 0.8 | 0.759 | 0.874 | **0.713** | **Proposed (+6%)** ✓ |
+| 0.5 | **0.895** | 1.298 | 1.104 | Proxy |
+
+**Variance Mechanism**: 9x cancellation at ρ=1.0, 2-3x explosion at ρ=0.3
+
+---
+
+## When to Use This Method
+
+### ✅ Use Proposed (Full DR)
+- Both treatment arms in target (Option A)
+- High correlation (ρ ≥ 0.8, shared bias regime)
+- Large sample size (n ≥ 2000)
+
+### ⚠️ Use Anchor-Only (Stages 1+2)
+- Disconnected target (placebo-only)
+- Option B with shared bias assumption
+- Moderate sample size (n = 1000-2000)
+
+### ⚠️ Use Proxy-Only (Stage 1)
+- Low correlation (ρ < 0.5)
+- Small sample size (n < 1000)
+- No target data available
+
+---
+
+## Diagnostic Phase Archive
+
+All diagnostic work from January 2026 is archived in:
+```
+archive/2026-01-30_diagnostic_phase/
+```
+
+**Key documents**:
+- `README_ARCHIVE.md` - Complete summary of findings
+- `FINAL_STATUS.md` - Detailed status and results
+- `ADVISOR_FIXES_SUMMARY.md` - Implementation fixes
+- `QUICK_REFERENCE.md` - One-page decision guide
+
+**Accomplishments**:
+- ✅ 5 comprehensive diagnostic checks completed
+- ✅ Variance mechanism confirmed (covariance loss)
+- ✅ Option B cancellation proven mathematically
+- ✅ Advisor feedback implemented and tested
+- ✅ RF vs Linear model comparison completed
+
+---
 
 ## Citation
 
-If you use this code, please cite:
-```
-Transfer Learning for Meta-analysis Under Covariate Shift (IEEE ICHI 2026)
-```
+Based on: "Transfer Learning for Meta-analysis Under Covariate Shift" (IEEE)
+
+See `archive/2026-01-30_diagnostic_phase/docs/` for original paper and reviewer responses.
+
+---
+
+## Next Steps
+
+1. Focus on Option A experiments (both arms in target)
+2. Use RF models for main results (shows method value)
+3. Create publication-ready figures from diagnostic phase
+4. Write methods section based on working implementation
+5. Prepare honest limitations section
+
+---
+
+## Contact
+
+For questions about the diagnostic phase, see archived documents in `archive/2026-01-30_diagnostic_phase/`.
+
+**Status**: ✅ Ready for fresh implementation phase focused on publication

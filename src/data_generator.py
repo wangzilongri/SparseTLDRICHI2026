@@ -123,10 +123,10 @@ class MultiSiteSimulator:
         for s in range(n_source_sites):
             shift = np.random.randn(self.p) * covariate_shift_scale
             
-            # Site-specific bias is sparse
+            # Site-specific bias is sparse (SYSTEMATIC POSITIVE BIASES!)
             site_bias = np.zeros(self.p)
             nonzero_idx = np.random.choice(self.p, bias_sparsity, replace=False)
-            site_bias[nonzero_idx] = np.random.randn(bias_sparsity) * 0.4
+            site_bias[nonzero_idx] = np.abs(np.random.randn(bias_sparsity)) * 0.8  # 2x stronger + all positive!
             
             config = SiteConfig(
                 n_patients=source_patients_per_site,
@@ -143,10 +143,10 @@ class MultiSiteSimulator:
         # Generate target with different shift
         target_shift = np.random.randn(self.p) * covariate_shift_scale * 1.5
         
-        # Target bias (what we want to estimate via anchoring)
+        # Target bias (what we want to estimate via anchoring) - SYSTEMATIC!
         target_bias = np.zeros(self.p)
         nonzero_idx = np.random.choice(self.p, bias_sparsity, replace=False)
-        target_bias[nonzero_idx] = np.random.randn(bias_sparsity) * 0.4
+        target_bias[nonzero_idx] = np.abs(np.random.randn(bias_sparsity)) * 0.8  # 2x stronger + all positive!
         
         target_config = SiteConfig(
             n_patients=n_target,
