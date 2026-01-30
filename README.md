@@ -25,21 +25,30 @@ source venv/bin/activate  # On Unix/Mac
 pip install -r requirements.txt
 ```
 
+### Run Experiments
+
+```bash
+# Quick test of all estimators
+python experiments/test_estimators.py
+
+# Full ablation study (20 runs)
+python experiments/ablation_study.py
+```
+
 ### Basic Usage
 
 ```python
-from src.scratch_estimator_fixed import PlaceboAnchoredDRLearner
+from src.estimator import PlaceboAnchoredDRLearner
 
 # Initialize
 model = PlaceboAnchoredDRLearner(option='A', verbose=True)
 
 # Fit (Option A: both arms in target)
-model.fit(X_source, A_source, Y_source,
+model.fit(X_source, A_source, Y_source, c_source,
           X_target, A_target, Y_target)
 
 # Predict
 tau_hat = model.predict(X_target)  # Stage-3 DR estimate
-tau_plugin = model.predict_tau_plugin(X_target)  # Plug-in estimate
 ```
 
 ---
