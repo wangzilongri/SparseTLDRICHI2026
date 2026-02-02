@@ -247,15 +247,26 @@ METHOD_REGISTRY: Dict[str, MethodSpec] = {
         description="Source-only proxy model, no target anchoring"
     ),
     
-    # Anchor-only baseline
+    # Anchor-only baseline (placebo correction only)
     "AnchorOnly": MethodSpec(
         method="AnchorOnly",
         feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,
+        uses_target_treated=False,  # Only uses placebo for correction
+        uses_source_data=True,
+        description="Proxy + placebo-only anchoring (δ₁ = 0)"
+    ),
+    
+    # Anchor-only A baseline (both corrections from target, no Step B)
+    "AnchorOnlyA": MethodSpec(
+        method="AnchorOnlyA",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
         feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
         uses_target_placebo=True,
-        uses_target_treated=True,  # Needs treated for direct correction
+        uses_target_treated=True,  # Needs treated for δ₁ correction
         uses_source_data=True,
-        description="Proxy + target anchoring (needs both arms)"
+        description="Proxy + both corrections from target (no Step B transfer)"
     ),
     
     # Proposed Option A (needs target treated)
@@ -289,6 +300,17 @@ METHOD_REGISTRY: Dict[str, MethodSpec] = {
         uses_target_treated=False,
         uses_source_data=True,
         description="Proposed with kernel transfer operator (Option B)"
+    ),
+    
+    # Proposed Option B with ridge Stage-2 (for A5 dense corrections)
+    "ProposedB_RidgeStage2": MethodSpec(
+        method="ProposedB_RidgeStage2",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,
+        uses_target_treated=False,
+        uses_source_data=True,
+        description="Proposed Option B with ridge (not LASSO) Stage-2 corrections"
     ),
     
     # IPD hierarchical model

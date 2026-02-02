@@ -27,13 +27,16 @@ from benchmark_schema import PlotSpec, Feasibility
 
 # Consistent colors for each method
 # Proposed methods (A and B) use green shades to show they're related
+# Anchor-only variants use blue shades
 METHOD_COLORS = {
     'NoTransfer': '#d62728',           # Red
     'ProxyOnly': '#ff7f0e',            # Orange  
-    'AnchorOnly': '#1f77b4',           # Blue
+    'AnchorOnly': '#1f77b4',           # Blue (placebo-only anchor)
+    'AnchorOnlyA': '#6baed6',          # Light blue (both arms anchor)
     'ProposedA': '#2ca02c',            # Green (dark) - Option A
     'ProposedB_LinearStepB': '#98df8a', # Green (light) - Option B Linear
     'ProposedB_KernelStepB': '#c7e9c0', # Green (very light) - Option B Kernel
+    'ProposedB_RidgeStage2': '#a1d99b', # Green (medium) - Option B Ridge
     'IPD_RE': '#e377c2',               # Pink
     'AIPWTransport': '#7f7f7f',        # Gray
     'EntropyBalancing': '#bcbd22',     # Yellow-green
@@ -47,9 +50,11 @@ METHOD_MARKERS = {
     'NoTransfer': 'X',
     'ProxyOnly': 's',
     'AnchorOnly': '^',
+    'AnchorOnlyA': 'v',                # Down triangle
     'ProposedA': 'o',
     'ProposedB_LinearStepB': 'D',
     'ProposedB_KernelStepB': 'p',
+    'ProposedB_RidgeStage2': 'P',   # Plus (filled)
     'IPD_RE': 'v',
     'AIPWTransport': '<',
     'EntropyBalancing': '>',

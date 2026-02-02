@@ -11,6 +11,10 @@ Usage:
     python experiments/core_sweeps.py --sweep proxy --n_rep 50 --output results/sweeps
     python experiments/core_sweeps.py --sweep imbalance --n_rep 50 --output results/sweeps
     python experiments/core_sweeps.py --sweep all --n_rep 20 --output results/sweeps
+    
+    # Parallel execution (recommended):
+    python experiments/core_sweeps.py --sweep all --n_rep 20 --n_jobs -1  # Use all cores
+    python experiments/core_sweeps.py --sweep gold --n_rep 50 --n_jobs 8  # Use 8 cores
 """
 
 import os
@@ -23,6 +27,8 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Optional, Tuple
 from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
 
 # Add paths
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -247,6 +253,189 @@ Same multi-site RCT setting, but with unequal site sizes.
 
 
 # =============================================================================
+# Core Sweep Runner - Parallel Worker
+# =============================================================================
+
+def _run_single_rep(
+    scenario: Scenario,
+    rep: int,
+    seed: int,
+    methods: List[str],
+    config: dict,
+    benchmark_id: str
+) -> List[dict]:
+    """
+    Worker function for parallel execution.
+    Runs all methods for a single (scenario, rep) pair.
+    
+    Parameters
+    ----------
+    scenario : Scenario
+        The scenario to run
+    rep : int
+        Replication index
+    seed : int
+        Random seed for this rep
+    methods : list of str
+        Methods to run
+    config : dict
+        Sweep configuration
+    benchmark_id : str
+        Benchmark identifier
+        
+    Returns
+    -------
+    list of dict
+        Results for all methods in this rep
+    """
+    # Import here to avoid pickling issues
+    from benchmark_adapters import create_data_generator, create_metric_computer, create_method_factories
+    from benchmark_schema import get_method_spec
+    
+    data_generator = create_data_generator()
+    metric_computer = create_metric_computer()
+    
+    results = []
+    
+    # Generate data
+    try:
+        data = data_generator(scenario, seed)
+    except Exception as e:
+        warnings.warn(f"Data generation failed for scenario {scenario.scenario_id}, rep {rep}: {e}")
+        # Return NaN results for all methods
+        for method_name in methods:
+            results.append({
+                'benchmark_id': benchmark_id,
+                'scenario_id': scenario.scenario_id,
+                'rep': rep,
+                'method': method_name,
+                'feasibility': 'unknown',
+                'seed': seed,
+                config['sweep_param']: getattr(scenario, config['sweep_param']),
+                'm0': scenario.m0,
+                'n_proxy_total': scenario.n_proxy_total,
+                'C_sources': scenario.C_sources,
+                'nontransfer_scale': scenario.nontransfer_scale,
+                'pehe': np.nan,
+                'tau_corr': np.nan,
+                'ate_hat': np.nan,
+                'ate_abs_err': np.nan,
+                'qini_auc': np.nan,
+                'calib_slope': np.nan,
+                'calib_r2': np.nan,
+                'tau_ece': np.nan,
+                'policy_regret': np.nan,
+                'stage2_lambda': None,
+                'stage2_n_selected': None,
+                'stepb_M_fro_norm': None,
+                'stepb_M_effective_rank': None,
+                'runtime_sec': 0.0,
+            })
+        return results
+    
+    # Create method factories (fresh for each rep)
+    method_factories = create_method_factories(seed)
+    
+    for method_name in methods:
+        if method_name not in method_factories:
+            continue
+        
+        method_spec = get_method_spec(method_name)
+        feasibility = method_spec.feasibility_restricted.value
+        
+        t0 = time.time()
+        try:
+            # Create estimator
+            estimator = method_factories[method_name]()
+            
+            # Fit
+            estimator.fit(
+                X_source=data['X_source'],
+                A_source=data['A_source'],
+                Y_source=data['Y_source'],
+                c_source=data['c_source'],
+                X_target=data['X_target'],
+                A_target=data['A_target'],
+                Y_target=data['Y_target'],
+                propensity_target=data.get('propensity_target')
+            )
+            
+            # Predict
+            tau_pred = estimator.predict(data['X_target_eval'])
+            
+            # Compute metrics
+            metrics = metric_computer(
+                tau_true=data['tau_true'],
+                tau_pred=tau_pred,
+                mu0_true=data['mu0_true'],
+                mu1_true=data['mu1_true'],
+                ate_true=data['ate_true']
+            )
+            
+            runtime = time.time() - t0
+            
+            # Get diagnostics
+            stage2_lambda = getattr(estimator, 'stage2_lambda_', None)
+            stage2_n_selected = getattr(estimator, 'stage2_n_selected_', None)
+            
+            if hasattr(estimator, 'transfer_diagnostics_'):
+                td = estimator.transfer_diagnostics_
+                stepb_fro = td.get('M_fro_norm')
+                stepb_rank = td.get('M_effective_rank')
+            else:
+                stepb_fro = None
+                stepb_rank = None
+            
+        except Exception as e:
+            warnings.warn(f"Method {method_name} failed: {e}")
+            metrics = {'pehe': np.nan, 'ate_abs_err': np.nan}
+            runtime = time.time() - t0
+            stage2_lambda = None
+            stage2_n_selected = None
+            stepb_fro = None
+            stepb_rank = None
+        
+        # Create result row
+        result = {
+            'benchmark_id': benchmark_id,
+            'scenario_id': scenario.scenario_id,
+            'rep': rep,
+            'method': method_name,
+            'feasibility': feasibility,
+            'seed': seed,
+            
+            # Scenario params
+            config['sweep_param']: getattr(scenario, config['sweep_param']),
+            'm0': scenario.m0,
+            'n_proxy_total': scenario.n_proxy_total,
+            'C_sources': scenario.C_sources,
+            'nontransfer_scale': scenario.nontransfer_scale,
+            
+            # Metrics
+            'pehe': metrics.get('pehe', np.nan),
+            'tau_corr': metrics.get('tau_corr', np.nan),
+            'ate_hat': metrics.get('ate_hat', np.nan),
+            'ate_abs_err': metrics.get('ate_abs_err', np.nan),
+            'qini_auc': metrics.get('qini_auc', np.nan),
+            'calib_slope': metrics.get('calib_slope', np.nan),
+            'calib_r2': metrics.get('calib_r2', np.nan),
+            'tau_ece': metrics.get('tau_ece', np.nan),
+            'policy_regret': metrics.get('policy_regret', np.nan),
+            
+            # Diagnostics
+            'stage2_lambda': stage2_lambda,
+            'stage2_n_selected': stage2_n_selected,
+            'stepb_M_fro_norm': stepb_fro,
+            'stepb_M_effective_rank': stepb_rank,
+            'runtime_sec': runtime,
+        }
+        
+        results.append(result)
+    
+    return results
+
+
+# =============================================================================
 # Core Sweep Runner
 # =============================================================================
 
@@ -256,6 +445,7 @@ def run_sweep(
     seed0: int = 42,
     methods: List[str] = None,
     output_dir: str = 'results/sweeps',
+    n_jobs: int = 1,
     verbose: bool = True
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -273,6 +463,11 @@ def run_sweep(
         Methods to run. Default: DEFAULT_METHODS
     output_dir : str
         Output directory
+    n_jobs : int
+        Number of parallel jobs. 
+        1 = sequential (default)
+        -1 = use all available cores
+        > 1 = use that many cores
     verbose : bool
         Print progress
         
@@ -292,6 +487,14 @@ def run_sweep(
     if methods is None:
         methods = DEFAULT_METHODS
     
+    # Determine actual number of workers
+    if n_jobs == -1:
+        actual_n_jobs = multiprocessing.cpu_count()
+    elif n_jobs <= 0:
+        actual_n_jobs = max(1, multiprocessing.cpu_count() + n_jobs)
+    else:
+        actual_n_jobs = n_jobs
+    
     if verbose:
         print("=" * 70)
         print(f"Sweep: {config['description']}")
@@ -299,13 +502,8 @@ def run_sweep(
         print(f"Sweep param: {config['sweep_param']} ∈ {config['sweep_values']}")
         print(f"Methods: {methods}")
         print(f"Reps: {n_rep}")
+        print(f"Parallel jobs: {actual_n_jobs}" + (" (sequential)" if actual_n_jobs == 1 else f" ({multiprocessing.cpu_count()} cores available)"))
         print("=" * 70)
-    
-    # Setup
-    data_generator = create_data_generator()
-    metric_computer = create_metric_computer()
-    
-    all_results = []
     
     # Generate scenarios
     scenarios = []
@@ -315,124 +513,66 @@ def run_sweep(
         scenario = Scenario(benchmark_id=benchmark_id, **scenario_params)
         scenarios.append(scenario)
     
-    # Run
-    total_runs = len(scenarios) * n_rep * len(methods)
-    pbar = tqdm(total=total_runs, desc="Running", disable=not verbose)
-    
+    # Build task list: (scenario, rep, seed) tuples
+    tasks = []
     for scenario in scenarios:
         for rep in range(n_rep):
             seed = generate_seed(scenario.scenario_id, rep, seed0)
-            
-            # Generate data
-            try:
-                data = data_generator(scenario, seed)
-            except Exception as e:
-                warnings.warn(f"Data generation failed: {e}")
-                pbar.update(len(methods))
-                continue
-            
-            # Create method factories (fresh for each rep)
-            method_factories = create_method_factories(seed)
-            
-            for method_name in methods:
-                pbar.update(1)
-                
-                if method_name not in method_factories:
-                    continue
-                
-                method_spec = get_method_spec(method_name)
-                feasibility = method_spec.feasibility_restricted.value
-                
-                t0 = time.time()
-                try:
-                    # Create estimator
-                    estimator = method_factories[method_name]()
-                    
-                    # Fit
-                    estimator.fit(
-                        X_source=data['X_source'],
-                        A_source=data['A_source'],
-                        Y_source=data['Y_source'],
-                        c_source=data['c_source'],
-                        X_target=data['X_target'],
-                        A_target=data['A_target'],
-                        Y_target=data['Y_target'],
-                        propensity_target=data.get('propensity_target')
-                    )
-                    
-                    # Predict
-                    tau_pred = estimator.predict(data['X_target_eval'])
-                    
-                    # Compute metrics
-                    metrics = metric_computer(
-                        tau_true=data['tau_true'],
-                        tau_pred=tau_pred,
-                        mu0_true=data['mu0_true'],
-                        mu1_true=data['mu1_true'],
-                        ate_true=data['ate_true']
-                    )
-                    
-                    runtime = time.time() - t0
-                    
-                    # Get diagnostics
-                    stage2_lambda = getattr(estimator, 'stage2_lambda_', None)
-                    stage2_n_selected = getattr(estimator, 'stage2_n_selected_', None)
-                    
-                    if hasattr(estimator, 'transfer_diagnostics_'):
-                        td = estimator.transfer_diagnostics_
-                        stepb_fro = td.get('M_fro_norm')
-                        stepb_rank = td.get('M_effective_rank')
-                    else:
-                        stepb_fro = None
-                        stepb_rank = None
-                    
-                except Exception as e:
-                    warnings.warn(f"Method {method_name} failed: {e}")
-                    metrics = {'pehe': np.nan, 'ate_abs_err': np.nan}
-                    runtime = time.time() - t0
-                    stage2_lambda = None
-                    stage2_n_selected = None
-                    stepb_fro = None
-                    stepb_rank = None
-                
-                # Create result row
-                result = {
-                    'benchmark_id': benchmark_id,
-                    'scenario_id': scenario.scenario_id,
-                    'rep': rep,
-                    'method': method_name,
-                    'feasibility': feasibility,
-                    'seed': seed,
-                    
-                    # Scenario params
-                    config['sweep_param']: getattr(scenario, config['sweep_param']),
-                    'm0': scenario.m0,
-                    'n_proxy_total': scenario.n_proxy_total,
-                    'C_sources': scenario.C_sources,
-                    'nontransfer_scale': scenario.nontransfer_scale,
-                    
-                    # Metrics
-                    'pehe': metrics.get('pehe', np.nan),
-                    'tau_corr': metrics.get('tau_corr', np.nan),
-                    'ate_hat': metrics.get('ate_hat', np.nan),
-                    'ate_abs_err': metrics.get('ate_abs_err', np.nan),
-                    'qini_auc': metrics.get('qini_auc', np.nan),
-                    'calib_slope': metrics.get('calib_slope', np.nan),
-                    'calib_r2': metrics.get('calib_r2', np.nan),
-                    'tau_ece': metrics.get('tau_ece', np.nan),
-                    'policy_regret': metrics.get('policy_regret', np.nan),
-                    
-                    # Diagnostics
-                    'stage2_lambda': stage2_lambda,
-                    'stage2_n_selected': stage2_n_selected,
-                    'stepb_M_fro_norm': stepb_fro,
-                    'stepb_M_effective_rank': stepb_rank,
-                    'runtime_sec': runtime,
-                }
-                
-                all_results.append(result)
+            tasks.append((scenario, rep, seed))
     
-    pbar.close()
+    total_tasks = len(tasks)
+    total_runs = total_tasks * len(methods)
+    
+    if verbose:
+        print(f"Total tasks: {total_tasks} (scenario × rep)")
+        print(f"Total method evaluations: {total_runs}")
+    
+    # Execute tasks
+    if actual_n_jobs == 1:
+        # Sequential execution with progress bar
+        all_results = []
+        pbar = tqdm(total=total_runs, desc="Running", disable=not verbose)
+        
+        for scenario, rep, seed in tasks:
+            rep_results = _run_single_rep(
+                scenario, rep, seed, methods, config, benchmark_id
+            )
+            all_results.extend(rep_results)
+            pbar.update(len(methods))
+        
+        pbar.close()
+    else:
+        # Parallel execution using ProcessPoolExecutor
+        if verbose:
+            print(f"\nStarting parallel execution with {actual_n_jobs} workers...")
+        
+        all_results = []
+        completed = 0
+        
+        with ProcessPoolExecutor(max_workers=actual_n_jobs) as executor:
+            # Submit all tasks
+            future_to_task = {
+                executor.submit(
+                    _run_single_rep, 
+                    scenario, rep, seed, methods, config, benchmark_id
+                ): (scenario.scenario_id, rep)
+                for scenario, rep, seed in tasks
+            }
+            
+            # Collect results as they complete
+            pbar = tqdm(total=total_runs, desc="Running", disable=not verbose)
+            
+            for future in as_completed(future_to_task):
+                task_id = future_to_task[future]
+                try:
+                    rep_results = future.result()
+                    all_results.extend(rep_results)
+                    pbar.update(len(methods))
+                except Exception as e:
+                    warnings.warn(f"Task {task_id} failed: {e}")
+                    pbar.update(len(methods))
+            
+            pbar.close()
     
     # Create DataFrame
     df_rep = pd.DataFrame(all_results)
@@ -790,32 +930,119 @@ def _generate_findings(sweep_name: str, df_agg: pd.DataFrame, config: dict) -> L
 # Run All Sweeps
 # =============================================================================
 
+def _run_sweep_and_report(
+    sweep_name: str,
+    n_rep: int,
+    seed0: int,
+    methods: Optional[List[str]],
+    output_dir: str
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Helper function for parallel sweep execution.
+    Runs a sweep and generates plots/report.
+    """
+    df_rep, df_agg = run_sweep(
+        sweep_name, n_rep=n_rep, seed0=seed0,
+        methods=methods, output_dir=output_dir,
+        n_jobs=1,  # Sequential within sweep to avoid nested parallelism
+        verbose=False  # Reduce output noise
+    )
+    generate_sweep_plots(sweep_name, df_agg, output_dir, verbose=False)
+    generate_sweep_report(sweep_name, df_rep, df_agg, output_dir)
+    return df_rep, df_agg
+
+
 def run_all_sweeps(
     n_rep: int = 20,
     seed0: int = 42,
     methods: List[str] = None,
     output_dir: str = 'results/sweeps',
+    n_jobs: int = 1,
+    parallel_sweeps: bool = False,
     verbose: bool = True
 ) -> Dict[str, Tuple[pd.DataFrame, pd.DataFrame]]:
-    """Run all core sweeps."""
+    """
+    Run all core sweeps.
     
-    results = {}
+    Parameters
+    ----------
+    n_rep : int
+        Number of Monte Carlo reps per scenario
+    seed0 : int
+        Master seed
+    methods : list of str, optional
+        Methods to run
+    output_dir : str
+        Output directory
+    n_jobs : int
+        Number of parallel jobs for each sweep.
+        1 = sequential, -1 = all cores
+    parallel_sweeps : bool
+        If True, run the three sweeps in parallel (each with n_jobs=1 internally
+        to avoid nested parallelism). If False, run sweeps sequentially with
+        n_jobs parallelism within each sweep.
+    verbose : bool
+        Print progress
+        
+    Returns
+    -------
+    dict
+        sweep_name -> (df_rep, df_agg)
+    """
+    sweep_names = ['gold', 'proxy', 'imbalance']
     
-    for sweep_name in ['gold', 'proxy', 'imbalance']:
+    if parallel_sweeps:
+        # Run sweeps in parallel (each sweep runs sequentially internally)
+        # This is useful when you have few cores and want to maximize utilization
         if verbose:
             print(f"\n{'='*70}")
-            print(f"Running {sweep_name} sweep...")
+            print("Running all sweeps in parallel...")
             print('='*70)
         
-        df_rep, df_agg = run_sweep(
-            sweep_name, n_rep=n_rep, seed0=seed0, 
-            methods=methods, output_dir=output_dir, verbose=verbose
-        )
+        # Determine number of sweep workers (max 3, one per sweep)
+        n_sweep_workers = min(3, multiprocessing.cpu_count())
         
-        generate_sweep_plots(sweep_name, df_agg, output_dir, verbose=verbose)
-        generate_sweep_report(sweep_name, df_rep, df_agg, output_dir)
+        results = {}
         
-        results[sweep_name] = (df_rep, df_agg)
+        with ProcessPoolExecutor(max_workers=n_sweep_workers) as executor:
+            future_to_sweep = {
+                executor.submit(
+                    _run_sweep_and_report,
+                    sweep_name, n_rep, seed0, methods, output_dir
+                ): sweep_name
+                for sweep_name in sweep_names
+            }
+            
+            for future in as_completed(future_to_sweep):
+                sweep_name = future_to_sweep[future]
+                try:
+                    df_rep, df_agg = future.result()
+                    results[sweep_name] = (df_rep, df_agg)
+                    if verbose:
+                        print(f"✓ Completed {sweep_name} sweep")
+                except Exception as e:
+                    warnings.warn(f"Sweep {sweep_name} failed: {e}")
+                    results[sweep_name] = (pd.DataFrame(), pd.DataFrame())
+    else:
+        # Run sweeps sequentially, with parallelism within each sweep
+        results = {}
+        
+        for sweep_name in sweep_names:
+            if verbose:
+                print(f"\n{'='*70}")
+                print(f"Running {sweep_name} sweep...")
+                print('='*70)
+            
+            df_rep, df_agg = run_sweep(
+                sweep_name, n_rep=n_rep, seed0=seed0, 
+                methods=methods, output_dir=output_dir,
+                n_jobs=n_jobs, verbose=verbose
+            )
+            
+            generate_sweep_plots(sweep_name, df_agg, output_dir, verbose=verbose)
+            generate_sweep_report(sweep_name, df_rep, df_agg, output_dir)
+            
+            results[sweep_name] = (df_rep, df_agg)
     
     if verbose:
         print(f"\n{'='*70}")
@@ -831,22 +1058,62 @@ def run_all_sweeps(
 # =============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="Run core benchmark sweeps")
+    parser = argparse.ArgumentParser(
+        description="Run core benchmark sweeps",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run all sweeps sequentially (default)
+  python experiments/core_sweeps.py --sweep all --n_rep 20
+
+  # Run all sweeps with parallel execution within each sweep (recommended)
+  python experiments/core_sweeps.py --sweep all --n_rep 50 --n_jobs -1
+
+  # Run a single sweep with 8 parallel workers
+  python experiments/core_sweeps.py --sweep gold --n_rep 100 --n_jobs 8
+
+  # Run all sweeps in parallel (sweeps run concurrently, not within)
+  python experiments/core_sweeps.py --sweep all --n_rep 20 --parallel_sweeps
+        """
+    )
     parser.add_argument('--sweep', type=str, default='all',
                        choices=['gold', 'proxy', 'imbalance', 'all'],
-                       help='Sweep to run')
+                       help='Sweep to run (default: all)')
     parser.add_argument('--n_rep', type=int, default=20,
-                       help='Number of MC replicates')
+                       help='Number of MC replicates (default: 20)')
     parser.add_argument('--seed', type=int, default=42,
-                       help='Master seed')
+                       help='Master seed (default: 42)')
     parser.add_argument('--output', type=str, default='results/sweeps',
-                       help='Output directory')
+                       help='Output directory (default: results/sweeps)')
     parser.add_argument('--methods', type=str, nargs='+', default=None,
-                       help='Methods to run')
+                       help='Methods to run (default: all standard methods)')
+    parser.add_argument('--n_jobs', type=int, default=1,
+                       help='Number of parallel jobs. 1=sequential (default), '
+                            '-1=all cores, N=use N cores')
+    parser.add_argument('--parallel_sweeps', action='store_true',
+                       help='Run sweeps in parallel (instead of parallel within sweeps). '
+                            'Useful when running --sweep all with limited cores.')
     parser.add_argument('--quiet', action='store_true',
                        help='Suppress progress output')
     
     args = parser.parse_args()
+    
+    # Report configuration
+    if not args.quiet:
+        print("\n" + "="*70)
+        print("Core Sweeps Benchmark Runner")
+        print("="*70)
+        print(f"Sweep: {args.sweep}")
+        print(f"Reps: {args.n_rep}")
+        print(f"Seed: {args.seed}")
+        print(f"Output: {args.output}")
+        print(f"Methods: {args.methods or 'default'}")
+        print(f"Parallel jobs: {args.n_jobs} {'(all cores)' if args.n_jobs == -1 else ''}")
+        if args.sweep == 'all':
+            print(f"Parallel sweeps: {args.parallel_sweeps}")
+        print("="*70 + "\n")
+    
+    start_time = time.time()
     
     if args.sweep == 'all':
         run_all_sweeps(
@@ -854,6 +1121,8 @@ def main():
             seed0=args.seed,
             methods=args.methods,
             output_dir=args.output,
+            n_jobs=args.n_jobs,
+            parallel_sweeps=args.parallel_sweeps,
             verbose=not args.quiet
         )
     else:
@@ -863,10 +1132,17 @@ def main():
             seed0=args.seed,
             methods=args.methods,
             output_dir=args.output,
+            n_jobs=args.n_jobs,
             verbose=not args.quiet
         )
         generate_sweep_plots(args.sweep, df_agg, args.output, verbose=not args.quiet)
         generate_sweep_report(args.sweep, df_rep, df_agg, args.output)
+    
+    elapsed = time.time() - start_time
+    if not args.quiet:
+        print(f"\n{'='*70}")
+        print(f"Total runtime: {elapsed:.1f}s ({elapsed/60:.1f} min)")
+        print(f"{'='*70}")
 
 
 if __name__ == "__main__":

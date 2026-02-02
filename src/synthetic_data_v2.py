@@ -26,11 +26,26 @@ from typing import Dict, Tuple, Optional
 
 @dataclass
 class SyntheticRCTConfig:
-    """Configuration for synthetic RCT generation."""
+    """
+    Configuration for synthetic RCT generation.
+    
+    A5 Sparsity Control (ADVISOR FIX #1):
+        `dev_sparsity` is THE governing constraint for |β_{0,c}|_0.
+        `shared_support_frac` controls what fraction of dev_sparsity is shared.
+        
+        Effective support:
+            s_shared = max(1, int(dev_sparsity * shared_support_frac))
+            s_idio = dev_sparsity - s_shared
+    
+    Step B Identifiability:
+        For M* to be learnable, we need rank(B0) >= transfer_rank.
+        This requires dev_sparsity >= transfer_rank typically.
+        Generator will warn if this condition is violated.
+    """
     
     # Basic dimensions
-    n_features: int = 5
-    n_effect_modifiers: int = 3  # For reference (tau defined via mu1-mu0)
+    n_features: int = 30
+    n_effect_modifiers: int = 5  # ADVISOR FIX #4: Set restrict_deviation_to_first_k to this for meaningful effect modifiers
     n_source_sites: int = 10     # INCREASED for Step B identifiability
     n_target: int = 200
     n_source_per_site: int = 500
@@ -47,17 +62,21 @@ class SyntheticRCTConfig:
     # Proxy nonlinearity (makes Stage 1 nontrivial)
     proxy_nonlinear_scale: float = 0.5    # Mild nonlinearity in proxy
     
+    # ═══════════════════════════════════════════════════════════════════════
     # A5: Site deviation structure (sparse linear)
-    dev_sparsity: int = 2                 # Nonzeros in beta_{0,c}
+    # ADVISOR FIX #1: dev_sparsity is THE primary control for |β_{0,c}|_0
+    # ═══════════════════════════════════════════════════════════════════════
+    dev_sparsity: int = 3                 # TOTAL nonzeros in β_{0,c} (THE governing constraint)
     dev_scale: float = 0.4                # Magnitude of corrections
+    shared_support_frac: float = 0.67     # Fraction of dev_sparsity that's shared (e.g., 0.67 → 2/3 shared)
+    restrict_deviation_to_first_k: Optional[int] = None  # e.g., 3 for effect modifiers only
     
-    # Support structure (critical for Step B!)
-    shared_support_size: int = 2          # Shared across sites
-    idiosyncratic_support_size: int = 0   # Site-specific extras
-    restrict_deviation_to_first_k: Optional[int] = None  # e.g., 3 for effect modifiers
+    # Legacy (DEPRECATED, kept for backward compatibility)
+    shared_support_size: Optional[int] = None   # Use shared_support_frac instead
+    idiosyncratic_support_size: Optional[int] = None  # Computed from dev_sparsity - shared
     
     # A6: Transfer operator + nontransfer
-    transfer_rank: int = 1                # rank(M*)
+    transfer_rank: int = 2                # rank(M*) - SHOULD BE <= dev_sparsity for identifiability
     transfer_strength: float = 1.0        # Scales M*
     transfer_structure: str = "low_rank"  # "low_rank", "rhoI", "diag", "diag_plus_low_rank"
     nontransfer_scale_source: float = 0.05  # Small for sources
@@ -92,17 +111,92 @@ class SyntheticRCTGenerator:
         - beta_{1,c} = M* beta_{0,c} + nu_c (A6 cross-arm transfer)
         - r_{a,c}(x) optional misspecification
     
+    ADVISOR FIX #1: dev_sparsity is THE governing constraint for |β_{0,c}|_0
+    ADVISOR FIX #2: Reports rank(B0) and warns if Step B may be ill-posed
+    
     Outcomes:
         Y = mu_{0,c}(X) + A * tau_c(X) + eps
         where tau_c(X) = mu_{1,c}(X) - mu_{0,c}(X)
     """
     
     def __init__(self, config: SyntheticRCTConfig = None):
+        import warnings
+        
         self.config = config or SyntheticRCTConfig()
         self.rng = np.random.default_rng(self.config.random_state)
         
         p = self.config.n_features
         r = min(self.config.transfer_rank, p)
+        
+        # ═════════════════════════════════════════════════════════════════
+        # ADVISOR FINAL FIX #1: Strict sparsity allocation from dev_sparsity
+        # dev_sparsity is THE governing constraint - legacy fields ignored
+        # ═════════════════════════════════════════════════════════════════
+        s_total = self.config.dev_sparsity
+        
+        # Handle legacy config: IGNORE legacy fields, always use dev_sparsity
+        # (Previous soft-override caused confusion; clean policy is clearer)
+        if self.config.shared_support_size is not None:
+            warnings.warn(
+                f"DEPRECATED: shared_support_size is ignored. Use dev_sparsity={s_total} "
+                f"and shared_support_frac={self.config.shared_support_frac} instead. "
+                f"idiosyncratic_support_size is also ignored."
+            )
+        
+        # Compute requested allocation from dev_sparsity
+        s_shared_requested = max(1, int(s_total * self.config.shared_support_frac))
+        s_idio_requested = s_total - s_shared_requested
+        
+        # ═════════════════════════════════════════════════════════════════
+        # ADVISOR FINAL FIX #2: Reconcile with available_support
+        # Ensure realized sparsity = dev_sparsity when feasible
+        # ═════════════════════════════════════════════════════════════════
+        available_support = (list(range(self.config.restrict_deviation_to_first_k))
+                            if self.config.restrict_deviation_to_first_k is not None
+                            else list(range(p)))
+        n_available = len(available_support)
+        
+        # Clamp to available features
+        if s_total > n_available:
+            warnings.warn(
+                f"dev_sparsity ({s_total}) > available features ({n_available}). "
+                f"Clamping to {n_available}."
+            )
+            s_total = n_available
+        
+        # Sample shared support first
+        s_shared_actual = min(s_shared_requested, n_available)
+        self.shared_support = self.rng.choice(
+            available_support,
+            size=s_shared_actual,
+            replace=False
+        )
+        
+        # Remaining features for idiosyncratic support
+        remaining_support = list(set(available_support) - set(self.shared_support))
+        s_idio_actual = min(s_total - s_shared_actual, len(remaining_support))
+        
+        # Store REALIZED sizes (what we actually use)
+        self.s_shared_ = s_shared_actual
+        self.s_idio_ = s_idio_actual
+        self.s_total_realized_ = s_shared_actual + s_idio_actual
+        
+        # Warn if we couldn't achieve requested sparsity
+        if self.s_total_realized_ < self.config.dev_sparsity:
+            warnings.warn(
+                f"Realized sparsity ({self.s_total_realized_}) < requested dev_sparsity ({self.config.dev_sparsity}) "
+                f"due to limited available_support ({n_available}). "
+                f"Increase restrict_deviation_to_first_k or n_features."
+            )
+        
+        # ═════════════════════════════════════════════════════════════════
+        # Identifiability check (pre-construction warning)
+        # ═════════════════════════════════════════════════════════════════
+        if self.s_total_realized_ < self.config.transfer_rank:
+            warnings.warn(
+                f"Step B identifiability warning: realized sparsity ({self.s_total_realized_}) < transfer_rank ({self.config.transfer_rank}). "
+                f"M* may not be learnable beyond a subspace of dimension {self.s_total_realized_}."
+            )
         
         # ═════════════════════════════════════════════════════════════════
         # Proxy coefficients (shared across all sites)
@@ -124,19 +218,8 @@ class SyntheticRCTGenerator:
                 for a in [0, 1]:
                     self.misspec_w[(c, a)] = self.rng.normal(0, 1.0, size=p)
         
-        # ═════════════════════════════════════════════════════════════════
-        # Shared support structure (critical for Step B!)
-        # ═════════════════════════════════════════════════════════════════
-        available_support = (list(range(self.config.restrict_deviation_to_first_k))
-                            if self.config.restrict_deviation_to_first_k is not None
-                            else list(range(p)))
-        
-        # Global shared support
-        self.shared_support = self.rng.choice(
-            available_support,
-            size=min(self.config.shared_support_size, len(available_support)),
-            replace=False
-        )
+        # Store remaining_support for site-specific idiosyncratic sampling
+        self.remaining_support_ = remaining_support
         
         # ═════════════════════════════════════════════════════════════════
         # Transfer operator M* (A6 with controllable structure)
@@ -210,25 +293,26 @@ class SyntheticRCTGenerator:
                 self.site_noise_std[c] = self.config.noise_std
             
             # ─────────────────────────────────────────────────────────────
-            # Sparse placebo deviation beta_{0,c} with shared support
+            # ADVISOR FINAL FIX #2: Sparse placebo deviation β_{0,c}
+            # Uses pre-computed s_shared_ and s_idio_ (realized sizes)
             # ─────────────────────────────────────────────────────────────
             beta0_c = np.zeros(p)
             
-            # Shared support (always included)
+            # Shared support (always included, s_shared_ features)
             beta0_c[self.shared_support] = self.rng.normal(
                 0, self.config.dev_scale, size=len(self.shared_support)
             )
             
-            # Idiosyncratic support (site-specific)
-            if self.config.idiosyncratic_support_size > 0:
-                # Choose from available_support \ shared_support
-                remaining = list(set(available_support) - set(self.shared_support))
-                if len(remaining) > 0:
-                    idio_size = min(self.config.idiosyncratic_support_size, len(remaining))
-                    idio_support = self.rng.choice(remaining, size=idio_size, replace=False)
-                    beta0_c[idio_support] = self.rng.normal(
-                        0, self.config.dev_scale * 0.5, size=idio_size
-                    )
+            # Idiosyncratic support (site-specific extras from remaining_support_)
+            if self.s_idio_ > 0 and len(self.remaining_support_) > 0:
+                idio_size = min(self.s_idio_, len(self.remaining_support_))
+                idio_support = self.rng.choice(
+                    self.remaining_support_, size=idio_size, replace=False
+                )
+                # Slightly smaller magnitude for idiosyncratic
+                beta0_c[idio_support] = self.rng.normal(
+                    0, self.config.dev_scale * 0.5, size=idio_size
+                )
             
             # ─────────────────────────────────────────────────────────────
             # Nontransfer component nu_c
@@ -425,8 +509,11 @@ class SyntheticRCTGenerator:
         """
         Return diagnostic information about the DGP.
         
-        Useful for validating that Step B can recover M*.
-        Includes transfer quality metrics (SNR, cosine similarity).
+        ADVISOR FIX #2: Now includes Step B identifiability diagnostics:
+        - rank(B0): rank of stacked β_{0,c} matrix across sources
+        - identifiability_warning: True if rank(B0) < transfer_rank
+        
+        Also includes transfer quality metrics (SNR, cosine similarity).
         """
         diag = {
             'n_features': self.config.n_features,
@@ -439,9 +526,67 @@ class SyntheticRCTGenerator:
             'transfer_structure': self.config.transfer_structure,
             'shared_support': list(self.shared_support),
             'shared_support_size': len(self.shared_support),
+            # ADVISOR FINAL FIX: Report REALIZED sparsity allocation
+            'dev_sparsity_requested': self.config.dev_sparsity,
+            'dev_sparsity_realized': self.s_total_realized_,
+            's_shared': self.s_shared_,
+            's_idio': self.s_idio_,
         }
         
+        # ═════════════════════════════════════════════════════════════════
+        # ADVISOR FINAL FIX #3: Step B identifiability + conditioning
+        # ═════════════════════════════════════════════════════════════════
+        # Build B0 matrix from SOURCE sites only (not target)
+        B0_list = [self.beta0[c] for c in range(1, self.config.n_source_sites + 1)]
+        B0 = np.column_stack(B0_list) if B0_list else np.zeros((self.config.n_features, 1))
+        
+        rank_B0 = int(np.linalg.matrix_rank(B0))
+        diag['rank_B0'] = rank_B0
+        diag['B0_shape'] = B0.shape
+        
+        # ADVISOR FINAL FIX #3: Add singular value / condition number diagnostics
+        svals = np.linalg.svd(B0, compute_uv=False)
+        diag['B0_singular_values'] = svals.tolist()
+        diag['B0_singular_value_max'] = float(svals[0]) if len(svals) > 0 else 0.0
+        diag['B0_singular_value_min'] = float(svals[-1]) if len(svals) > 0 else 0.0
+        diag['B0_condition_number'] = float(svals[0] / (svals[-1] + 1e-12)) if len(svals) > 0 else float('inf')
+        
+        # Check identifiability
+        transfer_rank = self.config.transfer_rank
+        identifiable = rank_B0 >= transfer_rank
+        diag['stepB_identifiable'] = identifiable
+        
+        # Conditioning warning (even if rank is OK, bad conditioning can cause issues)
+        condition_threshold = 100.0  # Heuristic threshold
+        well_conditioned = diag['B0_condition_number'] < condition_threshold
+        diag['stepB_well_conditioned'] = well_conditioned
+        
+        if not identifiable:
+            diag['identifiability_warning'] = (
+                f"rank(B0)={rank_B0} < transfer_rank={transfer_rank}. "
+                f"M* is only learnable on a {rank_B0}-dimensional subspace. "
+                f"Consider increasing dev_sparsity or n_source_sites."
+            )
+        elif not well_conditioned:
+            diag['identifiability_warning'] = (
+                f"B0 is rank-sufficient but poorly conditioned (κ={diag['B0_condition_number']:.1f}). "
+                f"Step B may be numerically unstable. Consider increasing s_idio (more site variation)."
+            )
+        else:
+            diag['identifiability_warning'] = None
+        
+        # Also check dev_sparsity vs transfer_rank
+        if self.s_total_realized_ < transfer_rank:
+            diag['sparsity_vs_rank_warning'] = (
+                f"realized_sparsity={self.s_total_realized_} < transfer_rank={transfer_rank}. "
+                f"This limits the effective rank of B0."
+            )
+        else:
+            diag['sparsity_vs_rank_warning'] = None
+        
+        # ═════════════════════════════════════════════════════════════════
         # Per-site deviations and transfer quality
+        # ═════════════════════════════════════════════════════════════════
         for c in range(0, self.config.n_source_sites + 1):
             site_name = 'target' if c == 0 else f'source_{c}'
             beta0_c = self.beta0[c]
@@ -504,25 +649,34 @@ def generate_synthetic_rct(
     """
     Convenience wrapper for generating synthetic RCT data.
     
-    NEW: Default increased to 10 sites for Step B identifiability.
+    ADVISOR FIXES:
+    - Default 10 source sites for Step B identifiability
+    - dev_sparsity (default 3) controls |β_{0,c}|_0 directly
+    - transfer_rank (default 2) should be <= dev_sparsity
     
     Parameters
     ----------
-    n_source_sites : int (default 10, increased from 3)
+    n_source_sites : int (default 10)
+        Number of source sites. More sites help Step B identifiability.
     n_target : int
+        Target site sample size
     n_source_per_site : int
+        Samples per source site
     random_state : int
+        Random seed
     **config_kwargs : additional config overrides
-        - proxy_nonlinear_scale: float (default 0.5, makes Stage 1 nontrivial)
-        - shared_support_size: int (controls Step B difficulty)
+        - dev_sparsity: int (THE control for |β_{0,c}|_0, default 3)
+        - shared_support_frac: float (fraction of sparsity that's shared, default 0.67)
+        - transfer_rank: int (rank of M*, should be <= dev_sparsity, default 2)
         - transfer_structure: str ("low_rank", "rhoI", "diag", "diag_plus_low_rank")
         - nontransfer_scale_target: float (degradation knob)
+        - proxy_nonlinear_scale: float (default 0.5, makes Stage 1 nontrivial)
     
     Returns
     -------
     source_data : dict
     target_data : dict
-    generator : SyntheticRCTGenerator (for diagnostics)
+    generator : SyntheticRCTGenerator (for diagnostics including rank_B0)
     """
     config = SyntheticRCTConfig(
         n_source_sites=n_source_sites,

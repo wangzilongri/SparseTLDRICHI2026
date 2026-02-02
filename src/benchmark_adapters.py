@@ -269,6 +269,8 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
     Create method factory functions for benchmark runner.
     
     Each factory returns a fresh estimator instance when called.
+    All ablations now use the same PlaceboAnchoredDRLearner class with
+    different `variant` settings for consistency and reproducibility.
     
     Parameters
     ----------
@@ -281,17 +283,219 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
         method_name -> factory callable
     """
     from estimator_fixed import PlaceboAnchoredDRLearner
-    from ablations import ProxyOnlyBaseline, AnchorOnlyBaseline, NoTransferBaseline
     
+    # All methods use the same class with different variants
+    # This ensures consistent behavior and artifact persistence
     factories = {
-        'NoTransfer': lambda: NoTransferBaseline(random_state=seed),
-        'ProxyOnly': lambda: ProxyOnlyBaseline(random_state=seed),
-        'AnchorOnly': lambda: AnchorOnlyBaseline(random_state=seed),
-        'ProposedA': lambda: PlaceboAnchoredDRLearner(option='A', random_state=seed),
-        'ProposedB_LinearStepB': lambda: PlaceboAnchoredDRLearner(option='B', random_state=seed),
+        # No transfer: target-only, no source data used
+        'NoTransfer': lambda: PlaceboAnchoredDRLearner(
+            variant='no_transfer', 
+            random_state=seed
+        ),
+        
+        # Proxy only: source proxy models only, no anchoring (delta=0)
+        'ProxyOnly': lambda: PlaceboAnchoredDRLearner(
+            variant='proxy_only', 
+            random_state=seed
+        ),
+        
+        # Anchor only: proxy + placebo correction, no Step B transfer
+        'AnchorOnly': lambda: PlaceboAnchoredDRLearner(
+            variant='anchor_only', 
+            random_state=seed
+        ),
+        
+        # Anchor only A: proxy + both corrections from target, no Step B
+        # Fair comparison when target has both arms
+        'AnchorOnlyA': lambda: PlaceboAnchoredDRLearner(
+            variant='anchor_only_A', 
+            random_state=seed
+        ),
+        
+        # Proposed Option A: needs target treated data
+        'ProposedA': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A', 
+            random_state=seed
+        ),
+        
+        # Proposed Option B with linear Step B: the main method
+        'ProposedB_LinearStepB': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_B', 
+            random_state=seed
+        ),
+        
+        # Proposed Option B with ridge Stage-2 (for A5 dense correction)
+        'ProposedB_RidgeStage2': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_B', 
+            stage2_mode='ridge',
+            random_state=seed
+        ),
     }
     
     return factories
+
+
+def create_method_factory_single(method_name: str, seed: int = 42) -> Callable:
+    """
+    Create a factory for a single method by name.
+    
+    Parameters
+    ----------
+    method_name : str
+        Method name from METHOD_REGISTRY
+    seed : int
+        Random seed
+        
+    Returns
+    -------
+    factory : callable
+        Factory that returns an estimator instance
+    """
+    factories = create_method_factories(seed)
+    if method_name not in factories:
+        raise ValueError(f"Unknown method: {method_name}. Available: {list(factories.keys())}")
+    return factories[method_name]
+
+
+# =============================================================================
+# Efficient Multi-Method Runner (uses SharedComponents)
+# =============================================================================
+
+def run_methods_efficiently(
+    data: Dict[str, Any],
+    methods: list,
+    seed: int = 42,
+    verbose: bool = False
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Run multiple methods efficiently by sharing Stage 1 and Step B.
+    
+    This avoids refitting proxy models and transfer operator for each method,
+    providing significant speedup when running multiple ablations.
+    
+    FIX #9: Only fit shared components that are actually needed by the methods.
+    
+    Parameters
+    ----------
+    data : dict
+        Data dictionary from data_generator with keys:
+        X_source, A_source, Y_source, c_source, X_target, A_target, Y_target, etc.
+    methods : list of str
+        Method names to run
+    seed : int
+        Random seed
+    verbose : bool
+        Print progress
+        
+    Returns
+    -------
+    results : dict
+        method_name -> {
+            'tau_pred': array,
+            'estimator': fitted estimator,
+            'diagnostics': dict
+        }
+    """
+    from estimator_fixed import SharedComponents, PlaceboAnchoredDRLearner
+    
+    # Map method names to variants
+    method_to_variant = {
+        'NoTransfer': 'no_transfer',
+        'ProxyOnly': 'proxy_only',
+        'AnchorOnly': 'anchor_only',
+        'AnchorOnlyA': 'anchor_only_A',  # Added new variant
+        'ProposedA': 'proposed_A',
+        'ProposedB_LinearStepB': 'proposed_B',
+        'ProposedB_RidgeStage2': 'proposed_B',  # Same variant, different stage2_mode
+    }
+    
+    method_to_stage2_mode = {
+        'ProposedB_RidgeStage2': 'ridge',
+    }
+    
+    # Get variants for the methods we're running
+    variants = [method_to_variant.get(m, 'proposed_B') for m in methods if m in method_to_variant]
+    
+    # Determine what needs to be fit (FIX #2: only fit what's needed)
+    need_proxy = any(v in ['proxy_only', 'anchor_only', 'anchor_only_A', 'proposed_A', 'proposed_B'] for v in variants)
+    need_stepB = any(v == 'proposed_B' for v in variants)
+    
+    results = {}
+    X_eval = data.get('X_target_eval', data['X_target'])
+    
+    if need_proxy:
+        # Fit shared components once (only fit what's needed)
+        if verbose:
+            print(f"Fitting shared components (fit_proxy={need_proxy}, fit_stepB={need_stepB})...")
+        
+        shared = SharedComponents(random_state=seed, verbose=verbose)
+        shared.fit(
+            data['X_source'], data['A_source'], 
+            data['Y_source'], data['c_source'],
+            fit_proxy=need_proxy,
+            fit_stepB=need_stepB
+        )
+        
+        # Run each method using shared components
+        for method in methods:
+            variant = method_to_variant.get(method)
+            if variant is None:
+                warnings.warn(f"Unknown method {method}, skipping")
+                continue
+            
+            stage2_mode = method_to_stage2_mode.get(method, 'lasso')
+            
+            if verbose:
+                print(f"  Running {method} (variant={variant})...")
+            
+            est = PlaceboAnchoredDRLearner(
+                variant=variant,
+                stage2_mode=stage2_mode,
+                random_state=seed,
+                verbose=False
+            )
+            
+            # Use shared components
+            est.fit_with_shared(
+                shared,
+                data['X_target'], data['A_target'], data['Y_target'],
+                data.get('propensity_target')
+            )
+            
+            tau_pred = est.predict(X_eval)
+            
+            results[method] = {
+                'tau_pred': tau_pred,
+                'estimator': est,
+                'diagnostics': est.get_diagnostics()
+            }
+    else:
+        # No shared components needed (all no_transfer)
+        for method in methods:
+            variant = method_to_variant.get(method, 'no_transfer')
+            
+            est = PlaceboAnchoredDRLearner(
+                variant=variant,
+                random_state=seed,
+                verbose=False
+            )
+            
+            est.fit(
+                data['X_source'], data['A_source'], 
+                data['Y_source'], data['c_source'],
+                data['X_target'], data['A_target'], data['Y_target'],
+                data.get('propensity_target')
+            )
+            
+            tau_pred = est.predict(X_eval)
+            
+            results[method] = {
+                'tau_pred': tau_pred,
+                'estimator': est,
+                'diagnostics': est.get_diagnostics()
+            }
+    
+    return results
 
 
 # =============================================================================
