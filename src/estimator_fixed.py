@@ -258,7 +258,8 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
             else:  # default lasso
                 self.correction_model = Pipeline([
                     ("scaler", StandardScaler()),
-                    ("lasso", LassoCV(cv=5, fit_intercept=True, random_state=self.random_state, n_jobs=-1))
+                    ("lasso", LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
+                                      random_state=self.random_state, n_jobs=-1))
                 ])
         if self.cate_model is None:
             self.cate_model = RandomForestRegressor(
@@ -397,7 +398,7 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                 resid_p = Y_p - mu0_proxy
                 
                 # Fit LASSO on scaled X (no pipeline - we use global scaler)
-                lasso_0 = LassoCV(cv=5, fit_intercept=True, 
+                lasso_0 = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
                                   random_state=self.random_state, n_jobs=-1)
                 lasso_0.fit(X_p_scaled, resid_p)
                 beta_0_by_site[site] = lasso_0.coef_
@@ -414,7 +415,7 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                 resid_t = Y_t - mu1_proxy
                 
                 # Fit LASSO on scaled X
-                lasso_1 = LassoCV(cv=5, fit_intercept=True,
+                lasso_1 = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
                                   random_state=self.random_state, n_jobs=-1)
                 lasso_1.fit(X_t_scaled, resid_t)
                 beta_1_by_site[site] = lasso_1.coef_
@@ -722,7 +723,7 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         if use_global_scaler and self.global_scaler_ is not None:
             # Fit in global scaled space for M compatibility
             X_arm_scaled = self.global_scaler_.transform(X_arm)
-            lasso = LassoCV(cv=5, fit_intercept=True,
+            lasso = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
                            random_state=self.random_state, n_jobs=-1)
             lasso.fit(X_arm_scaled, resid)
             # FIX #4: Store alpha_ for diagnostics
@@ -869,7 +870,7 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                     
                     # Fit in GLOBAL scaled space
                     X_p_scaled = self.global_scaler_.transform(X_p)
-                    lasso = LassoCV(cv=5, fit_intercept=True,
+                    lasso = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
                                    random_state=self.random_state, n_jobs=-1)
                     lasso.fit(X_p_scaled, resid_p)
                     
@@ -1249,7 +1250,8 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
             else:
                 self.correction_model = Pipeline([
                     ("scaler", StandardScaler()),
-                    ("lasso", LassoCV(cv=5, fit_intercept=True, random_state=self.random_state, n_jobs=-1))
+                    ("lasso", LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
+                                      random_state=self.random_state, n_jobs=-1))
                 ])
         
         # Initialize diagnostics tracking
@@ -1468,7 +1470,7 @@ class SharedComponents:
                 mu0_proxy = self.proxy_models_[0].predict(X_p_unscaled)
                 resid_p = Y_p - mu0_proxy
                 
-                lasso_0 = LassoCV(cv=5, fit_intercept=True, 
+                lasso_0 = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
                                   random_state=self.random_state, n_jobs=-1)
                 lasso_0.fit(X_p_scaled, resid_p)
                 beta_0_by_site[site] = lasso_0.coef_
@@ -1483,7 +1485,7 @@ class SharedComponents:
                 mu1_proxy = self.proxy_models_[1].predict(X_t_unscaled)
                 resid_t = Y_t - mu1_proxy
                 
-                lasso_1 = LassoCV(cv=5, fit_intercept=True,
+                lasso_1 = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
                                   random_state=self.random_state, n_jobs=-1)
                 lasso_1.fit(X_t_scaled, resid_t)
                 beta_1_by_site[site] = lasso_1.coef_

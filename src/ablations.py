@@ -134,7 +134,7 @@ class AnchorOnlyBaseline(BaseEstimator, RegressorMixin):
                 n_estimators=100, max_depth=8, random_state=self.random_state
             )
         if self.correction_model is None:
-            self.correction_model = LassoCV(cv=5, random_state=self.random_state)
+            self.correction_model = LassoCV(cv=5, max_iter=10000, tol=1e-3, random_state=self.random_state)
         
         # Stage 1: Proxy models
         if self.verbose:
