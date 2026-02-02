@@ -34,7 +34,9 @@ class SyntheticRCTConfig:
     n_source_sites: int = 10     # INCREASED for Step B identifiability
     n_target: int = 200
     n_source_per_site: int = 500
-    treatment_prob: float = 0.5
+    treatment_prob: float = 0.5              # Default for all sites
+    treatment_prob_source: Optional[float] = None  # Override for source sites
+    treatment_prob_target: Optional[float] = None  # Override for target site (overlap stress)
     noise_std: float = 0.5
     
     # Covariate shift
@@ -351,8 +353,14 @@ class SyntheticRCTGenerator:
             # Override for disconnected target
             A = self.rng.binomial(1, self.config.target_treated_frac, size=n_samples)
         else:
-            # Standard RCT
-            A = self.rng.binomial(1, self.config.treatment_prob, size=n_samples)
+            # Standard RCT with site-specific propensities
+            if site_id == 0:
+                # Target site
+                e = self.config.treatment_prob_target or self.config.treatment_prob
+            else:
+                # Source sites
+                e = self.config.treatment_prob_source or self.config.treatment_prob
+            A = self.rng.binomial(1, e, size=n_samples)
         
         # ═════════════════════════════════════════════════════════════════
         # Potential outcomes

@@ -111,6 +111,13 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         else:
             propensity_target = np.asarray(propensity_target).ravel()
         
+        # Validate propensity (issue 4.1)
+        if propensity_target.shape[0] != n_target:
+            raise ValueError(f"propensity_target has shape {propensity_target.shape}, "
+                           f"expected ({n_target},)")
+        if np.any(propensity_target <= 0) or np.any(propensity_target >= 1):
+            warnings.warn("propensity_target contains values outside (0,1); will be clipped")
+        
         # Initialize models
         if self.proxy_model is None:
             self.proxy_model = RandomForestRegressor(
@@ -178,83 +185,187 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         """
         Option B Step B: Learn cross-arm transfer operator M from sources.
         
-        For each source site c:
-        1. Fit corrections β₀,c and β₁,c
-        2. Stack into matrices B₀ = [β₀,₁ ... β₀,C], B₁ = [β₁,₁ ... β₁,C]
-        3. Learn M via ridge regression: β₁,c ≈ M·β₀,c
+        Mathematical model (aligned with DGP A6):
+            β_{1,c} ≈ M* @ β_{0,c} + ν_c
+        
+        Algorithm:
+        1. Fit GLOBAL scaler on all source X (shared coordinate system)
+        2. For each source site c with BOTH arms:
+           - Fit β_{0,c} on scaled placebo residuals
+           - Fit β_{1,c} on scaled treated residuals
+        3. Stack ALIGNED matrices: B₀ = [β₀,c₁ ... β₀,cK], B₁ = [β₁,c₁ ... β₁,cK]
+        4. Matrix ridge: M̂ = B₁ B₀ᵀ (B₀ B₀ᵀ + λI)⁻¹
+        
+        CRITICAL FIXES (advisor feedback):
+        - FIX #1: Align β₀ and β₁ by site - only use sites with BOTH arms
+        - FIX #2: Use GLOBAL scaler so coefficients are comparable across sites
+        - FIX #3: Matrix ridge regression (not per-row) for stability
         """
         sites = np.unique(c_source)
         sites = sites[sites > 0]  # Exclude target (c=0)
+        p = self.n_features_
         
         if len(sites) < 2:
             warnings.warn("Less than 2 source sites; using M=I fallback")
-            self.M_hat_ = np.eye(self.n_features_)
+            self.M_hat_ = np.eye(p)
+            self.global_scaler_ = None
+            self.transfer_diagnostics_ = {'n_sites_used': 0, 'fallback': True}
             return
         
-        beta_0_list = []
-        beta_1_list = []
+        # ═══════════════════════════════════════════════════════════════════
+        # FIX #2: Fit GLOBAL scaler on all source X (shared coordinate system)
+        # ═══════════════════════════════════════════════════════════════════
+        self.global_scaler_ = StandardScaler()
+        self.global_scaler_.fit(X_source)
+        X_source_scaled = self.global_scaler_.transform(X_source)
         
-        for c in sites:
-            mask_site = (c_source == c)
-            X_c = X_source[mask_site]
+        # ═══════════════════════════════════════════════════════════════════
+        # FIX #1: Build dictionaries keyed by site, then intersect
+        # ═══════════════════════════════════════════════════════════════════
+        beta_0_by_site = {}
+        beta_1_by_site = {}
+        
+        min_samples_per_arm = 10  # Minimum for stable LASSO
+        
+        for site in sites:
+            mask_site = (c_source == site)
+            X_c_scaled = X_source_scaled[mask_site]  # Use globally scaled X
+            X_c_unscaled = X_source[mask_site]  # For proxy predictions
             A_c = A_source[mask_site]
             Y_c = Y_source[mask_site]
             
-            # Fit corrections for this site
-            for a, beta_list in [(0, beta_0_list), (1, beta_1_list)]:
-                mask_arm = (A_c == a)
-                if np.sum(mask_arm) < 10:
-                    continue
+            # Try to fit β_{0,c} (placebo correction)
+            mask_placebo = (A_c == 0)
+            if np.sum(mask_placebo) >= min_samples_per_arm:
+                X_p_scaled = X_c_scaled[mask_placebo]
+                X_p_unscaled = X_c_unscaled[mask_placebo]
+                Y_p = Y_c[mask_placebo]
                 
-                X_a = X_c[mask_arm]
-                Y_a = Y_c[mask_arm]
+                # Residualize against proxy (proxy was fit on unscaled X)
+                mu0_proxy = self.proxy_models_[0].predict(X_p_unscaled)
+                resid_p = Y_p - mu0_proxy
+                
+                # Fit LASSO on scaled X (no pipeline - we use global scaler)
+                lasso_0 = LassoCV(cv=5, fit_intercept=True, 
+                                  random_state=self.random_state, n_jobs=-1)
+                lasso_0.fit(X_p_scaled, resid_p)
+                beta_0_by_site[site] = lasso_0.coef_
+            
+            # Try to fit β_{1,c} (treated correction)
+            mask_treated = (A_c == 1)
+            if np.sum(mask_treated) >= min_samples_per_arm:
+                X_t_scaled = X_c_scaled[mask_treated]
+                X_t_unscaled = X_c_unscaled[mask_treated]
+                Y_t = Y_c[mask_treated]
                 
                 # Residualize against proxy
-                mu_proxy = self.proxy_models_[a].predict(X_a)
-                resid = Y_a - mu_proxy
+                mu1_proxy = self.proxy_models_[1].predict(X_t_unscaled)
+                resid_t = Y_t - mu1_proxy
                 
-                # Fit correction
-                correction = clone(self.correction_model)
-                correction.fit(X_a, resid)
-                
-                # Extract coefficients (handle pipeline)
-                if hasattr(correction, 'named_steps'):
-                    beta = correction.named_steps['lasso'].coef_
-                else:
-                    beta = correction.coef_
-                
-                beta_list.append(beta)
+                # Fit LASSO on scaled X
+                lasso_1 = LassoCV(cv=5, fit_intercept=True,
+                                  random_state=self.random_state, n_jobs=-1)
+                lasso_1.fit(X_t_scaled, resid_t)
+                beta_1_by_site[site] = lasso_1.coef_
         
-        if len(beta_0_list) < 2 or len(beta_1_list) < 2:
-            warnings.warn("Insufficient sites for M estimation; using M=I")
-            self.M_hat_ = np.eye(self.n_features_)
+        # ═══════════════════════════════════════════════════════════════════
+        # Intersection: only sites with BOTH arms (critical alignment!)
+        # ═══════════════════════════════════════════════════════════════════
+        common_sites = sorted(set(beta_0_by_site.keys()) & set(beta_1_by_site.keys()))
+        
+        if len(common_sites) < 2:
+            warnings.warn(f"Only {len(common_sites)} sites with both arms; using M=I")
+            self.M_hat_ = np.eye(p)
+            self.transfer_diagnostics_ = {'n_sites_used': len(common_sites), 'fallback': True}
             return
         
-        # Stack into matrices
-        B_0 = np.column_stack(beta_0_list)  # p × C
-        B_1 = np.column_stack(beta_1_list)  # p × C
+        # Stack in SAME ORDER (critical for alignment!)
+        B_0 = np.column_stack([beta_0_by_site[c] for c in common_sites])  # p × C
+        B_1 = np.column_stack([beta_1_by_site[c] for c in common_sites])  # p × C
+        C = len(common_sites)
         
-        # Learn M via ridge regression in coefficient space
-        # For each feature dimension, regress β₁[j,:] on β₀[j,:]
-        M_hat = np.zeros((self.n_features_, self.n_features_))
+        if self.verbose:
+            print(f"  Step B: Using {C} source sites with both arms")
+            print(f"  B_0 shape: {B_0.shape}, B_1 shape: {B_1.shape}")
         
-        for j in range(self.n_features_):
-            # Ridge regression for jth row of M
-            ridge = RidgeCV(alphas=np.logspace(-3, 3, 20))
-            ridge.fit(B_0.T, B_1[j, :])  # Fit: β₁[j,:] ~ M[j,:]·B₀
-            M_hat[j, :] = ridge.coef_
+        # ═══════════════════════════════════════════════════════════════════
+        # FIX #3: Matrix ridge regression (not per-row)
+        # M̂ = B₁ B₀ᵀ (B₀ B₀ᵀ + λI)⁻¹
+        # ═══════════════════════════════════════════════════════════════════
+        
+        # Choose λ via leave-one-site-out CV
+        sigma_scale = np.linalg.norm(B_0, 'fro') / np.sqrt(C * p) + 1e-6
+        lambda_candidates = sigma_scale * np.array([0.01, 0.1, 1.0, 10.0, 100.0])
+        
+        best_lambda = lambda_candidates[2]  # Default middle value
+        best_error = np.inf
+        
+        # Leave-one-site-out CV for λ selection (only if enough sites)
+        if C >= 4:
+            for lam in lambda_candidates:
+                cv_error = 0.0
+                for held_out_site in common_sites:
+                    # Leave site out
+                    train_sites = [s for s in common_sites if s != held_out_site]
+                    B0_train = np.column_stack([beta_0_by_site[s] for s in train_sites])
+                    B1_train = np.column_stack([beta_1_by_site[s] for s in train_sites])
+                    
+                    # Fit M on training sites
+                    G = B0_train @ B0_train.T
+                    try:
+                        M_cv = (B1_train @ B0_train.T) @ np.linalg.inv(G + lam * np.eye(p))
+                    except np.linalg.LinAlgError:
+                        continue
+                    
+                    # Predict on held-out site
+                    beta0_test = beta_0_by_site[held_out_site]
+                    beta1_test = beta_1_by_site[held_out_site]
+                    beta1_pred = M_cv @ beta0_test
+                    cv_error += np.sum((beta1_test - beta1_pred)**2)
+                
+                if cv_error < best_error:
+                    best_error = cv_error
+                    best_lambda = lam
+        
+        # Final fit with selected λ
+        G = B_0 @ B_0.T  # p × p
+        try:
+            M_hat = (B_1 @ B_0.T) @ np.linalg.inv(G + best_lambda * np.eye(p))
+        except np.linalg.LinAlgError:
+            warnings.warn("Matrix inversion failed in Step B; using M=I")
+            self.M_hat_ = np.eye(p)
+            self.transfer_diagnostics_ = {'n_sites_used': C, 'fallback': True}
+            return
         
         self.M_hat_ = M_hat
         
+        # Compute diagnostics
+        svd_vals = np.linalg.svd(M_hat, compute_uv=False)
+        self.transfer_diagnostics_ = {
+            'n_sites_used': C,
+            'sites_used': common_sites,
+            'lambda_selected': best_lambda,
+            'M_fro_norm': np.linalg.norm(M_hat, 'fro'),
+            'M_spectral_norm': np.linalg.norm(M_hat, 2),
+            'M_effective_rank': np.sum(svd_vals > 1e-6 * svd_vals[0]),
+            'M_condition_number': svd_vals[0] / (svd_vals[-1] + 1e-10),
+            'fallback': False
+        }
+        
         if self.verbose:
-            print(f"  Learned M from {len(sites)} source sites")
-            print(f"  ||M||_F = {np.linalg.norm(M_hat, 'fro'):.3f}")
+            print(f"  λ selected: {best_lambda:.4f}")
+            print(f"  ||M||_F = {self.transfer_diagnostics_['M_fro_norm']:.3f}")
+            print(f"  ||M||_2 = {self.transfer_diagnostics_['M_spectral_norm']:.3f}")
+            print(f"  Effective rank(M) = {self.transfer_diagnostics_['M_effective_rank']}")
     
     def _fit_target_dr(self, X_target, A_target, Y_target, propensity_target):
         """
         Stage 2-3: Target corrections + DR with leak-proof cross-fitting.
         
         Key: Every nuisance estimate used for observation i is trained WITHOUT i.
+        
+        For Option B: Target corrections MUST use the same global scaler as Step B
+        to ensure coefficients are in the same coordinate system.
         """
         n_target = len(X_target)
         
@@ -267,6 +378,11 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         
         pseudo_outcomes = np.zeros(n_target)
         self.fold_corrections_ = []  # For diagnostics
+        
+        # For Option B, check if we have the global scaler from Step B
+        use_global_scaler = (self.option == 'B' and 
+                            hasattr(self, 'global_scaler_') and 
+                            self.global_scaler_ is not None)
         
         for fold_idx, (train_idx, val_idx) in enumerate(skf.split(X_target, A_target)):
             # Training data for this fold
@@ -294,8 +410,27 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                 mu0_p = self.proxy_models_[0].predict(X_p)
                 resid_p = Y_p - mu0_p
                 
-                delta_0_fold = clone(self.correction_model)
-                delta_0_fold.fit(X_p, resid_p)
+                if use_global_scaler:
+                    # OPTION B: Fit in global scaled space for M compatibility
+                    X_p_scaled = self.global_scaler_.transform(X_p)
+                    lasso = LassoCV(cv=5, fit_intercept=True,
+                                   random_state=self.random_state, n_jobs=-1)
+                    lasso.fit(X_p_scaled, resid_p)
+                    
+                    # Wrap in predictor that uses global scaler
+                    class _ScaledDelta:
+                        def __init__(self, coef, scaler):
+                            self.coef_ = coef
+                            self.scaler = scaler
+                            self.intercept_ = 0.0
+                        def predict(self, X):
+                            return self.scaler.transform(X) @ self.coef_
+                    
+                    delta_0_fold = _ScaledDelta(lasso.coef_, self.global_scaler_)
+                else:
+                    # OPTION A: Use pipeline with local scaler
+                    delta_0_fold = clone(self.correction_model)
+                    delta_0_fold.fit(X_p, resid_p)
             else:
                 # FIXED: Zero fallback (no leakage!)
                 delta_0_fold = _ZeroDelta(self.n_features_)
@@ -368,21 +503,30 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         """
         Apply learned operator M to placebo correction.
         
+        Mathematical operation:
+            β₁ = M̂ @ β₀
+        
+        IMPORTANT: β₀ must be in the GLOBAL scaled coordinate system.
+        The returned predictor also operates in that system.
+        
         Returns a predictor with .predict(X) method.
         """
         if isinstance(delta_0_fold, _ZeroDelta):
             return _ZeroDelta(self.n_features_)
         
-        # Extract β₀ coefficients
-        if hasattr(delta_0_fold, 'named_steps'):
-            beta_0 = delta_0_fold.named_steps['lasso'].coef_
-        else:
+        # Extract β₀ coefficients (should already be in global scaled space)
+        if hasattr(delta_0_fold, 'coef_'):
             beta_0 = delta_0_fold.coef_
+        else:
+            beta_0 = np.zeros(self.n_features_)
         
-        # Apply operator: β₁ = M·β₀
+        # Apply operator: β₁ = M @ β₀
         beta_1 = self.M_hat_ @ beta_0
         
-        # Create predictor
+        # Get the scaler used during Step B (or during target correction fitting)
+        scaler = getattr(self, 'global_scaler_', None)
+        
+        # Create predictor that uses the same scaler
         class _TransferredDelta:
             def __init__(self, beta, scaler=None):
                 self.coef_ = beta
