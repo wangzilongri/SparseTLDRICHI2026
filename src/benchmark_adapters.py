@@ -33,6 +33,13 @@ def create_data_generator() -> Callable:
     """
     from synthetic_data_v2 import SyntheticRCTConfig, SyntheticRCTGenerator
     
+    # Import fair DGP (optional, may not exist)
+    try:
+        from synthetic_data_v2_fair import FairSyntheticRCTConfig, FairSyntheticRCTGenerator
+        FAIR_DGP_AVAILABLE = True
+    except ImportError:
+        FAIR_DGP_AVAILABLE = False
+    
     def data_generator(scenario: Scenario, seed: int) -> Dict[str, Any]:
         """
         Generate synthetic data based on scenario configuration.
@@ -104,11 +111,30 @@ def create_data_generator() -> Callable:
         if scenario.p_dim is not None:
             config_kwargs['n_features'] = scenario.p_dim
         
-        # Create config
-        config = SyntheticRCTConfig(**config_kwargs)
+        # Fair DGP knobs (for OptionB evaluation)
+        if scenario.overlap_lambda is not None:
+            config_kwargs['overlap_lambda'] = scenario.overlap_lambda
+        if scenario.intercept_drift_scale is not None:
+            config_kwargs['intercept_drift_scale'] = scenario.intercept_drift_scale
+        if scenario.nu_support_overlap is not None:
+            config_kwargs['nu_support_overlap'] = scenario.nu_support_overlap
+        if scenario.nu_coefficient_corr is not None:
+            config_kwargs['nu_coefficient_corr'] = scenario.nu_coefficient_corr
         
-        # Generate data
-        generator = SyntheticRCTGenerator(config)
+        # Choose DGP: fair or standard
+        use_fair = scenario.use_fair_dgp or any([
+            scenario.overlap_lambda is not None,
+            scenario.intercept_drift_scale is not None,
+            scenario.nu_support_overlap is not None,
+            scenario.nu_coefficient_corr is not None,
+        ])
+        
+        if use_fair and FAIR_DGP_AVAILABLE:
+            config = FairSyntheticRCTConfig(**config_kwargs)
+            generator = FairSyntheticRCTGenerator(config)
+        else:
+            config = SyntheticRCTConfig(**config_kwargs)
+            generator = SyntheticRCTGenerator(config)
         source_data, target_data = generator.generate_full_dataset()
         
         # Generate larger evaluation set for target (held out)

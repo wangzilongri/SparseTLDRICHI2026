@@ -82,6 +82,13 @@ class Scenario:
     a6_nonlin_rho: Optional[float] = None       # Mixing param for nonlinear transfer
     nontransfer_scale: Optional[float] = None   # Scale of non-transferable component
     
+    # Fair DGP knobs (for OptionB evaluation)
+    use_fair_dgp: Optional[bool] = None         # If True, use FairSyntheticRCTGenerator
+    overlap_lambda: Optional[float] = None      # Covariate overlap (0=same as source, 1=shifted)
+    intercept_drift_scale: Optional[float] = None  # Arm intercept variance σ_α
+    nu_support_overlap: Optional[float] = None  # Nontransfer support overlap with β₀
+    nu_coefficient_corr: Optional[float] = None # Correlation between ν and β₀
+    
     # Network knobs
     K_treatments: Optional[int] = None          # Number of treatments
     graph_type: Optional[str] = None            # GraphType value

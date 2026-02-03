@@ -399,6 +399,211 @@ Same multi-site RCT setting, but with unequal site sizes.
 - At ratio = 20.0: Extreme imbalance (~30 smallest, ~600 largest)
 """
     },
+    
+    # =========================================================================
+    # FAIR SWEEPS: For OptionB (ProposedB_SourceDR) evaluation
+    # =========================================================================
+    'gold_fair': {
+        'benchmark_id': 'gold_fair_sweep',
+        'description': 'Fair OptionB evaluation: m₀ × m₁ grid with controlled DGP',
+        'base_scenario': {
+            'n_proxy_total': 20000,
+            'C_sources': 10,
+            'nontransfer_scale': 0.1,  # SNR ≈ 3-4 (fair, not adversarial)
+            'use_fair_dgp': True,
+            'overlap_lambda': 0.25,    # AUC ≈ 0.7-0.8 (moderate overlap)
+            'intercept_drift_scale': 0.5,  # Controlled drift
+        },
+        'sweep_type': 'grid_2d',
+        'sweep_param': 'm0',
+        'sweep_param_2': 'm1',
+        'sweep_values': [100, 500, 1000],
+        'm1_values': [0, 100, 500, 1000],
+        'methods': DEFAULT_METHODS_OPTION_A,
+        
+        'motivation': """
+**Research Question:** How does OptionB (ProposedB_SourceDR) perform when its assumptions are *approximately satisfied*?
+
+**Why This Matters:**
+- Previous sweeps used adversarial DGP settings (SNR < 1, AUC = 1.0, high drift)
+- This led to "catastrophic failure" for OptionB that was structurally guaranteed
+- This sweep uses **fair settings** where OptionB assumptions hold:
+  - SNR ≥ 2 (cross-arm transfer signal present)
+  - Overlap AUC ~ 0.75 (moderate, not degenerate)
+  - Intercept drift controlled (σ_α = 0.5)
+
+**Expected Behavior:**
+- **ProposedB_SourceDR** should show moderate performance (not catastrophic failure)
+- At m₁ = 0, ProposedB_SourceDR is the only Proposed variant that works
+- As m₁ increases, ProposedA should outperform ProposedB variants
+- The gap between ProposedA and ProposedB_SourceDR reflects the value of target treated data
+""",
+        'dgp_description': """
+**Fair DGP for OptionB Evaluation:**
+
+Uses `FairSyntheticRCTConfig` with advisor-recommended settings:
+
+**Cross-arm Transfer (A6):**
+- `nontransfer_scale_target = 0.1` → SNR ≈ 3-4
+- This means: ‖M*β₀‖ >> ‖ν‖ (transfer signal dominates)
+
+**Covariate Overlap:**
+- `overlap_lambda = 0.25` → AUC ≈ 0.75
+- This means: Source models can generalize to target (not pure extrapolation)
+
+**Intercept Drift:**
+- `intercept_drift_scale = 0.5` → σ_α = 0.5
+- This means: Arm means are stable across replications
+
+**Outcome Model:**
+$$\\mu_{a,c}(x) = \\alpha_{a,c} + x^\\top b_a + x^\\top \\beta_{a,c} + \\text{nonlin}(x)$$
+
+where $\\beta_{1,c} = M^* \\beta_{0,c} + \\nu_c$ with small $\\nu_c$.
+"""
+    },
+    
+    'snr_ladder': {
+        'benchmark_id': 'snr_ladder_sweep',
+        'description': 'Cross-arm validity sweep: varying nontransfer strength (SNR)',
+        'base_scenario': {
+            'n_proxy_total': 10000,
+            'C_sources': 10,
+            'm0': 500,
+            'm1': 0,  # Disconnected target for OptionB
+            'use_fair_dgp': True,
+            'overlap_lambda': 0.25,  # Fixed moderate overlap
+            'intercept_drift_scale': 0.5,  # Fixed low drift
+        },
+        'sweep_param': 'nontransfer_scale',
+        'sweep_values': [0.0, 0.05, 0.1, 0.2, 0.3, 0.4],  # SNR: ∞ → 6 → 3 → 1.5 → 1 → 0.8
+        'methods': DEFAULT_METHODS_OPTION_B,
+        
+        'motivation': """
+**Research Question:** Where does ProposedB_SourceDR break down as cross-arm transfer weakens?
+
+**Why This Matters:**
+- OptionB relies on β₁ ≈ M*β₀ (cross-arm structure)
+- As nontransfer component ν grows, SNR = ‖M*β₀‖/‖ν‖ decreases
+- This sweep identifies the **SNR threshold** below which OptionB fails
+
+**Expected Behavior:**
+- SNR ≥ 2: OptionB performs reasonably
+- SNR ≈ 1: Boundary - significant degradation
+- SNR < 1: Assumption violated - expected failure
+
+**Fairness Note:** Other factors (overlap, drift) are held at fair values.
+""",
+        'dgp_description': """
+**Swept Parameter:** `nontransfer_scale_target`
+
+| Value | Approx SNR | Expected |
+|-------|------------|----------|
+| 0.00 | ∞ | Best (perfect transfer) |
+| 0.05 | ~6 | Good |
+| 0.10 | ~3 | Moderate |
+| 0.20 | ~1.5 | Degraded |
+| 0.30 | ~1 | Boundary |
+| 0.40 | ~0.8 | Failed (assumption violated) |
+
+**Fixed Parameters:**
+- overlap_lambda = 0.25 (moderate overlap)
+- intercept_drift_scale = 0.5 (controlled drift)
+"""
+    },
+    
+    'overlap_ladder': {
+        'benchmark_id': 'overlap_ladder_sweep',
+        'description': 'Overlap stress sweep: varying covariate shift',
+        'base_scenario': {
+            'n_proxy_total': 10000,
+            'C_sources': 10,
+            'm0': 500,
+            'm1': 0,
+            'use_fair_dgp': True,
+            'nontransfer_scale': 0.0,  # Perfect transfer
+            'intercept_drift_scale': 0.5,  # Fixed low drift
+        },
+        'sweep_param': 'overlap_lambda',
+        'sweep_values': [0.0, 0.25, 0.5, 0.75, 1.0],  # AUC: 0.5 → 0.75 → 0.9 → 0.95 → 1.0
+        'methods': DEFAULT_METHODS_OPTION_B,
+        
+        'motivation': """
+**Research Question:** How does OptionB degrade as source/target covariate distributions diverge?
+
+**Why This Matters:**
+- OptionB trains on source pseudo-outcomes and predicts on target X
+- If source and target X have no overlap, this is pure extrapolation
+- This sweep identifies the **overlap threshold** for generalization
+
+**Expected Behavior:**
+- AUC < 0.8: Reasonable generalization
+- AUC ≈ 0.9: Degraded performance
+- AUC > 0.95: Extrapolation failure (assumption violated)
+""",
+        'dgp_description': """
+**Swept Parameter:** `overlap_lambda`
+
+| Value | Approx AUC | Expected |
+|-------|------------|----------|
+| 0.00 | ~0.55 | Best (same distribution) |
+| 0.25 | ~0.75 | Good (realistic) |
+| 0.50 | ~0.90 | Degraded |
+| 0.75 | ~0.95 | Severe degradation |
+| 1.00 | ~1.00 | Failed (no overlap) |
+
+**Fixed Parameters:**
+- nontransfer_scale = 0.0 (perfect cross-arm transfer)
+- intercept_drift_scale = 0.5 (controlled drift)
+"""
+    },
+    
+    'drift_ladder': {
+        'benchmark_id': 'drift_ladder_sweep',
+        'description': 'Intercept drift stress sweep: varying arm baseline variance',
+        'base_scenario': {
+            'n_proxy_total': 10000,
+            'C_sources': 10,
+            'm0': 500,
+            'm1': 0,
+            'use_fair_dgp': True,
+            'nontransfer_scale': 0.0,  # Perfect transfer
+            'overlap_lambda': 0.25,  # Fixed moderate overlap
+        },
+        'sweep_param': 'intercept_drift_scale',
+        'sweep_values': [0.0, 0.5, 1.0, 2.0, 4.0],
+        'methods': DEFAULT_METHODS_OPTION_B,
+        
+        'motivation': """
+**Research Question:** How robust is OptionB to arm-specific intercept drift?
+
+**Why This Matters:**
+- OptionB cannot correct target-specific arm intercepts (no target treated data)
+- If α₀,t and α₁,t vary wildly across replications, calibration intercept SD explodes
+- This sweep identifies the **drift threshold** for calibration
+
+**Expected Behavior:**
+- σ_α ≤ 1: Calibration reasonable
+- σ_α = 2: Calibration intercept SD high
+- σ_α > 2: Calibration failure
+""",
+        'dgp_description': """
+**Swept Parameter:** `intercept_drift_scale` (σ_α)
+
+Arm intercepts: α_{a,c} ~ N(0, σ_α²)
+
+| Value | Expected |
+|-------|----------|
+| 0.0 | Best (no drift) |
+| 0.5 | Good (controlled) |
+| 1.0 | Moderate degradation |
+| 2.0 | High calibration variance |
+| 4.0 | Severe calibration failure |
+
+**Fixed Parameters:**
+- nontransfer_scale = 0.0 (perfect cross-arm transfer)
+- overlap_lambda = 0.25 (moderate overlap)
+"""
+    },
 }
 
 
@@ -421,6 +626,9 @@ def _create_nan_result(benchmark_id, scenario, rep, method_name, feasibility, se
         'n_proxy_total': scenario.n_proxy_total,
         'C_sources': scenario.C_sources,
         'nontransfer_scale': scenario.nontransfer_scale,
+        # Fair DGP params
+        'overlap_lambda': getattr(scenario, 'overlap_lambda', None),
+        'intercept_drift_scale': getattr(scenario, 'intercept_drift_scale', None),
         # Point estimation
         'pehe': np.nan, 'ate_hat': np.nan, 'ate_abs_err': np.nan, 'ate_bias': np.nan,
         # Ranking
@@ -1603,8 +1811,10 @@ Examples:
         """
     )
     parser.add_argument('--sweep', type=str, default='all',
-                       choices=['gold', 'gold_option_a', 'proxy', 'imbalance', 'all'],
-                       help='Sweep to run (default: all)')
+                       choices=['gold', 'gold_option_a', 'proxy', 'imbalance', 
+                                'gold_fair', 'snr_ladder', 'overlap_ladder', 'drift_ladder',
+                                'all', 'all_fair'],
+                       help='Sweep to run (default: all). Fair sweeps: gold_fair, snr_ladder, overlap_ladder, drift_ladder')
     parser.add_argument('--n_rep', type=int, default=20,
                        help='Number of MC replicates (default: 20)')
     parser.add_argument('--seed', type=int, default=42,
@@ -1651,6 +1861,25 @@ Examples:
             parallel_sweeps=args.parallel_sweeps,
             verbose=not args.quiet
         )
+    elif args.sweep == 'all_fair':
+        # Run all fair sweeps
+        fair_sweeps = ['gold_fair', 'snr_ladder', 'overlap_ladder', 'drift_ladder']
+        for sweep_name in fair_sweeps:
+            if not args.quiet:
+                print(f"\n{'='*70}")
+                print(f"Running fair sweep: {sweep_name}")
+                print('='*70)
+            df_rep, df_agg = run_sweep(
+                sweep_name=sweep_name,
+                n_rep=args.n_rep,
+                seed0=args.seed,
+                methods=args.methods,
+                output_dir=args.output,
+                n_jobs=args.n_jobs,
+                verbose=not args.quiet
+            )
+            generate_plots(sweep_name, df_agg, args.output, verbose=not args.quiet)
+            generate_sweep_report(sweep_name, df_rep, df_agg, args.output)
     else:
         df_rep, df_agg = run_sweep(
             args.sweep,
