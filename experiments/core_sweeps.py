@@ -12,7 +12,7 @@ Usage:
     python experiments/core_sweeps.py --sweep imbalance --n_rep 50 --output results/sweeps
     python experiments/core_sweeps.py --sweep all --n_rep 20 --output results/sweeps
     
-    # Parallel execution (recommended):
+    # Parallel execution (recommended):n
     python experiments/core_sweeps.py --sweep all --n_rep 20 --n_jobs -1  # Use all cores
     python experiments/core_sweeps.py --sweep gold --n_rep 50 --n_jobs 8  # Use 8 cores
 """
@@ -54,6 +54,9 @@ from benchmark_adapters import (
 # =============================================================================
 
 METRIC_DEFINITIONS = {
+    # =========================================================================
+    # POINT ESTIMATION METRICS
+    # =========================================================================
     'pehe': {
         'name': 'PEHE (Precision in Estimating Heterogeneous Effects)',
         'formula': r'$\sqrt{\frac{1}{n}\sum_i (\hat{\tau}(x_i) - \tau(x_i))^2}$',
@@ -66,24 +69,128 @@ METRIC_DEFINITIONS = {
         'name': 'ATE Absolute Error',
         'formula': r'$|\hat{\text{ATE}} - \text{ATE}|$',
         'direction': 'lower is better',
-        'description': 'Absolute difference between estimated and true average treatment effect. '
-                      'Measures population-level accuracy.',
+        'description': 'Absolute difference between estimated and true average treatment effect.',
         'interpretation': 'Important for policy decisions about whether to adopt treatment broadly.'
     },
+    'ate_bias': {
+        'name': 'ATE Bias (Signed)',
+        'formula': r'$\hat{\text{ATE}} - \text{ATE}$',
+        'direction': 'closer to 0 is better',
+        'description': 'Signed bias in ATE estimate. Positive = overestimate, negative = underestimate.',
+        'interpretation': 'Shows systematic over/under-estimation tendencies.'
+    },
+    
+    # =========================================================================
+    # RANKING / HETEROGENEITY DISCOVERY METRICS
+    # =========================================================================
     'tau_corr': {
         'name': 'Spearman Rank Correlation',
         'formula': r'$\rho(\text{rank}(\hat{\tau}), \text{rank}(\tau))$',
         'direction': 'higher is better',
-        'description': 'Rank correlation between predicted and true treatment effects. '
-                      'Measures ability to correctly rank individuals by treatment benefit.',
-        'interpretation': 'A correlation of 1.0 means perfect ranking; 0.0 means random ranking. '
-                        'Critical for targeting interventions to high-benefit individuals.'
+        'description': 'Rank correlation between predicted and true treatment effects.',
+        'interpretation': '1.0 = perfect ranking, 0.0 = random. Critical for targeting interventions.'
     },
+    'tau_kendall': {
+        'name': 'Kendall Rank Correlation',
+        'formula': r'$\tau_K(\hat{\tau}, \tau)$',
+        'direction': 'higher is better',
+        'description': 'Kendall tau-b correlation. More robust to ties than Spearman.',
+        'interpretation': 'Alternative ranking metric; useful when ties are common.'
+    },
+    'qini_auc': {
+        'name': 'Qini AUC (Oracle)',
+        'formula': r'Normalized AUC of cumulative uplift curve',
+        'direction': 'higher is better',
+        'description': 'Area under the Qini curve. Measures ranking quality for treatment targeting.',
+        'interpretation': '1.0 = oracle ranking, 0.0 = random. Simulation-only metric using true τ.'
+    },
+    'topk_10_ratio': {
+        'name': 'Top-10% Uplift Capture Ratio',
+        'formula': r'$\frac{\bar{\tau}_{top10\%\ by\ \hat{\tau}}}{\bar{\tau}_{top10\%\ by\ \tau}}$',
+        'direction': 'higher is better',
+        'description': 'Fraction of maximum uplift captured when treating top 10% by predicted CATE.',
+        'interpretation': '1.0 = oracle selection. Measures targeting efficiency for top patients.'
+    },
+    'topk_20_ratio': {
+        'name': 'Top-20% Uplift Capture Ratio',
+        'formula': r'$\frac{\bar{\tau}_{top20\%\ by\ \hat{\tau}}}{\bar{\tau}_{top20\%\ by\ \tau}}$',
+        'direction': 'higher is better',
+        'description': 'Fraction of maximum uplift captured when treating top 20% by predicted CATE.',
+        'interpretation': '1.0 = oracle selection. Less stringent than top-10%.'
+    },
+    'topk_30_ratio': {
+        'name': 'Top-30% Uplift Capture Ratio',
+        'formula': r'$\frac{\bar{\tau}_{top30\%\ by\ \hat{\tau}}}{\bar{\tau}_{top30\%\ by\ \tau}}$',
+        'direction': 'higher is better',
+        'description': 'Fraction of maximum uplift captured when treating top 30%.',
+        'interpretation': 'Less stringent targeting metric.'
+    },
+    
+    # =========================================================================
+    # CALIBRATION METRICS
+    # =========================================================================
+    'calib_slope': {
+        'name': 'Calibration Slope',
+        'formula': r'$\beta$ in $\tau = \alpha + \beta \hat{\tau}$',
+        'direction': 'closer to 1 is better',
+        'description': 'Slope of regression of true τ on predicted τ̂. Ideal = 1.0.',
+        'interpretation': '<1 = overconfident predictions, >1 = underconfident.'
+    },
+    'calib_r2': {
+        'name': 'Calibration R²',
+        'formula': r'$R^2$ of calibration regression',
+        'direction': 'higher is better',
+        'description': 'Variance explained by predictions. Measures calibration quality.',
+        'interpretation': 'Higher R² means predictions track true effects well.'
+    },
+    'tau_ece': {
+        'name': 'CATE ECE (Expected Calibration Error)',
+        'formula': r'$\sum_b \frac{n_b}{n} |E[\tau | \hat{\tau} \in b] - E[\hat{\tau} | \hat{\tau} \in b]|$',
+        'direction': 'lower is better',
+        'description': 'Expected calibration error for CATE. Binned average miscalibration.',
+        'interpretation': 'Lower ECE means better calibration across prediction ranges.'
+    },
+    
+    # =========================================================================
+    # DECISION-FOCUSED METRICS
+    # =========================================================================
+    'policy_value': {
+        'name': 'Policy Value (Treat if τ̂ > 0)',
+        'formula': r'$E[\mu_0 + \pi(\hat{\tau}) \cdot \tau]$ where $\pi(\hat{\tau}) = 1\{\hat{\tau} > 0\}$',
+        'direction': 'higher is better',
+        'description': 'Expected outcome under threshold-based treatment policy.',
+        'interpretation': 'Higher value = better treatment decisions based on predictions.'
+    },
+    'policy_regret': {
+        'name': 'Policy Regret vs Oracle',
+        'formula': r'$V(\pi^*) - V(\hat{\pi})$',
+        'direction': 'lower is better',
+        'description': 'Gap between oracle policy value and estimated policy value.',
+        'interpretation': 'Lower regret = closer to optimal treatment decisions.'
+    },
+    'policy_value_top20': {
+        'name': 'Policy Value (Treat Top 20%)',
+        'formula': r'$E[\mu_0 + \pi_{top20\%}(\hat{\tau}) \cdot \tau]$',
+        'direction': 'higher is better',
+        'description': 'Expected outcome when treating top 20% by predicted CATE.',
+        'interpretation': 'Budget-constrained policy evaluation.'
+    },
+    'policy_regret_top20': {
+        'name': 'Policy Regret (Top 20% Budget)',
+        'formula': r'$V(\pi^*_{top20\%}) - V(\hat{\pi}_{top20\%})$',
+        'direction': 'lower is better',
+        'description': 'Regret compared to oracle top-20% policy.',
+        'interpretation': 'Budget-constrained regret.'
+    },
+    
+    # =========================================================================
+    # DIAGNOSTIC METRICS
+    # =========================================================================
     'mu0_rmse': {
         'name': 'μ₀ RMSE (Control Outcome)',
         'formula': r'$\sqrt{\frac{1}{n}\sum_i (\hat{\mu}_0(x_i) - \mu_0(x_i))^2}$',
         'direction': 'lower is better',
-        'description': 'RMSE of predicted control outcomes. Measures quality of nuisance estimation.',
+        'description': 'RMSE of predicted control outcomes. Measures nuisance estimation quality.',
         'interpretation': 'Important diagnostic; poor μ₀ estimation can propagate to CATE errors.'
     }
 }
@@ -93,36 +200,88 @@ METRIC_DEFINITIONS = {
 # Sweep Configurations
 # =============================================================================
 
-DEFAULT_METHODS = ['NoTransfer', 'ProxyOnly', 'AnchorOnly', 'ProposedA', 'ProposedB_LinearStepB']
+# ═══════════════════════════════════════════════════════════════════════════
+# METHOD LISTS - Updated to reflect CORRECTED data requirements
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Methods for disconnected target (m1=0, placebo-only)
+# CRITICAL: Only methods that DON'T require target treated for Stage 3!
+DEFAULT_METHODS_OPTION_B = [
+    # Our methods that work with placebo-only
+    'ProxyOnly',           # Source proxy only
+    'AnchorPlugin',        # Placebo anchor, plug-in CATE (no DR)
+    'ProposedB_SourceDR',  # TRUE disconnected method: Step B + source-DR
+    
+    # Transport baselines (don't require target treated)
+    # NOTE: For CATE prediction, HongTwoStage≈IPWTransport (both weighted),
+    # and AIPWTransport≈OutcomeModelTransport≈IPD_RE (all unweighted).
+    # We keep representative methods from each category.
+    'IPWTransport',           # Hong: weighted outcome models
+    'EntropyBalancing',       # Entropy balancing weights (different from IPW)
+    'OutcomeModelTransport',  # Rott: unweighted outcome models (reference)
+]
+
+# Methods for connected target (m1>0, has target treated)
+# Can use methods that require target treated for Stage 3
+DEFAULT_METHODS_OPTION_A = [
+    # Baselines
+    'TargetOnlyDR',        # Target-only DR (renamed from NoTransfer)
+    'ProxyOnly',           # Source proxy only
+    
+    # Anchor ablations
+    'AnchorOnly',          # Placebo anchor + DR (needs target treated!)
+    'AnchorPlugin',        # Placebo anchor, plug-in (no DR) - for comparison
+    
+    # Proposed methods
+    'ProposedA',           # Both corrections from target
+    'ProposedB_LinearStepB',  # Step B + target-DR
+    'ProposedB_SourceDR',  # Step B + source-DR (for comparison)
+    
+    # Transport baselines (non-redundant for CATE)
+    # NOTE: HongTwoStage≈IPWTransport, AIPWTransport≈OutcomeModelTransport≈IPD_RE
+    'IPWTransport',           # Weighted outcome models
+    'EntropyBalancing',       # Entropy balancing
+    'OutcomeModelTransport',  # Unweighted outcome models
+    'DRLearner_PooledWithSite', 'DRLearner_PooledNoSite',
+]
+
+# Default for backward compatibility
+DEFAULT_METHODS = DEFAULT_METHODS_OPTION_B
 
 SWEEP_CONFIGS = {
     'gold': {
         'benchmark_id': 'gold_sweep',
-        'description': 'Target placebo (m₀) budget sweep',
+        'description': 'Target budget 2D grid sweep (m₀ × m₁)',
         'base_scenario': {
             'n_proxy_total': 2000,
             'C_sources': 10,
             'nontransfer_scale': 0.3,
         },
-        'sweep_param': 'm0',
-        'sweep_values': [25, 50, 100, 200, 500],
+        # 2D grid sweep over m0 and m1
+        'sweep_type': 'grid_2d',
+        'sweep_param': 'm0',  # Primary for line plots
+        'sweep_param_2': 'm1',  # Secondary for grid
+        'sweep_values': [25, 50, 100, 200],  # m0 values
+        'm1_values': [0, 25, 50, 100],  # m1 values (0 = disconnected, >0 = Option A enabled)
+        'methods': DEFAULT_METHODS_OPTION_A,  # Include all methods; infeasible ones will be skipped
         
         # Detailed documentation for report
         'motivation': """
-**Research Question:** How does the amount of target placebo data (m₀) affect estimator performance?
+**Research Question:** How does the amount of target data (m₀ placebo, m₁ treated) jointly affect estimator performance?
 
 **Why This Matters:**
 - In clinical trials, placebo/control arms are expensive and ethically constrained
-- Real-world target data is often limited (e.g., 50-200 patients)
-- Transfer learning methods aim to leverage proxy data to compensate for limited target data
-- This sweep tests whether our estimator maintains accuracy with small m₀
+- The amount of treated data in target varies: from 0 (external control) to balanced RCT
+- This 2D sweep shows the full landscape of performance vs data availability
+- m₁ = 0 row shows "disconnected target" scenario (only Option B feasible)
+- m₁ > 0 rows show "connected target" scenarios (Option A also feasible)
 
 **Expected Behavior:**
-- **ProxyOnly** should be insensitive to m₀ (uses only source data)
-- **AnchorOnly** should improve with m₀ (relies solely on target data)
-- **Proposed** should improve with m₀ but remain competitive even at low m₀ due to transfer
-- At very small m₀, Proposed should outperform AnchorOnly
-- At very large m₀, AnchorOnly may catch up as target data becomes sufficient
+- **ProxyOnly** should be insensitive to both m₀ and m₁ (uses only source data)
+- **AnchorOnly/ProposedB** should improve with m₀ but be insensitive to m₁
+- **ProposedA** should improve with both m₀ AND m₁
+- At m₁ = 0, ProposedA is infeasible (NaN)
+- At large m₁, ProposedA should outperform ProposedB
 """,
         'dgp_description': """
 **Data Generating Process:**
@@ -131,23 +290,14 @@ The simulation generates data from a multi-site RCT setting where treatment effe
 differ between source sites and the target population.
 
 **Fixed Parameters:**
-- **Covariates:** $X \\in \\mathbb{R}^{10}$, drawn from $\\mathcal{N}(0, I_{10})$
+- **Covariates:** $X \\in \\mathbb{R}^{30}$
 - **Source sites:** C = 10 sites with 2,000 total observations
-- **Site allocation:** Uniform across source sites
-- **Treatment assignment:** 50% probability (randomized)
 - **Non-transfer component:** $\\sigma_{\\text{nontransfer}} = 0.3$ (moderate)
 
-**Outcome Model:**
-$$Y = \\mu_0(X) + T \\cdot \\tau(X) + \\epsilon, \\quad \\epsilon \\sim \\mathcal{N}(0, 1)$$
-
-**CATE Structure:**
-- Source sites: $\\tau^{(c)}(x) = \\beta_c^\\top x$ (linear, heterogeneous across sites)
-- Target: $\\tau_0(x) = M \\beta_{\\text{proxy}}^\\top x + \\delta^\\top x$ where:
-  - $M$ is a low-rank transfer operator (captures systematic transport)
-  - $\\delta$ is a sparse correction (captures target-specific effects)
-
-**What Varies:**
-- **m₀** (target placebo sample size): 25 → 500
+**What Varies (2D Grid):**
+- **m₀** (target placebo): {25, 50, 100, 200}
+- **m₁** (target treated): {0, 25, 50, 100}
+- Total: 16 scenarios per method
 """
     },
     'proxy': {
@@ -253,6 +403,44 @@ Same multi-site RCT setting, but with unequal site sizes.
 
 
 # =============================================================================
+# Helper: Create NaN result row
+# =============================================================================
+
+def _create_nan_result(benchmark_id, scenario, rep, method_name, feasibility, seed, config):
+    """Create a result row with all NaN metrics (for failed/infeasible methods)."""
+    return {
+        'benchmark_id': benchmark_id,
+        'scenario_id': scenario.scenario_id,
+        'rep': rep,
+        'method': method_name,
+        'feasibility': feasibility,
+        'seed': seed,
+        config['sweep_param']: getattr(scenario, config['sweep_param']),
+        'm0': scenario.m0,
+        'm1': getattr(scenario, 'm1', None),
+        'n_proxy_total': scenario.n_proxy_total,
+        'C_sources': scenario.C_sources,
+        'nontransfer_scale': scenario.nontransfer_scale,
+        # Point estimation
+        'pehe': np.nan, 'ate_hat': np.nan, 'ate_abs_err': np.nan, 'ate_bias': np.nan,
+        # Ranking
+        'tau_corr': np.nan, 'tau_kendall': np.nan, 'qini_auc': np.nan,
+        'topk_10_ratio': np.nan, 'topk_20_ratio': np.nan, 'topk_30_ratio': np.nan,
+        'topk_10_captured': np.nan, 'topk_20_captured': np.nan,
+        # Calibration
+        'calib_slope': np.nan, 'calib_intercept': np.nan, 'calib_r2': np.nan,
+        'tau_ece': np.nan, 'tau_mce': np.nan,
+        # Decision
+        'policy_value': np.nan, 'policy_regret': np.nan,
+        'policy_value_top20': np.nan, 'policy_regret_top20': np.nan,
+        # Diagnostics
+        'stage2_lambda': None, 'stage2_n_selected': None,
+        'stepb_M_fro_norm': None, 'stepb_M_effective_rank': None,
+        'runtime_sec': 0.0,
+    }
+
+
+# =============================================================================
 # Core Sweep Runner - Parallel Worker
 # =============================================================================
 
@@ -304,33 +492,9 @@ def _run_single_rep(
         warnings.warn(f"Data generation failed for scenario {scenario.scenario_id}, rep {rep}: {e}")
         # Return NaN results for all methods
         for method_name in methods:
-            results.append({
-                'benchmark_id': benchmark_id,
-                'scenario_id': scenario.scenario_id,
-                'rep': rep,
-                'method': method_name,
-                'feasibility': 'unknown',
-                'seed': seed,
-                config['sweep_param']: getattr(scenario, config['sweep_param']),
-                'm0': scenario.m0,
-                'n_proxy_total': scenario.n_proxy_total,
-                'C_sources': scenario.C_sources,
-                'nontransfer_scale': scenario.nontransfer_scale,
-                'pehe': np.nan,
-                'tau_corr': np.nan,
-                'ate_hat': np.nan,
-                'ate_abs_err': np.nan,
-                'qini_auc': np.nan,
-                'calib_slope': np.nan,
-                'calib_r2': np.nan,
-                'tau_ece': np.nan,
-                'policy_regret': np.nan,
-                'stage2_lambda': None,
-                'stage2_n_selected': None,
-                'stepb_M_fro_norm': None,
-                'stepb_M_effective_rank': None,
-                'runtime_sec': 0.0,
-            })
+            results.append(_create_nan_result(
+                benchmark_id, scenario, rep, method_name, 'unknown', seed, config
+            ))
         return results
     
     # Create method factories (fresh for each rep)
@@ -341,12 +505,42 @@ def _run_single_rep(
             continue
         
         method_spec = get_method_spec(method_name)
-        feasibility = method_spec.feasibility_restricted.value
+        
+        # Check feasibility based on data availability
+        has_target_treated = data.get('has_target_treated', False)
+        
+        # Skip methods that require target treated data when not available
+        if method_spec.uses_target_treated and not has_target_treated:
+            # Record as infeasible but don't run
+            results.append(_create_nan_result(
+                benchmark_id, scenario, rep, method_name, 'infeasible_no_target_treated', seed, config
+            ))
+            continue
+        
+        feasibility = method_spec.get_feasibility(has_target_treated).value
         
         t0 = time.time()
         try:
             # Create estimator
             estimator = method_factories[method_name]()
+            
+            # Filter target data based on method's data usage
+            # Methods that don't use target treated should only see placebo
+            if method_spec.uses_target_treated:
+                # Method can use all target data
+                X_target_method = data['X_target']
+                A_target_method = data['A_target']
+                Y_target_method = data['Y_target']
+                propensity_method = data.get('propensity_target')
+            else:
+                # Method should only see target placebo (A=0)
+                placebo_mask = (data['A_target'] == 0)
+                X_target_method = data['X_target'][placebo_mask]
+                A_target_method = data['A_target'][placebo_mask]
+                Y_target_method = data['Y_target'][placebo_mask]
+                propensity_method = data.get('propensity_target')
+                if propensity_method is not None:
+                    propensity_method = propensity_method[placebo_mask]
             
             # Fit
             estimator.fit(
@@ -354,10 +548,10 @@ def _run_single_rep(
                 A_source=data['A_source'],
                 Y_source=data['Y_source'],
                 c_source=data['c_source'],
-                X_target=data['X_target'],
-                A_target=data['A_target'],
-                Y_target=data['Y_target'],
-                propensity_target=data.get('propensity_target')
+                X_target=X_target_method,
+                A_target=A_target_method,
+                Y_target=Y_target_method,
+                propensity_target=propensity_method
             )
             
             # Predict
@@ -407,22 +601,51 @@ def _run_single_rep(
             # Scenario params
             config['sweep_param']: getattr(scenario, config['sweep_param']),
             'm0': scenario.m0,
+            'm1': getattr(scenario, 'm1', None),
             'n_proxy_total': scenario.n_proxy_total,
             'C_sources': scenario.C_sources,
             'nontransfer_scale': scenario.nontransfer_scale,
             
-            # Metrics
+            # ─────────────────────────────────────────────────────────────────
+            # Point Estimation Metrics
+            # ─────────────────────────────────────────────────────────────────
             'pehe': metrics.get('pehe', np.nan),
-            'tau_corr': metrics.get('tau_corr', np.nan),
             'ate_hat': metrics.get('ate_hat', np.nan),
             'ate_abs_err': metrics.get('ate_abs_err', np.nan),
+            'ate_bias': metrics.get('ate_bias', np.nan),
+            
+            # ─────────────────────────────────────────────────────────────────
+            # Ranking / Heterogeneity Discovery Metrics
+            # ─────────────────────────────────────────────────────────────────
+            'tau_corr': metrics.get('tau_corr', np.nan),
+            'tau_kendall': metrics.get('tau_kendall', np.nan),
             'qini_auc': metrics.get('qini_auc', np.nan),
+            'topk_10_ratio': metrics.get('topk_10_ratio', np.nan),
+            'topk_20_ratio': metrics.get('topk_20_ratio', np.nan),
+            'topk_30_ratio': metrics.get('topk_30_ratio', np.nan),
+            'topk_10_captured': metrics.get('topk_10_captured', np.nan),
+            'topk_20_captured': metrics.get('topk_20_captured', np.nan),
+            
+            # ─────────────────────────────────────────────────────────────────
+            # Calibration Metrics
+            # ─────────────────────────────────────────────────────────────────
             'calib_slope': metrics.get('calib_slope', np.nan),
+            'calib_intercept': metrics.get('calib_intercept', np.nan),
             'calib_r2': metrics.get('calib_r2', np.nan),
             'tau_ece': metrics.get('tau_ece', np.nan),
-            'policy_regret': metrics.get('policy_regret', np.nan),
+            'tau_mce': metrics.get('tau_mce', np.nan),
             
+            # ─────────────────────────────────────────────────────────────────
+            # Decision-Focused Metrics
+            # ─────────────────────────────────────────────────────────────────
+            'policy_value': metrics.get('policy_value', np.nan),
+            'policy_regret': metrics.get('policy_regret', np.nan),
+            'policy_value_top20': metrics.get('policy_value_top20', np.nan),
+            'policy_regret_top20': metrics.get('policy_regret_top20', np.nan),
+            
+            # ─────────────────────────────────────────────────────────────────
             # Diagnostics
+            # ─────────────────────────────────────────────────────────────────
             'stage2_lambda': stage2_lambda,
             'stage2_n_selected': stage2_n_selected,
             'stepb_M_fro_norm': stepb_fro,
@@ -485,7 +708,8 @@ def run_sweep(
     benchmark_id = config['benchmark_id']
     
     if methods is None:
-        methods = DEFAULT_METHODS
+        # Use sweep-specific methods if defined, otherwise default
+        methods = config.get('methods', DEFAULT_METHODS)
     
     # Determine actual number of workers
     if n_jobs == -1:
@@ -499,7 +723,17 @@ def run_sweep(
         print("=" * 70)
         print(f"Sweep: {config['description']}")
         print(f"Benchmark ID: {benchmark_id}")
-        print(f"Sweep param: {config['sweep_param']} ∈ {config['sweep_values']}")
+        sweep_type = config.get('sweep_type', '1d')
+        if sweep_type == 'grid_2d':
+            print(f"Sweep type: 2D grid")
+            print(f"m0 values: {config['sweep_values']}")
+            print(f"m1 values: {config.get('m1_values', [])}")
+            print(f"Total scenarios: {len(config['sweep_values']) * len(config.get('m1_values', [1]))}")
+        else:
+            print(f"Sweep param: {config['sweep_param']} ∈ {config['sweep_values']}")
+            m1_vals = config.get('m1_values')
+            if m1_vals and any(v is not None and v > 0 for v in m1_vals):
+                print(f"m1 values: {m1_vals} (Option A enabled)")
         print(f"Methods: {methods}")
         print(f"Reps: {n_rep}")
         print(f"Parallel jobs: {actual_n_jobs}" + (" (sequential)" if actual_n_jobs == 1 else f" ({multiprocessing.cpu_count()} cores available)"))
@@ -507,11 +741,30 @@ def run_sweep(
     
     # Generate scenarios
     scenarios = []
-    for val in config['sweep_values']:
-        scenario_params = config['base_scenario'].copy()
-        scenario_params[config['sweep_param']] = val
-        scenario = Scenario(benchmark_id=benchmark_id, **scenario_params)
-        scenarios.append(scenario)
+    sweep_type = config.get('sweep_type', '1d')
+    m1_values = config.get('m1_values', [None] * len(config['sweep_values']))
+    
+    if sweep_type == 'grid_2d':
+        # 2D grid: cartesian product of sweep_values (m0) × m1_values
+        for m0_val in config['sweep_values']:
+            for m1_val in m1_values:
+                scenario_params = config['base_scenario'].copy()
+                scenario_params['m0'] = m0_val
+                scenario_params['m1'] = m1_val if m1_val is not None else 0
+                scenario = Scenario(benchmark_id=benchmark_id, **scenario_params)
+                scenarios.append(scenario)
+    else:
+        # 1D sweep: m1 co-varies with index
+        for i, val in enumerate(config['sweep_values']):
+            scenario_params = config['base_scenario'].copy()
+            scenario_params[config['sweep_param']] = val
+            
+            # Set m1 if specified (enables Option A methods when m1 > 0)
+            if i < len(m1_values) and m1_values[i] is not None:
+                scenario_params['m1'] = m1_values[i]
+            
+            scenario = Scenario(benchmark_id=benchmark_id, **scenario_params)
+            scenarios.append(scenario)
     
     # Build task list: (scenario, rep, seed) tuples
     tasks = []
@@ -614,18 +867,36 @@ def generate_sweep_plots(
     config = SWEEP_CONFIGS[sweep_name]
     benchmark_id = config['benchmark_id']
     sweep_param = config['sweep_param']
+    sweep_type = config.get('sweep_type', '1d')
     
     setup_plot_style()
     
     os.makedirs(output_dir, exist_ok=True)
     
-    # PEHE plot
     if verbose:
         print(f"\nGenerating plots for {benchmark_id}...")
     
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
+    
+    if sweep_type == 'grid_2d':
+        # 2D grid sweep: generate heatmaps for each method
+        _generate_heatmap_plots(df_agg, config, output_dir, verbose)
+    else:
+        # 1D sweep: generate line plots
+        _generate_line_plots(df_agg, config, output_dir, verbose)
+    
+    if verbose:
+        print(f"✓ Plots saved to {output_dir}")
+
+
+def _generate_line_plots(df_agg: pd.DataFrame, config: dict, output_dir: str, verbose: bool):
+    """Generate line plots for 1D sweeps."""
+    import matplotlib.pyplot as plt
+    
+    benchmark_id = config['benchmark_id']
+    sweep_param = config['sweep_param']
     
     # 1. PEHE vs sweep param
     fig = plot_line(
@@ -634,7 +905,7 @@ def generate_sweep_plots(
         y='pehe_mean', 
         hue='method',
         yerr='pehe_sd',
-        title=f'PEHE vs {sweep_param}',
+        title=f'PEHE vs {sweep_param} (↓ lower is better)',
         xlabel=sweep_param,
         ylabel='PEHE'
     )
@@ -650,7 +921,7 @@ def generate_sweep_plots(
             y='ate_abs_err_mean',
             hue='method',
             yerr='ate_abs_err_sd',
-            title=f'ATE Error vs {sweep_param}',
+            title=f'ATE Error vs {sweep_param} (↓ lower is better)',
             xlabel=sweep_param,
             ylabel='|ATE Error|'
         )
@@ -665,15 +936,122 @@ def generate_sweep_plots(
             y='tau_corr_mean',
             hue='method',
             yerr='tau_corr_sd',
-            title=f'Spearman Correlation vs {sweep_param}',
+            title=f'Spearman ρ vs {sweep_param} (↑ higher is better)',
             xlabel=sweep_param,
             ylabel='Spearman ρ'
         )
         fig.savefig(os.path.join(output_dir, f'{benchmark_id}_corr.png'), dpi=150)
         plt.close(fig)
+
+
+def _generate_heatmap_plots(df_agg: pd.DataFrame, config: dict, output_dir: str, verbose: bool):
+    """Generate heatmap plots for 2D grid sweeps."""
+    import matplotlib.pyplot as plt
+    import numpy as np
     
-    if verbose:
-        print(f"✓ Plots saved to {output_dir}")
+    benchmark_id = config['benchmark_id']
+    m0_values = sorted(df_agg['m0'].dropna().unique())
+    m1_values = sorted(df_agg['m1'].dropna().unique())
+    methods = df_agg['method'].unique()
+    
+    # Metrics to plot: (column, display_name, colormap, lower_is_better)
+    # Core metrics + ranking + decision metrics
+    metrics = [
+        # Core point estimation
+        ('pehe_mean', 'PEHE (↓ lower is better)', 'viridis_r', True),
+        ('ate_abs_err_mean', 'ATE Error (↓ lower is better)', 'viridis_r', True),
+        # Ranking
+        ('tau_corr_mean', 'Spearman ρ (↑ higher is better)', 'viridis', False),
+        ('qini_auc_mean', 'Qini AUC (↑ higher is better)', 'viridis', False),
+        ('topk_20_ratio_mean', 'Top-20% Capture (↑ higher is better)', 'viridis', False),
+        # Decision-focused
+        ('policy_regret_mean', 'Policy Regret (↓ lower is better)', 'viridis_r', True),
+        # Calibration
+        ('tau_ece_mean', 'CATE ECE (↓ lower is better)', 'viridis_r', True),
+    ]
+    
+    for metric_col, metric_name, cmap, lower_better in metrics:
+        if metric_col not in df_agg.columns:
+            continue
+        
+        n_methods = len(methods)
+        n_cols = min(3, n_methods)
+        n_rows = (n_methods + n_cols - 1) // n_cols
+        
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
+        if n_methods == 1:
+            axes = np.array([[axes]])
+        elif n_rows == 1:
+            axes = axes.reshape(1, -1)
+        elif n_cols == 1:
+            axes = axes.reshape(-1, 1)
+        
+        # Find global min/max for consistent color scale
+        vmin = df_agg[metric_col].min()
+        vmax = df_agg[metric_col].max()
+        
+        for idx, method in enumerate(methods):
+            row, col = idx // n_cols, idx % n_cols
+            ax = axes[row, col]
+            
+            # Create pivot table for heatmap
+            method_data = df_agg[df_agg['method'] == method]
+            
+            # Build matrix
+            matrix = np.full((len(m1_values), len(m0_values)), np.nan)
+            for _, row_data in method_data.iterrows():
+                m0_idx = m0_values.index(row_data['m0'])
+                m1_idx = m1_values.index(row_data['m1'])
+                matrix[m1_idx, m0_idx] = row_data[metric_col]
+            
+            # Plot heatmap (origin='lower' so m1=0 is at bottom)
+            im = ax.imshow(matrix, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax, origin='lower')
+            
+            # Set ticks
+            ax.set_xticks(range(len(m0_values)))
+            ax.set_xticklabels(m0_values)
+            ax.set_yticks(range(len(m1_values)))
+            ax.set_yticklabels(m1_values)
+            
+            ax.set_xlabel('m0 (placebo)')
+            ax.set_ylabel('m1 (treated)')
+            ax.set_title(f'{method}')
+            
+            # Add value annotations
+            for i in range(len(m1_values)):
+                for j in range(len(m0_values)):
+                    val = matrix[i, j]
+                    if not np.isnan(val):
+                        text_color = 'white' if (val - vmin) / (vmax - vmin + 1e-10) > 0.5 else 'black'
+                        ax.text(j, i, f'{val:.2f}', ha='center', va='center', 
+                               color=text_color, fontsize=8)
+                    else:
+                        ax.text(j, i, 'N/A', ha='center', va='center', 
+                               color='gray', fontsize=8)
+        
+        # Hide empty subplots
+        for idx in range(n_methods, n_rows * n_cols):
+            row, col = idx // n_cols, idx % n_cols
+            axes[row, col].axis('off')
+        
+        # Add colorbar
+        fig.subplots_adjust(right=0.85)
+        cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7])
+        cbar = fig.colorbar(im, cax=cbar_ax)
+        cbar.set_label(metric_name)
+        
+        fig.suptitle(f'{metric_name} vs Target Budget (m0 x m1)', fontsize=14, y=1.02)
+        
+        # Save
+        metric_short = metric_col.replace('_mean', '')
+        fig.savefig(os.path.join(output_dir, f'{benchmark_id}_{metric_short}.png'), 
+                   dpi=150, bbox_inches='tight')
+        fig.savefig(os.path.join(output_dir, f'{benchmark_id}_{metric_short}.pdf'),
+                   bbox_inches='tight')
+        plt.close(fig)
+        
+        if verbose:
+            print(f"  ✓ {metric_name} heatmap saved")
 
 
 # =============================================================================
@@ -780,30 +1158,110 @@ def generate_sweep_report(
         f.write("## 6. Results\n\n")
         
         f.write("### Best Methods (averaged across sweep)\n\n")
-        best = find_best_methods(df_agg, metrics=['pehe', 'ate_abs_err', 'tau_corr'])
+        
+        # Metrics to report and their direction
+        metrics_info = [
+            ('pehe', 'lower'),
+            ('ate_abs_err', 'lower'),
+            ('tau_corr', 'higher'),
+            ('qini_auc', 'higher'),
+            ('topk_20_ratio', 'higher'),
+            ('policy_regret', 'lower'),
+            ('tau_ece', 'lower'),
+        ]
+        
+        best = find_best_methods(df_agg, metrics=[m for m, _ in metrics_info])
         f.write("| Metric | Best Method | Value | Direction |\n")
         f.write("|--------|-------------|-------|----------|\n")
-        for metric, info in best.items():
-            direction = "↓ lower is better" if metric in ['pehe', 'ate_abs_err', 'mu0_rmse'] else "↑ higher is better"
-            f.write(f"| {metric} | **{info['method']}** | {info['value']:.4f} | {direction} |\n")
+        for metric, direction in metrics_info:
+            if metric in best:
+                info = best[metric]
+                dir_str = "↓ lower is better" if direction == 'lower' else "↑ higher is better"
+                f.write(f"| {metric} | **{info['method']}** | {info['value']:.4f} | {dir_str} |\n")
         f.write("\n")
         
         # =====================================================================
-        # 7. DETAILED RESULTS TABLE
+        # 7. DETAILED RESULTS TABLES
         # =====================================================================
-        f.write("### Full Results Table\n\n")
-        f.write(f"| {sweep_param} | Method | PEHE (↓) | ATE Err (↓) | Spearman (↑) |\n")
-        f.write("|---|---|---|---|---|\n")
         
-        # Sort for readability
-        df_sorted = df_agg.sort_values([sweep_param, 'method'])
+        # Check if this is a 2D grid sweep (has m1 column with varying values)
+        is_2d_sweep = 'm1' in df_agg.columns and df_agg['m1'].nunique() > 1
+        
+        # Helper function for formatting metric values
+        def fmt_metric(row, col, decimals=3):
+            mean_col = f'{col}_mean'
+            sd_col = f'{col}_sd'
+            if mean_col not in row or np.isnan(row.get(mean_col, np.nan)):
+                return "N/A"
+            mean_val = row[mean_col]
+            sd_val = row.get(sd_col, 0)
+            if np.isnan(sd_val):
+                return f"{mean_val:.{decimals}f}"
+            return f"{mean_val:.{decimals}f} ± {sd_val:.{decimals}f}"
+        
+        # Sort data
+        if is_2d_sweep:
+            df_sorted = df_agg.sort_values(['m0', 'm1', 'method'])
+            index_cols = ['m0', 'm1']
+        else:
+            df_sorted = df_agg.sort_values([sweep_param, 'method'])
+            index_cols = [sweep_param]
+        
+        # ----- Table 1: Core Metrics -----
+        f.write("### Core Metrics\n\n")
+        
+        header = " | ".join(index_cols + ['Method', 'PEHE (↓)', 'ATE Err (↓)', 'Spearman (↑)', 'Qini (↑)'])
+        f.write(f"| {header} |\n")
+        f.write("|" + "|".join(["---"] * (len(index_cols) + 4)) + "|\n")
         
         for _, row in df_sorted.iterrows():
-            pehe_str = f"{row['pehe_mean']:.3f} ± {row['pehe_sd']:.3f}" if not np.isnan(row.get('pehe_mean', np.nan)) else "N/A"
-            ate_str = f"{row['ate_abs_err_mean']:.3f} ± {row['ate_abs_err_sd']:.3f}" if not np.isnan(row.get('ate_abs_err_mean', np.nan)) else "N/A"
-            corr_str = f"{row['tau_corr_mean']:.3f} ± {row['tau_corr_sd']:.3f}" if not np.isnan(row.get('tau_corr_mean', np.nan)) else "N/A"
-            
-            f.write(f"| {row[sweep_param]} | {row['method']} | {pehe_str} | {ate_str} | {corr_str} |\n")
+            idx_vals = [str(int(row[c])) if c in ['m0', 'm1'] and not np.isnan(row.get(c, np.nan)) else str(row.get(c, 'N/A')) for c in index_cols]
+            row_data = idx_vals + [
+                row['method'],
+                fmt_metric(row, 'pehe'),
+                fmt_metric(row, 'ate_abs_err'),
+                fmt_metric(row, 'tau_corr'),
+                fmt_metric(row, 'qini_auc'),
+            ]
+            f.write("| " + " | ".join(row_data) + " |\n")
+        
+        f.write("\n")
+        
+        # ----- Table 2: Targeting Metrics -----
+        f.write("### Targeting / Ranking Metrics\n\n")
+        
+        header = " | ".join(index_cols + ['Method', 'Top-10% (↑)', 'Top-20% (↑)', 'Kendall (↑)'])
+        f.write(f"| {header} |\n")
+        f.write("|" + "|".join(["---"] * (len(index_cols) + 4)) + "|\n")
+        
+        for _, row in df_sorted.iterrows():
+            idx_vals = [str(int(row[c])) if c in ['m0', 'm1'] and not np.isnan(row.get(c, np.nan)) else str(row.get(c, 'N/A')) for c in index_cols]
+            row_data = idx_vals + [
+                row['method'],
+                fmt_metric(row, 'topk_10_ratio'),
+                fmt_metric(row, 'topk_20_ratio'),
+                fmt_metric(row, 'tau_kendall'),
+            ]
+            f.write("| " + " | ".join(row_data) + " |\n")
+        
+        f.write("\n")
+        
+        # ----- Table 3: Decision & Calibration Metrics -----
+        f.write("### Decision & Calibration Metrics\n\n")
+        
+        header = " | ".join(index_cols + ['Method', 'Policy Regret (↓)', 'Calib Slope', 'ECE (↓)'])
+        f.write(f"| {header} |\n")
+        f.write("|" + "|".join(["---"] * (len(index_cols) + 4)) + "|\n")
+        
+        for _, row in df_sorted.iterrows():
+            idx_vals = [str(int(row[c])) if c in ['m0', 'm1'] and not np.isnan(row.get(c, np.nan)) else str(row.get(c, 'N/A')) for c in index_cols]
+            row_data = idx_vals + [
+                row['method'],
+                fmt_metric(row, 'policy_regret'),
+                fmt_metric(row, 'calib_slope'),
+                fmt_metric(row, 'tau_ece'),
+            ]
+            f.write("| " + " | ".join(row_data) + " |\n")
         
         f.write("\n")
         
@@ -1077,7 +1535,7 @@ Examples:
         """
     )
     parser.add_argument('--sweep', type=str, default='all',
-                       choices=['gold', 'proxy', 'imbalance', 'all'],
+                       choices=['gold', 'gold_option_a', 'proxy', 'imbalance', 'all'],
                        help='Sweep to run (default: all)')
     parser.add_argument('--n_rep', type=int, default=20,
                        help='Number of MC replicates (default: 20)')

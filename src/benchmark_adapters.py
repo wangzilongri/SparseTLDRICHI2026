@@ -54,8 +54,21 @@ def create_data_generator() -> Callable:
             'random_state': seed,
         }
         
-        # Target sizes
-        if scenario.m0 is not None:
+        # Target sizes - compute total and treatment fraction
+        m0 = scenario.m0 if scenario.m0 is not None else 100
+        m1 = scenario.m1 if scenario.m1 is not None else 0
+        n_target_total = m0 + m1
+        
+        if n_target_total > 0:
+            config_kwargs['n_target'] = n_target_total
+            # Set treatment probability to achieve desired m0/m1 split
+            if m1 == 0:
+                # Disconnected target: placebo-only
+                config_kwargs['target_treated_frac'] = 0.0
+            else:
+                # Mixed target: set treatment_prob_target to get ~m1/(m0+m1) treated
+                config_kwargs['treatment_prob_target'] = m1 / n_target_total
+        elif scenario.m0 is not None:
             config_kwargs['n_target'] = scenario.m0
         
         # Source/proxy settings
@@ -103,6 +116,17 @@ def create_data_generator() -> Callable:
         np.random.seed(seed + 10000)  # Different seed for eval
         eval_target = generator.generate_site_data(0, 1000)
         
+        # Compute actual m0/m1 from generated data
+        actual_m0 = int(np.sum(target_data['A'] == 0))
+        actual_m1 = int(np.sum(target_data['A'] == 1))
+        has_target_treated = actual_m1 > 0
+        
+        # Compute propensity based on actual treatment assignment
+        if actual_m1 > 0:
+            propensity = actual_m1 / (actual_m0 + actual_m1)
+        else:
+            propensity = 0.5  # Default for placebo-only (doesn't affect estimation)
+        
         # Package for benchmark runner
         data = {
             # Source data
@@ -123,8 +147,13 @@ def create_data_generator() -> Callable:
             'mu1_true': eval_target['mu1_true'],
             'ate_true': float(np.mean(eval_target['tau_true'])),
             
-            # Propensity (uniform in RCT)
-            'propensity_target': np.full(len(target_data['X']), 0.5),
+            # Propensity (based on actual treatment fraction)
+            'propensity_target': np.full(len(target_data['X']), propensity),
+            
+            # Feasibility flags
+            'has_target_treated': has_target_treated,
+            'actual_m0': actual_m0,
+            'actual_m1': actual_m1,
             
             # Generator for diagnostics
             'generator': generator,
@@ -143,6 +172,12 @@ def create_metric_computer() -> Callable:
     """
     Create a metric computer function compatible with benchmark_runner.
     
+    Computes comprehensive metrics for CATE estimation:
+    1. Point estimation: PEHE, ATE Error, Bias
+    2. Ranking: Spearman, Kendall, Top-k uplift capture, Qini AUC
+    3. Calibration: Slope, Intercept, R², ECE
+    4. Decision-focused: Policy value, Policy regret
+    
     Returns
     -------
     metric_computer : callable
@@ -150,7 +185,8 @@ def create_metric_computer() -> Callable:
     """
     from metrics import (
         pehe, ate_error, cate_rank_correlation, qini_auc,
-        cate_calibration_slope_intercept, cate_ece, policy_metrics
+        cate_calibration_slope_intercept, cate_ece, 
+        policy_value, policy_regret, topk_uplift_capture
     )
     
     def metric_computer(
@@ -193,29 +229,63 @@ def create_metric_computer() -> Callable:
         tau_true = tau_true[:min_len]
         tau_pred = tau_pred[:min_len]
         
+        # =====================================================================
+        # 1. POINT ESTIMATION METRICS
+        # =====================================================================
+        
         # PEHE
         try:
             metrics['pehe'] = float(pehe(tau_true, tau_pred))
         except Exception:
             metrics['pehe'] = np.nan
         
-        # ATE error
+        # ATE and error
         try:
             metrics['ate_hat'] = float(np.mean(tau_pred))
+            ate_true_computed = float(np.mean(tau_true))
             if ate_true is not None:
                 metrics['ate_abs_err'] = float(abs(np.mean(tau_pred) - ate_true))
             else:
                 metrics['ate_abs_err'] = float(ate_error(tau_true, tau_pred))
+            # Bias (signed)
+            metrics['ate_bias'] = float(np.mean(tau_pred) - ate_true_computed)
         except Exception:
             metrics['ate_hat'] = np.nan
             metrics['ate_abs_err'] = np.nan
+            metrics['ate_bias'] = np.nan
         
-        # Rank correlation
+        # =====================================================================
+        # 2. RANKING METRICS (Heterogeneity Discovery)
+        # =====================================================================
+        
+        # Spearman correlation
         try:
             corr, pval = cate_rank_correlation(tau_true, tau_pred, method='spearman')
             metrics['tau_corr'] = float(corr) if not np.isnan(corr) else np.nan
         except Exception:
             metrics['tau_corr'] = np.nan
+        
+        # Kendall correlation
+        try:
+            corr_kendall, _ = cate_rank_correlation(tau_true, tau_pred, method='kendall')
+            metrics['tau_kendall'] = float(corr_kendall) if not np.isnan(corr_kendall) else np.nan
+        except Exception:
+            metrics['tau_kendall'] = np.nan
+        
+        # Top-k uplift capture
+        try:
+            topk = topk_uplift_capture(tau_true, tau_pred, k_fractions=[0.1, 0.2, 0.3])
+            metrics['topk_10_ratio'] = float(topk.get('topk_10_ratio', np.nan))
+            metrics['topk_20_ratio'] = float(topk.get('topk_20_ratio', np.nan))
+            metrics['topk_30_ratio'] = float(topk.get('topk_30_ratio', np.nan))
+            metrics['topk_10_captured'] = float(topk.get('topk_10_captured', np.nan))
+            metrics['topk_20_captured'] = float(topk.get('topk_20_captured', np.nan))
+        except Exception:
+            metrics['topk_10_ratio'] = np.nan
+            metrics['topk_20_ratio'] = np.nan
+            metrics['topk_30_ratio'] = np.nan
+            metrics['topk_10_captured'] = np.nan
+            metrics['topk_20_captured'] = np.nan
         
         # Qini AUC
         try:
@@ -223,7 +293,10 @@ def create_metric_computer() -> Callable:
         except Exception:
             metrics['qini_auc'] = np.nan
         
-        # Calibration
+        # =====================================================================
+        # 3. CALIBRATION METRICS
+        # =====================================================================
+        
         try:
             intercept, slope, r2, degenerate = cate_calibration_slope_intercept(tau_true, tau_pred)
             metrics['calib_slope'] = float(slope)
@@ -234,24 +307,46 @@ def create_metric_computer() -> Callable:
             metrics['calib_intercept'] = np.nan
             metrics['calib_r2'] = np.nan
         
-        # ECE
+        # ECE and MCE
         try:
             ece_val, mce_val, _ = cate_ece(tau_true, tau_pred)
             metrics['tau_ece'] = float(ece_val)
+            metrics['tau_mce'] = float(mce_val)
         except Exception:
             metrics['tau_ece'] = np.nan
+            metrics['tau_mce'] = np.nan
         
-        # Policy metrics (if potential outcomes available)
+        # =====================================================================
+        # 4. DECISION-FOCUSED METRICS (Policy Value / Regret)
+        # =====================================================================
+        
         if mu0_true is not None and mu1_true is not None:
             try:
                 mu0_true = np.asarray(mu0_true).ravel()[:min_len]
                 mu1_true = np.asarray(mu1_true).ravel()[:min_len]
-                pm = policy_metrics(tau_true, tau_pred, mu0_true, mu1_true)
-                metrics['policy_regret'] = float(pm.get('regret_treat_positive', np.nan))
+                
+                # Policy value (treat if τ̂ > 0)
+                metrics['policy_value'] = float(policy_value(tau_pred, mu0_true, mu1_true, threshold=0.0))
+                
+                # Policy regret vs oracle
+                metrics['policy_regret'] = float(policy_regret(tau_pred, mu0_true, mu1_true, threshold=0.0))
+                
+                # Top-k policy value/regret (treat top 20%)
+                metrics['policy_value_top20'] = float(policy_value(tau_pred, mu0_true, mu1_true, top_fraction=0.2))
+                metrics['policy_regret_top20'] = float(policy_regret(tau_pred, mu0_true, mu1_true, top_fraction=0.2))
+                
             except Exception:
+                metrics['policy_value'] = np.nan
                 metrics['policy_regret'] = np.nan
+                metrics['policy_value_top20'] = np.nan
+                metrics['policy_regret_top20'] = np.nan
+        else:
+            metrics['policy_value'] = np.nan
+            metrics['policy_regret'] = np.nan
+            metrics['policy_value_top20'] = np.nan
+            metrics['policy_regret_top20'] = np.nan
         
-        # μ₀ RMSE (if we had predictions, but for now skip)
+        # μ₀ RMSE (placeholder - would need model predictions)
         metrics['mu0_rmse'] = np.nan
         metrics['mu1_rmse'] = np.nan
         
@@ -269,8 +364,9 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
     Create method factory functions for benchmark runner.
     
     Each factory returns a fresh estimator instance when called.
-    All ablations now use the same PlaceboAnchoredDRLearner class with
-    different `variant` settings for consistency and reproducibility.
+    Ablations mostly use the same PlaceboAnchoredDRLearner class with
+    different `variant` settings for consistency, except for the
+    placebo-only NoTransfer baseline.
     
     Parameters
     ----------
@@ -287,9 +383,21 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
     # All methods use the same class with different variants
     # This ensures consistent behavior and artifact persistence
     factories = {
-        # No transfer: target-only, no source data used
+        # ═══════════════════════════════════════════════════════════════════
+        # BASELINES
+        # ═══════════════════════════════════════════════════════════════════
+        
+        # Target-only DR: Learn only on target (no source data)
+        # NOTE: This is NOT "no transfer" - it's "target-only baseline"
+        # Renamed from 'NoTransfer' for clarity per reviewer feedback
+        'TargetOnlyDR': lambda: PlaceboAnchoredDRLearner(
+            variant='target_only_dr', 
+            random_state=seed
+        ),
+        
+        # Backward-compat alias (use TargetOnlyDR in new code)
         'NoTransfer': lambda: PlaceboAnchoredDRLearner(
-            variant='no_transfer', 
+            variant='target_only_dr', 
             random_state=seed
         ),
         
@@ -299,18 +407,26 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
             random_state=seed
         ),
         
-        # Anchor only: proxy + placebo correction, no Step B transfer
+        # ═══════════════════════════════════════════════════════════════════
+        # ANCHOR ABLATIONS (with/without DR)
+        # ═══════════════════════════════════════════════════════════════════
+        
+        # Anchor only: proxy + placebo correction + DR Stage 3
         'AnchorOnly': lambda: PlaceboAnchoredDRLearner(
             variant='anchor_only', 
             random_state=seed
         ),
         
-        # Anchor only A: proxy + both corrections from target, no Step B
-        # Fair comparison when target has both arms
-        'AnchorOnlyA': lambda: PlaceboAnchoredDRLearner(
-            variant='anchor_only_A', 
+        # NEW: Anchor plug-in: proxy + placebo correction, NO DR (plug-in CATE)
+        # Shows what Stage 3 (DR pseudo-outcomes) adds
+        'AnchorPlugin': lambda: PlaceboAnchoredDRLearner(
+            variant='anchor_plugin', 
             random_state=seed
         ),
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # PROPOSED METHODS
+        # ═══════════════════════════════════════════════════════════════════
         
         # Proposed Option A: needs target treated data
         'ProposedA': lambda: PlaceboAnchoredDRLearner(
@@ -318,9 +434,17 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
             random_state=seed
         ),
         
-        # Proposed Option B with linear Step B: the main method
+        # Proposed Option B (target DR): needs target treated for Stage 3
+        # NOTE: Despite Step B, this still requires target treated for DR!
         'ProposedB_LinearStepB': lambda: PlaceboAnchoredDRLearner(
             variant='proposed_B', 
+            random_state=seed
+        ),
+        
+        # NEW: Proposed Option B (source DR): works with placebo-only target!
+        # This is the TRUE disconnected-target method from the paper
+        'ProposedB_SourceDR': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_B_source_dr', 
             random_state=seed
         ),
         
@@ -331,6 +455,15 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
             random_state=seed
         ),
     }
+    
+    # Add transport baselines (reviewer-requested comparisons)
+    try:
+        from transport_baselines import create_transport_baseline_factories
+        transport_factories = create_transport_baseline_factories(seed)
+        factories.update(transport_factories)
+    except ImportError:
+        # Transport baselines not available
+        pass
     
     return factories
 

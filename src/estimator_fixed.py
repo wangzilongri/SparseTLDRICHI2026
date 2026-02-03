@@ -87,12 +87,27 @@ class _TransferredDelta:
 # =============================================================================
 
 VALID_VARIANTS = [
-    'no_transfer',      # Target-only DR learner: fit μ₀, μ₁ on target folds, no source data
-    'proxy_only',       # Stage1 on; Stage2 off; Stage3 uses proxy mu's only (delta=0)
-    'anchor_only',      # Stage1 on; Stage2 on for placebo only; treated delta = 0
-    'anchor_only_A',    # Stage1 on; Stage2 for both arms from target; no Step B transfer
-    'proposed_A',       # Stage1 + Stage2(A) + Stage3 (needs target treated)
-    'proposed_B',       # Stage1 + StepB + Stage2(B via StepB) + Stage3
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Baseline ablations
+    # ═══════════════════════════════════════════════════════════════════════════
+    'target_only_dr',   # Target-only DR (no source data) - renamed from 'no_transfer'
+    'no_transfer',      # DEPRECATED alias for target_only_dr (backward compat)
+    'proxy_only',       # Stage1 only; Stage3 uses proxy mu's (delta=0)
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Anchor ablations (with/without DR)
+    # ═══════════════════════════════════════════════════════════════════════════
+    'anchor_only',      # Stage1 + Stage2 (placebo only); treated delta = 0; DR Stage3
+    'anchor_plugin',    # Stage1 + Stage2 (placebo only); PLUG-IN CATE (no DR) - new!
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Proposed methods
+    # ═══════════════════════════════════════════════════════════════════════════
+    'proposed_A',       # Stage1 + Stage2(both arms from target) + DR Stage3 (needs target treated)
+    'proposed_B',       # Stage1 + StepB + Stage2(B) + DR Stage3 on TARGET (needs target treated!)
+    'proposed_B_source_dr',  # Stage1 + StepB + Stage2(B) + DR Stage3 on SOURCE (placebo-only target OK!)
+    
+    # REMOVED: anchor_only_A (was duplicate of proposed_A)
 ]
 
 
@@ -179,15 +194,25 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
             do_stage1: bool - fit proxy models on source
             do_stage2: bool - fit placebo correction (and possibly treated)
             do_stepB: bool - learn/use transfer operator M
-            do_stage3: bool - fit CATE model (always True)
+            do_stage3: bool - fit CATE model with DR pseudo-outcomes
+            do_plugin: bool - use plug-in CATE (no DR) instead of Stage 3
+            source_dr: bool - compute DR pseudo-outcomes on SOURCE (for disconnected target)
         """
         variant = self._get_effective_variant()
         
+        # Handle deprecated alias
+        if variant == 'no_transfer':
+            variant = 'target_only_dr'
+        
         return {
-            'do_stage1': variant in ['proxy_only', 'anchor_only', 'anchor_only_A', 'proposed_A', 'proposed_B'],
-            'do_stage2': variant in ['anchor_only', 'anchor_only_A', 'proposed_A', 'proposed_B'],
-            'do_stepB': variant in ['proposed_B'],
-            'do_stage3': True,  # Always fit CATE model
+            'do_stage1': variant in ['proxy_only', 'anchor_only', 'anchor_plugin', 
+                                     'proposed_A', 'proposed_B', 'proposed_B_source_dr'],
+            'do_stage2': variant in ['anchor_only', 'anchor_plugin',
+                                     'proposed_A', 'proposed_B', 'proposed_B_source_dr'],
+            'do_stepB': variant in ['proposed_B', 'proposed_B_source_dr'],
+            'do_stage3': variant not in ['anchor_plugin'],  # Plugin skips Stage 3
+            'do_plugin': variant in ['anchor_plugin'],  # Use plug-in CATE
+            'source_dr': variant in ['proposed_B_source_dr'],  # DR on source, not target
         }
         
     def fit(self, X_source, A_source, Y_source, c_source,
@@ -299,12 +324,42 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
             self.transfer_diagnostics_ = {'fallback': True, 'reason': 'stepB_disabled_by_variant'}
         
         # ===================================================================
-        # STAGE 2-3: Target-only corrections + DR with cross-fitting
+        # STAGE 2-3: Corrections + DR/Plugin CATE
         # ===================================================================
-        if self.verbose:
-            print(f"Stage 2-3: Target correction + DR with {self.n_folds}-fold cross-fitting...")
-        
-        self._fit_target_dr(X_target, A_target, Y_target, propensity_target, flags)
+        if flags.get('do_plugin', False):
+            # ═══════════════════════════════════════════════════════════════
+            # PLUG-IN CATE: Skip Stage 3 DR, use anchored μ directly
+            # τ(x) = μ̂₁^anch(x) - μ̂₀^anch(x)
+            # ═══════════════════════════════════════════════════════════════
+            if self.verbose:
+                print("Stage 2: Fitting placebo anchor (plug-in CATE, no DR)...")
+            
+            self._fit_plugin_cate(X_target, A_target, Y_target, flags)
+            
+        elif flags.get('source_dr', False):
+            # ═══════════════════════════════════════════════════════════════
+            # SOURCE-BASED DR: For disconnected targets (placebo-only)
+            # Compute DR pseudo-outcomes on SOURCE, train CATE on source
+            # ═══════════════════════════════════════════════════════════════
+            if self.verbose:
+                print(f"Stage 2-3: Target placebo anchor + SOURCE-based DR...")
+            
+            # Compute propensity for source
+            propensity_source = np.array([
+                0.5 if np.mean(A_source[c_source == c]) == 0.5 else np.mean(A_source[c_source == c])
+                for c in c_source
+            ])
+            
+            self._fit_source_dr(X_source, A_source, Y_source, c_source, propensity_source,
+                               X_target, A_target, Y_target, flags)
+        else:
+            # ═══════════════════════════════════════════════════════════════
+            # STANDARD: Target-based DR (requires target treated data)
+            # ═══════════════════════════════════════════════════════════════
+            if self.verbose:
+                print(f"Stage 2-3: Target correction + DR with {self.n_folds}-fold cross-fitting...")
+            
+            self._fit_target_dr(X_target, A_target, Y_target, propensity_target, flags)
         
         # Aggregate Stage-2 diagnostics
         self.stage2_lambda_ = float(np.nanmedian(self.stage2_lambda_folds_)) if self.stage2_lambda_folds_ else None
@@ -532,9 +587,17 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         variant = self._get_effective_variant()
         n_target = len(X_target)
         
+        # Determine effective n_splits based on minority class size
+        min_class_count = min(np.sum(A_target == 0), np.sum(A_target == 1))
+        effective_n_folds = min(self.n_folds, max(2, min_class_count))
+        
+        if effective_n_folds < self.n_folds and self.verbose:
+            print(f"  Note: Reduced folds from {self.n_folds} to {effective_n_folds} "
+                  f"(minority class has {min_class_count} samples)")
+        
         # FIXED: StratifiedKFold to ensure both arms in each fold
         skf = StratifiedKFold(
-            n_splits=self.n_folds, 
+            n_splits=effective_n_folds, 
             shuffle=True, 
             random_state=self.random_state
         )
@@ -569,10 +632,11 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
             # Variant-specific nuisance estimation
             # -----------------------------------------------------------------
             
-            if variant == 'no_transfer':
+            if variant in ['target_only_dr', 'no_transfer']:  # Handle both old and new names
                 # ═══════════════════════════════════════════════════════════════
-                # FIX #1: no_transfer is TRUE target-only DR learner
-                # Fit fold-specific μ₀, μ₁ on target data only (no source proxy)
+                # target_only_dr: TRUE target-only DR learner (no source data)
+                # Fit fold-specific μ₀, μ₁ on target data only
+                # NOTE: This is NOT "no transfer" - it's "learn only on target"
                 # ═══════════════════════════════════════════════════════════════
                 mu_models_fold = {}
                 for arm in [0, 1]:
@@ -613,22 +677,6 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                 # Anchored predictions
                 mu0_val = self.proxy_models_[0].predict(X_val) + delta_0_fold.predict(X_val)
                 mu1_val = self.proxy_models_[1].predict(X_val)  # No correction for treated
-                
-            elif variant == 'anchor_only_A':
-                # ═══════════════════════════════════════════════════════════════
-                # FIX #6: anchor_only_A - both corrections from target, no Step B
-                # Fair comparison when target has both arms
-                # ═══════════════════════════════════════════════════════════════
-                delta_0_fold = self._fit_fold_correction(
-                    X_train, A_train, Y_train, arm=0, use_global_scaler=False
-                )
-                delta_1_fold = self._fit_fold_correction(
-                    X_train, A_train, Y_train, arm=1, use_global_scaler=False
-                )
-                
-                # Anchored predictions
-                mu0_val = self.proxy_models_[0].predict(X_val) + delta_0_fold.predict(X_val)
-                mu1_val = self.proxy_models_[1].predict(X_val) + delta_1_fold.predict(X_val)
                 
             elif variant == 'proposed_A':
                 # Option A: Estimate both corrections from target data
@@ -687,6 +735,212 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         
         # Store global corrections (for predict_anchored convenience)
         self._fit_global_corrections(X_target, A_target, Y_target, flags)
+        
+        return self
+    
+    def _fit_plugin_cate(self, X_target, A_target, Y_target, flags=None):
+        """
+        PLUG-IN CATE: Skip Stage 3 DR, use anchored μ directly.
+        
+        This ablation shows what Stage 3 (DR pseudo-outcomes) adds beyond
+        simple plug-in estimation: τ(x) = μ̂₁^anch(x) - μ̂₀^anch(x)
+        
+        Note: This variant uses only placebo anchor (treated delta = 0),
+        matching anchor_only but without the DR pseudo-outcome correction.
+        """
+        if flags is None:
+            flags = self._variant_flags()
+        
+        # Initialize diagnostics
+        self.stage2_lambda_folds_ = []
+        self.stage2_n_selected_folds_ = []
+        self.fold_corrections_ = [] if self.save_fold_nuisance else None
+        self.folds_ = []
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # Fit global placebo correction (like anchor_only but no fold CV)
+        # ═══════════════════════════════════════════════════════════════════
+        mask_placebo = (A_target == 0)
+        n_placebo = mask_placebo.sum()
+        
+        if n_placebo >= 5:
+            X_p = X_target[mask_placebo]
+            Y_p = Y_target[mask_placebo]
+            mu0_p = self.proxy_models_[0].predict(X_p)
+            resid_p = Y_p - mu0_p
+            
+            self.delta_0_global_ = clone(self.correction_model)
+            self.delta_0_global_.fit(X_p, resid_p)
+            
+            # Track diagnostics
+            if hasattr(self.delta_0_global_, 'named_steps'):
+                for name in ['lasso', 'ridge']:
+                    if name in self.delta_0_global_.named_steps:
+                        model = self.delta_0_global_.named_steps[name]
+                        if hasattr(model, 'alpha_'):
+                            self.stage2_lambda_folds_.append(model.alpha_)
+                        if hasattr(model, 'coef_'):
+                            self.stage2_n_selected_folds_.append(np.sum(np.abs(model.coef_) > 1e-6))
+        else:
+            self.delta_0_global_ = _ZeroDelta(self.n_features_)
+        
+        # No treated correction for anchor_plugin
+        self.delta_1_global_ = _ZeroDelta(self.n_features_)
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # PLUG-IN CATE: τ(x) = μ̂₁(x) - μ̂₀^anch(x)
+        # No Stage 3 DR pseudo-outcomes!
+        # ═══════════════════════════════════════════════════════════════════
+        class PluginCATEModel:
+            """Simple wrapper that computes plug-in CATE from anchored predictions."""
+            def __init__(self, proxy_0, proxy_1, delta_0, delta_1):
+                self.proxy_0 = proxy_0
+                self.proxy_1 = proxy_1
+                self.delta_0 = delta_0
+                self.delta_1 = delta_1
+            
+            def predict(self, X):
+                mu0 = self.proxy_0.predict(X) + self.delta_0.predict(X)
+                mu1 = self.proxy_1.predict(X) + self.delta_1.predict(X)
+                return mu1 - mu0
+            
+            def fit(self, X, y):
+                # No-op: plug-in doesn't fit on pseudo-outcomes
+                return self
+        
+        self.cate_model_ = PluginCATEModel(
+            self.proxy_models_[0], self.proxy_models_[1],
+            self.delta_0_global_, self.delta_1_global_
+        )
+        
+        return self
+    
+    def _fit_source_dr(self, X_source, A_source, Y_source, c_source, propensity_source,
+                       X_target, A_target, Y_target, flags=None):
+        """
+        SOURCE-BASED DR: For disconnected targets (placebo-only).
+        
+        This is the key method for Option B when target has NO treated outcomes:
+        1. Fit placebo correction on TARGET (using target placebo only)
+        2. Transfer to treated using M̂ (learned from sources)
+        3. Compute DR pseudo-outcomes on SOURCE (which has both arms)
+        4. Train CATE model on SOURCE pseudo-outcomes
+        5. CATE model predicts on TARGET X (generalization)
+        
+        This allows estimation when target has only placebo outcomes.
+        """
+        if flags is None:
+            flags = self._variant_flags()
+        
+        n_source = len(X_source)
+        
+        # Initialize diagnostics
+        self.stage2_lambda_folds_ = []
+        self.stage2_n_selected_folds_ = []
+        self.fold_corrections_ = [] if self.save_fold_nuisance else None
+        self.folds_ = []
+        
+        # Check if we have the global scaler from Step B
+        use_global_scaler = (flags['do_stepB'] and 
+                            hasattr(self, 'global_scaler_') and 
+                            self.global_scaler_ is not None)
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 1: Fit global corrections on TARGET placebo
+        # ═══════════════════════════════════════════════════════════════════
+        mask_placebo = (A_target == 0)
+        
+        if mask_placebo.sum() >= 5:
+            X_p = X_target[mask_placebo]
+            Y_p = Y_target[mask_placebo]
+            
+            # Scale with global scaler for consistency with Step B
+            if use_global_scaler:
+                X_p_scaled = self.global_scaler_.transform(X_p)
+            else:
+                X_p_scaled = X_p
+            
+            mu0_p = self.proxy_models_[0].predict(X_p)
+            resid_p = Y_p - mu0_p
+            
+            self.delta_0_global_ = clone(self.correction_model)
+            if use_global_scaler:
+                # Use a model without internal scaler if global scaler is used
+                from sklearn.linear_model import LassoCV
+                self.delta_0_global_ = LassoCV(cv=5, max_iter=10000, tol=1e-3)
+            self.delta_0_global_.fit(X_p_scaled if use_global_scaler else X_p, resid_p)
+            
+            # Track diagnostics
+            if hasattr(self.delta_0_global_, 'alpha_'):
+                self.stage2_lambda_folds_.append(self.delta_0_global_.alpha_)
+            if hasattr(self.delta_0_global_, 'coef_'):
+                self.stage2_n_selected_folds_.append(np.sum(np.abs(self.delta_0_global_.coef_) > 1e-6))
+        else:
+            self.delta_0_global_ = _ZeroDelta(self.n_features_)
+        
+        # Transfer to treated using M̂
+        self.delta_1_global_ = self._apply_transfer_operator(self.delta_0_global_)
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 2: Compute DR pseudo-outcomes on SOURCE (cross-fitting)
+        # ═══════════════════════════════════════════════════════════════════
+        
+        # Use site-stratified K-fold to ensure each fold has multiple sites
+        from sklearn.model_selection import StratifiedKFold
+        
+        min_class_count = min(np.sum(A_source == 0), np.sum(A_source == 1))
+        effective_n_folds = min(self.n_folds, max(2, min_class_count))
+        
+        skf = StratifiedKFold(
+            n_splits=effective_n_folds,
+            shuffle=True,
+            random_state=self.random_state
+        )
+        
+        pseudo_outcomes_source = np.zeros(n_source)
+        
+        for fold_idx, (train_idx, val_idx) in enumerate(skf.split(X_source, A_source)):
+            self.folds_.append((train_idx.copy(), val_idx.copy()))
+            
+            # Validation data
+            X_val = X_source[val_idx]
+            A_val = A_source[val_idx]
+            Y_val = Y_source[val_idx]
+            e_val = propensity_source[val_idx]
+            
+            # Use GLOBAL corrections (fitted on target placebo)
+            # This is the key difference from target_dr:
+            # We DON'T fit fold-specific corrections on source
+            # We use the target-anchored corrections for all source predictions
+            
+            if use_global_scaler:
+                X_val_scaled = self.global_scaler_.transform(X_val)
+                delta_0_pred = self.delta_0_global_.predict(X_val_scaled)
+            else:
+                delta_0_pred = self.delta_0_global_.predict(X_val)
+            
+            delta_1_pred = self.delta_1_global_.predict(X_val)
+            
+            mu0_val = self.proxy_models_[0].predict(X_val) + delta_0_pred
+            mu1_val = self.proxy_models_[1].predict(X_val) + delta_1_pred
+            
+            # DR pseudo-outcomes
+            tau_val = mu1_val - mu0_val
+            e_clipped = np.clip(e_val, 1e-3, 1 - 1e-3)
+            mu_a = np.where(A_val == 1, mu1_val, mu0_val)
+            
+            psi_val = tau_val + ((A_val - e_clipped) / (e_clipped * (1 - e_clipped))) * (Y_val - mu_a)
+            pseudo_outcomes_source[val_idx] = psi_val
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 3: Fit CATE model on SOURCE pseudo-outcomes
+        # ═══════════════════════════════════════════════════════════════════
+        self.cate_model_ = clone(self.cate_model)
+        self.cate_model_.fit(X_source, pseudo_outcomes_source)
+        
+        if self.verbose:
+            print(f"  Source-DR: Trained CATE on {n_source} source samples")
+            print(f"  Target placebo anchor: n={mask_placebo.sum()}")
         
         return self
     
@@ -887,7 +1141,7 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
             self.delta_1_global_ = self._apply_transfer_operator(self.delta_0_global_)
             
         else:
-            # Other variants: use local pipeline scaler (anchor_only, anchor_only_A, proposed_A)
+            # Other variants: use local pipeline scaler (anchor_only, anchor_plugin, proposed_A)
             if np.sum(mask_placebo) >= 5:
                 X_p = X_target[mask_placebo]
                 Y_p = Y_target[mask_placebo]
@@ -904,7 +1158,7 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                 # Anchor-only: no treated correction
                 self.delta_1_global_ = _ZeroDelta(self.n_features_)
                 
-            elif variant in ['anchor_only_A', 'proposed_A']:
+            elif variant in ['proposed_A']:
                 # Both corrections from target
                 mask_treated = (A_target == 1)
                 if np.sum(mask_treated) >= 5:

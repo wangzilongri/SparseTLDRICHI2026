@@ -225,15 +225,32 @@ class PlotSpec:
 
 # Core methods
 METHOD_REGISTRY: Dict[str, MethodSpec] = {
-    # No transfer baseline
-    "NoTransfer": MethodSpec(
-        method="NoTransfer",
-        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+    # ═══════════════════════════════════════════════════════════════════════
+    # BASELINES
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    # Target-only DR: Learn μ₀, μ₁ only on target (no source data at all)
+    # NOTE: This is NOT "no transfer" - it's "target-only baseline"
+    # Renamed for clarity per reviewer feedback
+    "TargetOnlyDR": MethodSpec(
+        method="TargetOnlyDR",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,  # Needs target treated!
         feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
         uses_target_placebo=True,
-        uses_target_treated=True,  # Needs treated for CATE
+        uses_target_treated=True,  # CRITICAL: Requires treated for DR
         uses_source_data=False,
-        description="Target-only DR-Learner, no source data"
+        description="Target-only DR learner (no source data, learns on target)"
+    ),
+    
+    # Backward-compat alias
+    "NoTransfer": MethodSpec(
+        method="NoTransfer",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,  # CRITICAL: Requires treated for DR
+        uses_source_data=False,
+        description="Target-only DR learner (alias for TargetOnlyDR)"
     ),
     
     # Proxy-only baseline
@@ -247,29 +264,39 @@ METHOD_REGISTRY: Dict[str, MethodSpec] = {
         description="Source-only proxy model, no target anchoring"
     ),
     
-    # Anchor-only baseline (placebo correction only)
+    # ═══════════════════════════════════════════════════════════════════════
+    # ANCHOR ABLATIONS
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    # Anchor-only baseline (placebo correction only) + DR Stage 3
+    # CRITICAL FIX: This ALSO requires target treated for Stage 3 DR!
     "AnchorOnly": MethodSpec(
         method="AnchorOnly",
-        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
-        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
-        uses_target_placebo=True,
-        uses_target_treated=False,  # Only uses placebo for correction
-        uses_source_data=True,
-        description="Proxy + placebo-only anchoring (δ₁ = 0)"
-    ),
-    
-    # Anchor-only A baseline (both corrections from target, no Step B)
-    "AnchorOnlyA": MethodSpec(
-        method="AnchorOnlyA",
         feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
         feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
         uses_target_placebo=True,
-        uses_target_treated=True,  # Needs treated for δ₁ correction
+        uses_target_treated=True,  # CRITICAL: Stage 3 DR needs treated
         uses_source_data=True,
-        description="Proxy + both corrections from target (no Step B transfer)"
+        description="Proxy + placebo anchor + DR Stage3 (needs target treated for DR)"
     ),
     
-    # Proposed Option A (needs target treated)
+    # NEW: Anchor plug-in (placebo correction only) - NO DR
+    # This ablation shows what Stage 3 DR adds
+    "AnchorPlugin": MethodSpec(
+        method="AnchorPlugin",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,
+        uses_target_treated=False,  # No DR, so no treated needed!
+        uses_source_data=True,
+        description="Proxy + placebo anchor + plug-in CATE (NO DR, shows Stage3 value)"
+    ),
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # PROPOSED METHODS
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    # Proposed Option A (needs target treated for Stage 2 AND Stage 3)
     "ProposedA": MethodSpec(
         method="ProposedA",
         feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
@@ -280,18 +307,31 @@ METHOD_REGISTRY: Dict[str, MethodSpec] = {
         description="Proposed with direct target corrections (Option A)"
     ),
     
-    # Proposed Option B with linear Step B
+    # Proposed Option B with linear Step B + TARGET-based DR
+    # CRITICAL FIX: Stage 3 DR on target STILL requires target treated!
     "ProposedB_LinearStepB": MethodSpec(
         method="ProposedB_LinearStepB",
-        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
-        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,  # FIXED!
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
         uses_target_placebo=True,
-        uses_target_treated=False,
+        uses_target_treated=True,  # CRITICAL: Stage 3 DR needs treated
         uses_source_data=True,
-        description="Proposed with linear transfer operator (Option B)"
+        description="Proposed Option B + target-DR (needs target treated for Stage3)"
     ),
     
-    # Proposed Option B with kernel Step B
+    # NEW: Proposed Option B with SOURCE-based DR
+    # This is the TRUE disconnected-target method from the paper!
+    "ProposedB_SourceDR": MethodSpec(
+        method="ProposedB_SourceDR",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,  # Works with placebo-only!
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,
+        uses_target_treated=False,  # KEY: DR on source, not target
+        uses_source_data=True,
+        description="Proposed Option B + source-DR (TRUE disconnected-target method)"
+    ),
+    
+    # Proposed Option B with kernel Step B (not implemented yet)
     "ProposedB_KernelStepB": MethodSpec(
         method="ProposedB_KernelStepB",
         feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
@@ -305,26 +345,83 @@ METHOD_REGISTRY: Dict[str, MethodSpec] = {
     # Proposed Option B with ridge Stage-2 (for A5 dense corrections)
     "ProposedB_RidgeStage2": MethodSpec(
         method="ProposedB_RidgeStage2",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,  # Still uses target-DR
+        uses_source_data=True,
+        description="Proposed Option B with ridge Stage-2 + target-DR"
+    ),
+    
+    # =========================================================================
+    # TRANSPORT BASELINES (Reviewer-requested comparisons)
+    # Paper references in transport_baselines.py docstrings
+    # =========================================================================
+    
+    # (1) Reweighting-based transport estimators (Hong et al. 2025)
+    "IPWTransport": MethodSpec(
+        method="IPWTransport",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,  # Uses target X for selection model
+        uses_target_treated=False,
+        uses_source_data=True,
+        description="Hong IPW transport: w = ê/(1-ê) selection weights"
+    ),
+    
+    "EntropyBalancing": MethodSpec(
+        method="EntropyBalancing",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,  # Uses target X for moment matching
+        uses_target_treated=False,
+        uses_source_data=True,
+        description="Entropy balancing weights for covariate balance"
+    ),
+    
+    # (2) Outcome-regression transport estimators (Rott 2024)
+    "OutcomeModelTransport": MethodSpec(
+        method="OutcomeModelTransport",
         feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
         feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
         uses_target_placebo=True,
         uses_target_treated=False,
         uses_source_data=True,
-        description="Proposed Option B with ridge (not LASSO) Stage-2 corrections"
+        description="Rott outcome-model transport: fit g_a, average on target X"
     ),
     
-    # IPD hierarchical model
-    "IPD_RE": MethodSpec(
-        method="IPD_RE",
-        feasibility_restricted=Feasibility.ORACLE_TARGET_TREATED,
-        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+    "OutcomeModelTransport_WithSite": MethodSpec(
+        method="OutcomeModelTransport_WithSite",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
         uses_target_placebo=True,
-        uses_target_treated=True,
+        uses_target_treated=False,
         uses_source_data=True,
-        description="IPD random-effects hierarchical model"
+        description="Rott outcome-model with site indicators"
     ),
     
-    # AIPW Transport
+    # Backward compatibility aliases
+    "PooledRegression_WithSite": MethodSpec(
+        method="PooledRegression_WithSite",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,
+        uses_target_treated=False,
+        uses_source_data=True,
+        description="Pooled regression with site indicators and interactions"
+    ),
+    
+    "PooledRegression_NoSite": MethodSpec(
+        method="PooledRegression_NoSite",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,
+        uses_target_treated=False,
+        uses_source_data=True,
+        description="Pooled regression without site indicators"
+    ),
+    
+    # (3) Augmented/doubly robust transport estimators (Dahabreh et al. 2023)
     "AIPWTransport": MethodSpec(
         method="AIPWTransport",
         feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
@@ -332,18 +429,38 @@ METHOD_REGISTRY: Dict[str, MethodSpec] = {
         uses_target_placebo=True,
         uses_target_treated=False,
         uses_source_data=True,
-        description="AIPW with site reweighting for transport"
+        description="Dahabreh Eq.(8) augmented transport (pooled propensity)"
     ),
     
-    # Entropy balancing
-    "EntropyBalancing": MethodSpec(
-        method="EntropyBalancing",
+    "AIPWTransport_TrialSpecific": MethodSpec(
+        method="AIPWTransport_TrialSpecific",
         feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
         feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
         uses_target_placebo=True,
         uses_target_treated=False,
         uses_source_data=True,
-        description="Entropy balancing weights for transport"
+        description="Dahabreh Eq.(8) with trial-specific propensity"
+    ),
+    
+    # (4) IPD meta-analytic baselines (Hong 2025, Riley 2021)
+    "HongTwoStage": MethodSpec(
+        method="HongTwoStage",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,
+        uses_target_treated=False,
+        uses_source_data=True,
+        description="Hong two-stage: per-trial TATE then meta-analysis"
+    ),
+    
+    "IPD_RE": MethodSpec(
+        method="IPD_RE",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,
+        uses_target_treated=False,
+        uses_source_data=True,
+        description="Standard IPD random-effects MA (not target-specific)"
     ),
     
     # DR-Learner with site ID
@@ -417,9 +534,18 @@ SCENARIO_PARAM_COLS = [
 ]
 
 CORE_METRIC_COLS = [
-    'pehe', 'tau_corr', 'ate_hat', 'ate_true', 'ate_abs_err',
-    'mu0_rmse', 'mu1_rmse', 'mu0_ece', 'tau_ece',
-    'policy_regret', 'qini_auc'
+    # Point estimation
+    'pehe', 'ate_hat', 'ate_true', 'ate_abs_err', 'ate_bias',
+    # Ranking / heterogeneity discovery
+    'tau_corr', 'tau_kendall', 'qini_auc',
+    'topk_10_ratio', 'topk_20_ratio', 'topk_30_ratio',
+    'topk_10_captured', 'topk_20_captured',
+    # Calibration
+    'calib_slope', 'calib_intercept', 'calib_r2', 'tau_ece', 'tau_mce',
+    # Decision-focused
+    'policy_value', 'policy_regret', 'policy_value_top20', 'policy_regret_top20',
+    # Outcome model quality
+    'mu0_rmse', 'mu1_rmse', 'mu0_ece'
 ]
 
 DIAGNOSTIC_COLS = [
