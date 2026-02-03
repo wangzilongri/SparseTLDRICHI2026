@@ -253,7 +253,7 @@ SWEEP_CONFIGS = {
         'benchmark_id': 'gold_sweep',
         'description': 'Target budget 2D grid sweep (m₀ × m₁)',
         'base_scenario': {
-            'n_proxy_total': 2000,
+            'n_proxy_total': 20000,
             'C_sources': 10,
             'nontransfer_scale': 0.3,
         },
@@ -261,8 +261,8 @@ SWEEP_CONFIGS = {
         'sweep_type': 'grid_2d',
         'sweep_param': 'm0',  # Primary for line plots
         'sweep_param_2': 'm1',  # Secondary for grid
-        'sweep_values': [25, 50, 100, 200],  # m0 values
-        'm1_values': [0, 25, 50, 100],  # m1 values (0 = disconnected, >0 = Option A enabled)
+        'sweep_values': [100, 500, 1000],  # m0 values
+        'm1_values': [0, 100, 500, 1000],  # m1 values (0 = disconnected, >0 = Option A enabled)
         'methods': DEFAULT_METHODS_OPTION_A,  # Include all methods; infeasible ones will be skipped
         
         # Detailed documentation for report
@@ -1161,23 +1161,31 @@ def generate_sweep_report(
         
         # Metrics to report and their direction
         metrics_info = [
-            ('pehe', 'lower'),
-            ('ate_abs_err', 'lower'),
-            ('tau_corr', 'higher'),
-            ('qini_auc', 'higher'),
-            ('topk_20_ratio', 'higher'),
-            ('policy_regret', 'lower'),
-            ('tau_ece', 'lower'),
+            # Point estimation
+            ('pehe', 'lower', 'PEHE'),
+            ('ate_abs_err', 'lower', 'ATE Error'),
+            # Ranking
+            ('tau_corr', 'higher', 'Spearman ρ'),
+            ('tau_kendall', 'higher', 'Kendall τ'),
+            ('qini_auc', 'higher', 'Qini AUC'),
+            ('topk_10_ratio', 'higher', 'Top-10% Ratio'),
+            ('topk_20_ratio', 'higher', 'Top-20% Ratio'),
+            # Calibration
+            ('calib_r2', 'higher', 'Calibration R²'),
+            ('tau_ece', 'lower', 'CATE ECE'),
+            # Decision
+            ('policy_value', 'higher', 'Policy Value'),
+            ('policy_regret', 'lower', 'Policy Regret'),
         ]
         
-        best = find_best_methods(df_agg, metrics=[m for m, _ in metrics_info])
+        best = find_best_methods(df_agg, metrics=[m for m, _, _ in metrics_info])
         f.write("| Metric | Best Method | Value | Direction |\n")
         f.write("|--------|-------------|-------|----------|\n")
-        for metric, direction in metrics_info:
+        for metric, direction, display_name in metrics_info:
             if metric in best:
                 info = best[metric]
-                dir_str = "↓ lower is better" if direction == 'lower' else "↑ higher is better"
-                f.write(f"| {metric} | **{info['method']}** | {info['value']:.4f} | {dir_str} |\n")
+                dir_str = "↓ lower" if direction == 'lower' else "↑ higher"
+                f.write(f"| {display_name} | **{info['method']}** | {info['value']:.4f} | {dir_str} |\n")
         f.write("\n")
         
         # =====================================================================
@@ -1246,10 +1254,10 @@ def generate_sweep_report(
         
         f.write("\n")
         
-        # ----- Table 3: Decision & Calibration Metrics -----
-        f.write("### Decision & Calibration Metrics\n\n")
+        # ----- Table 3: ATE & Bias Metrics -----
+        f.write("### ATE Estimation\n\n")
         
-        header = " | ".join(index_cols + ['Method', 'Policy Regret (↓)', 'Calib Slope', 'ECE (↓)'])
+        header = " | ".join(index_cols + ['Method', 'ATE Est', 'ATE Err (↓)', 'ATE Bias'])
         f.write(f"| {header} |\n")
         f.write("|" + "|".join(["---"] * (len(index_cols) + 4)) + "|\n")
         
@@ -1257,9 +1265,69 @@ def generate_sweep_report(
             idx_vals = [str(int(row[c])) if c in ['m0', 'm1'] and not np.isnan(row.get(c, np.nan)) else str(row.get(c, 'N/A')) for c in index_cols]
             row_data = idx_vals + [
                 row['method'],
+                fmt_metric(row, 'ate_hat'),
+                fmt_metric(row, 'ate_abs_err'),
+                fmt_metric(row, 'ate_bias'),
+            ]
+            f.write("| " + " | ".join(row_data) + " |\n")
+        
+        f.write("\n")
+        
+        # ----- Table 4: Policy / Decision Metrics -----
+        f.write("### Policy / Decision Metrics\n\n")
+        
+        header = " | ".join(index_cols + ['Method', 'Policy Value (↑)', 'Regret (↓)', 'Value Top20 (↑)', 'Regret Top20 (↓)'])
+        f.write(f"| {header} |\n")
+        f.write("|" + "|".join(["---"] * (len(index_cols) + 5)) + "|\n")
+        
+        for _, row in df_sorted.iterrows():
+            idx_vals = [str(int(row[c])) if c in ['m0', 'm1'] and not np.isnan(row.get(c, np.nan)) else str(row.get(c, 'N/A')) for c in index_cols]
+            row_data = idx_vals + [
+                row['method'],
+                fmt_metric(row, 'policy_value'),
                 fmt_metric(row, 'policy_regret'),
+                fmt_metric(row, 'policy_value_top20'),
+                fmt_metric(row, 'policy_regret_top20'),
+            ]
+            f.write("| " + " | ".join(row_data) + " |\n")
+        
+        f.write("\n")
+        
+        # ----- Table 5: Calibration Metrics -----
+        f.write("### Calibration Metrics\n\n")
+        
+        header = " | ".join(index_cols + ['Method', 'Slope (→1)', 'Intercept (→0)', 'R² (↑)', 'ECE (↓)', 'MCE (↓)'])
+        f.write(f"| {header} |\n")
+        f.write("|" + "|".join(["---"] * (len(index_cols) + 6)) + "|\n")
+        
+        for _, row in df_sorted.iterrows():
+            idx_vals = [str(int(row[c])) if c in ['m0', 'm1'] and not np.isnan(row.get(c, np.nan)) else str(row.get(c, 'N/A')) for c in index_cols]
+            row_data = idx_vals + [
+                row['method'],
                 fmt_metric(row, 'calib_slope'),
+                fmt_metric(row, 'calib_intercept'),
+                fmt_metric(row, 'calib_r2'),
                 fmt_metric(row, 'tau_ece'),
+                fmt_metric(row, 'tau_mce'),
+            ]
+            f.write("| " + " | ".join(row_data) + " |\n")
+        
+        f.write("\n")
+        
+        # ----- Table 6: Extended Targeting Metrics -----
+        f.write("### Extended Targeting Metrics\n\n")
+        
+        header = " | ".join(index_cols + ['Method', 'Top-10% Captured', 'Top-20% Captured', 'Top-30% Ratio (↑)'])
+        f.write(f"| {header} |\n")
+        f.write("|" + "|".join(["---"] * (len(index_cols) + 4)) + "|\n")
+        
+        for _, row in df_sorted.iterrows():
+            idx_vals = [str(int(row[c])) if c in ['m0', 'm1'] and not np.isnan(row.get(c, np.nan)) else str(row.get(c, 'N/A')) for c in index_cols]
+            row_data = idx_vals + [
+                row['method'],
+                fmt_metric(row, 'topk_10_captured'),
+                fmt_metric(row, 'topk_20_captured'),
+                fmt_metric(row, 'topk_30_ratio'),
             ]
             f.write("| " + " | ".join(row_data) + " |\n")
         
