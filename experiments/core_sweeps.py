@@ -232,11 +232,24 @@ DEFAULT_METHODS_OPTION_A = [
     'AnchorOnly',          # Placebo anchor + DR (needs target treated!)
     'AnchorPlugin',        # Placebo anchor, plug-in (no DR) - for comparison
     
-    # Proposed methods
-    'ProposedA',           # Both corrections from target (separate proxy, separate correction)
+    # Proposed methods - Residual mode (default)
+    'ProposedA',           # Separate proxy, separate correction, residual
     'ProposedA_Together',  # Separate proxy, joint correction δ(X, A)
     'ProposedA_JointProxy', # Joint proxy μ(X, A), separate correction
     'ProposedA_FullyJoint', # Joint proxy AND joint correction
+    
+    # Proposed methods - Direct mode (fit on Y directly)
+    'ProposedA_Direct',           # Separate, direct fitting
+    'ProposedA_Together_Direct',  # Joint correction, direct fitting
+    'ProposedA_FullyDirect',      # Fully joint + direct
+    
+    # Proposed methods - No cross-fitting variants
+    'ProposedA_NoCrossfit',                # Residual, no cross-fitting
+    'ProposedA_Direct_NoCrossfit',         # Direct, no cross-fitting
+    'ProposedA_Together_NoCrossfit',       # Joint + no cross-fitting
+    'ProposedA_Together_Direct_NoCrossfit', # Joint + direct + no cross-fitting
+    
+    # Option B variants
     'ProposedB_LinearStepB',  # Step B + target-DR
     'ProposedB_SourceDR',  # Step B + source-DR (for comparison)
     
@@ -1609,10 +1622,22 @@ def _get_method_description(method: str) -> str:
         'NoTransfer': 'Uses only target placebo, no transfer',
         'ProxyOnly': 'Uses only source data, ignores target',
         'AnchorOnly': 'Uses only target placebo data',
-        'ProposedA': 'Proposed (Option A): separate proxy μ₀,μ₁ + separate correction δ₀,δ₁',
-        'ProposedA_Together': 'Proposed (Option A): separate proxy + joint correction δ(X,A)',
-        'ProposedA_JointProxy': 'Proposed (Option A): joint proxy μ(X,A) + separate correction',
-        'ProposedA_FullyJoint': 'Proposed (Option A): joint proxy + joint correction (fully pooled)',
+        # Residual mode variants
+        'ProposedA': 'Proposed: separate proxy + separate correction (residual)',
+        'ProposedA_Together': 'Proposed: separate proxy + joint correction (residual)',
+        'ProposedA_JointProxy': 'Proposed: joint proxy + separate correction (residual)',
+        'ProposedA_FullyJoint': 'Proposed: joint proxy + joint correction (residual)',
+        # Direct mode variants
+        'ProposedA_Direct': 'Proposed: separate + direct fitting',
+        'ProposedA_Together_Direct': 'Proposed: joint correction + direct fitting',
+        'ProposedA_JointProxy_Direct': 'Proposed: joint proxy + direct fitting',
+        'ProposedA_FullyDirect': 'Proposed: fully joint + direct fitting',
+        # No cross-fitting variants
+        'ProposedA_NoCrossfit': 'Proposed: residual, no cross-fitting',
+        'ProposedA_Direct_NoCrossfit': 'Proposed: direct, no cross-fitting',
+        'ProposedA_Together_NoCrossfit': 'Proposed: joint + no cross-fitting',
+        'ProposedA_Together_Direct_NoCrossfit': 'Proposed: joint + direct + no cross-fitting',
+        # Option B
         'ProposedB_LinearStepB': 'Proposed (Option B): placebo-anchored with linear Step B',
         'ProposedB_SourceDR': 'Proposed (Option B): source-DR for placebo-only target',
         'ProposedB_KernelStepB': 'Proposed (Option B): placebo-anchored with kernel Step B',

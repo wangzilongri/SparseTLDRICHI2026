@@ -161,6 +161,29 @@ class _JointProxyWrapper:
         return self
 
 
+class _DirectModelWrapper:
+    """Wrapper for direct outcome model (when correction_mode='direct').
+    
+    Marks that this model predicts μ directly (not a correction δ).
+    Used to distinguish between residual and direct modes in cross-fitting.
+    """
+    def __init__(self, model, is_direct=True):
+        self.model = model
+        self.is_direct = is_direct
+        # Copy attributes for diagnostics
+        if hasattr(model, 'coef_'):
+            self.coef_ = model.coef_
+        if hasattr(model, 'intercept_'):
+            self.intercept_ = model.intercept_
+    
+    def predict(self, X):
+        return self.model.predict(X)
+    
+    def fit(self, X, y):
+        self.model.fit(X, y)
+        return self
+
+
 # =============================================================================
 # Valid Variants
 # =============================================================================
@@ -226,6 +249,15 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         How to fit Stage 1 proxy models on source data:
         - 'separate': Fit separate models μ₀(X) and μ₁(X) for each treatment arm
         - 'together': Fit a single joint model μ(X, A) with treatment as a feature
+    correction_mode : str, default='residual'
+        How to fit Stage 2 correction/outcome models on target data:
+        - 'residual': Fit correction δ on residuals (Y - proxy), use μ = proxy + δ
+        - 'direct': Fit outcome model μ directly on Y, ignoring proxy in prediction
+    cross_fitting : bool, default=True
+        Whether to use cross-fitting in Stage 3:
+        - True: K-fold cross-fitting (fit nuisance on K-1 folds, predict on held-out)
+        - False: Fit nuisance on all data, compute pseudo-outcomes on same data
+        Note: Model selection CV (e.g., LassoCV) is always used regardless of this setting.
     n_folds : int, default=5
         Number of folds for cross-fitting in Stage 3
     save_fold_nuisance : bool, default=False
@@ -258,7 +290,8 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
     
     def __init__(self, proxy_model=None, correction_model=None, cate_model=None,
                  option='A', variant=None, stage2_mode='lasso', proxy_mode='separate',
-                 n_folds=5, save_fold_nuisance=False, random_state=42, verbose=False):
+                 correction_mode='residual', cross_fitting=True, n_folds=5, 
+                 save_fold_nuisance=False, random_state=42, verbose=False):
         self.proxy_model = proxy_model
         self.correction_model = correction_model
         self.cate_model = cate_model
@@ -266,6 +299,8 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         self.variant = variant
         self.stage2_mode = stage2_mode
         self.proxy_mode = proxy_mode
+        self.correction_mode = correction_mode
+        self.cross_fitting = cross_fitting
         self.n_folds = n_folds
         self.save_fold_nuisance = save_fold_nuisance
         self.random_state = random_state
@@ -746,6 +781,31 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                             hasattr(self, 'global_scaler_') and 
                             self.global_scaler_ is not None)
         
+        if not self.cross_fitting:
+            # ═══════════════════════════════════════════════════════════════════
+            # NO CROSS-FITTING: Fit nuisance on ALL data, compute pseudo-outcomes
+            # on same data. Simpler but may overfit.
+            # ═══════════════════════════════════════════════════════════════════
+            if self.verbose:
+                print(f"  Using NO cross-fitting (fitting on all {n_target} samples)")
+            
+            pseudo_outcomes = self._compute_pseudo_outcomes_no_crossfit(
+                X_target, A_target, Y_target, propensity_target,
+                variant, use_global_scaler
+            )
+            
+            # Fit final CATE model
+            self.cate_model_ = clone(self.cate_model)
+            self.cate_model_.fit(X_target, pseudo_outcomes)
+            
+            # Store global corrections (for predict_anchored convenience)
+            self._fit_global_corrections(X_target, A_target, Y_target, flags)
+            
+            return self
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # CROSS-FITTING (default): K-fold cross-fitting for DR pseudo-outcomes
+        # ═══════════════════════════════════════════════════════════════════════
         for fold_idx, (train_idx, val_idx) in enumerate(skf.split(X_target, A_target)):
             # Store fold indices for reproducibility
             self.folds_.append((train_idx.copy(), val_idx.copy()))
@@ -807,9 +867,13 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                 )
                 delta_1_fold = _ZeroDelta(self.n_features_)
                 
-                # Anchored predictions
-                mu0_val = self.proxy_models_[0].predict(X_val) + delta_0_fold.predict(X_val)
-                mu1_val = self.proxy_models_[1].predict(X_val)  # No correction for treated
+                # Compute predictions based on correction_mode
+                if self.correction_mode == 'direct' and isinstance(delta_0_fold, _DirectModelWrapper):
+                    mu0_val = delta_0_fold.predict(X_val)
+                    mu1_val = self.proxy_models_[1].predict(X_val)  # No correction for treated
+                else:
+                    mu0_val = self.proxy_models_[0].predict(X_val) + delta_0_fold.predict(X_val)
+                    mu1_val = self.proxy_models_[1].predict(X_val)  # No correction for treated
                 
             elif variant == 'proposed_A':
                 # Option A: Estimate both corrections from target data
@@ -820,13 +884,18 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                     X_train, A_train, Y_train, arm=1, use_global_scaler=False
                 )
                 
-                # Anchored predictions
-                mu0_val = self.proxy_models_[0].predict(X_val) + delta_0_fold.predict(X_val)
-                mu1_val = self.proxy_models_[1].predict(X_val) + delta_1_fold.predict(X_val)
+                # Compute predictions based on correction_mode
+                if self.correction_mode == 'direct':
+                    # Direct mode: use fitted models directly
+                    mu0_val = delta_0_fold.predict(X_val)
+                    mu1_val = delta_1_fold.predict(X_val)
+                else:
+                    # Residual mode: proxy + correction
+                    mu0_val = self.proxy_models_[0].predict(X_val) + delta_0_fold.predict(X_val)
+                    mu1_val = self.proxy_models_[1].predict(X_val) + delta_1_fold.predict(X_val)
             
             elif variant == 'proposed_A_together':
-                # Option A Together: Fit a single joint correction model δ(X, A)
-                # Instead of separate δ₀(X) and δ₁(X), we fit δ([X, A]) on all target data
+                # Option A Together: Fit a single joint model on all target data
                 delta_joint_fold = self._fit_fold_joint_correction(
                     X_train, A_train, Y_train, use_global_scaler=False
                 )
@@ -835,25 +904,38 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                 delta_0_fold = _ZeroDelta(self.n_features_)
                 delta_1_fold = _ZeroDelta(self.n_features_)
                 
-                # Anchored predictions using joint model
                 # Create augmented features: [X, A=0] and [X, A=1]
                 n_val = len(X_val)
                 X_aug_0 = np.column_stack([X_val, np.zeros(n_val)])
                 X_aug_1 = np.column_stack([X_val, np.ones(n_val)])
                 
-                mu0_val = self.proxy_models_[0].predict(X_val) + delta_joint_fold.predict(X_aug_0)
-                mu1_val = self.proxy_models_[1].predict(X_val) + delta_joint_fold.predict(X_aug_1)
+                # Compute predictions based on correction_mode
+                if self.correction_mode == 'direct':
+                    # Direct mode: joint model predicts μ directly
+                    mu0_val = delta_joint_fold.predict(X_aug_0)
+                    mu1_val = delta_joint_fold.predict(X_aug_1)
+                else:
+                    # Residual mode: proxy + joint correction
+                    mu0_val = self.proxy_models_[0].predict(X_val) + delta_joint_fold.predict(X_aug_0)
+                    mu1_val = self.proxy_models_[1].predict(X_val) + delta_joint_fold.predict(X_aug_1)
                 
             elif variant == 'proposed_B':
                 # Option B: Placebo correction with global scaler, transfer for treated
+                # NOTE: Direct mode doesn't make sense for Option B (transfer requires residuals)
+                # In direct mode, we fall back to fitting directly but transfer still uses proxy
                 delta_0_fold = self._fit_fold_correction(
                     X_train, A_train, Y_train, arm=0, use_global_scaler=use_global_scaler
                 )
                 delta_1_fold = self._apply_transfer_operator(delta_0_fold)
                 
-                # Anchored predictions
-                mu0_val = self.proxy_models_[0].predict(X_val) + delta_0_fold.predict(X_val)
-                mu1_val = self.proxy_models_[1].predict(X_val) + delta_1_fold.predict(X_val)
+                # Compute predictions based on correction_mode
+                if self.correction_mode == 'direct' and isinstance(delta_0_fold, _DirectModelWrapper):
+                    mu0_val = delta_0_fold.predict(X_val)
+                    # For treated, still use proxy + transferred delta (direct doesn't affect transfer)
+                    mu1_val = self.proxy_models_[1].predict(X_val) + delta_1_fold.predict(X_val)
+                else:
+                    mu0_val = self.proxy_models_[0].predict(X_val) + delta_0_fold.predict(X_val)
+                    mu1_val = self.proxy_models_[1].predict(X_val) + delta_1_fold.predict(X_val)
                 
             else:
                 raise ValueError(f"Invalid variant: {variant}")
@@ -1099,7 +1181,7 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
     
     def _fit_fold_correction(self, X_train, A_train, Y_train, arm, use_global_scaler=False):
         """
-        Fit correction model for one arm on one fold's training data.
+        Fit correction/outcome model for one arm on one fold's training data.
         
         Parameters
         ----------
@@ -1112,46 +1194,58 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
             
         Returns
         -------
-        delta : correction model with .predict(X) method
+        model : fitted model with .predict(X) method
+            If correction_mode='residual': returns delta where μ = proxy + delta
+            If correction_mode='direct': returns μ_target directly
         """
         mask = (A_train == arm)
         n_arm = np.sum(mask)
         
         if n_arm < 5:
             if self.verbose:
-                print(f"    Arm {arm}: Only {n_arm} samples, using zero correction")
-            return _ZeroDelta(self.n_features_)
+                print(f"    Arm {arm}: Only {n_arm} samples, using zero/fallback")
+            if self.correction_mode == 'direct':
+                # For direct mode, fall back to proxy model
+                return _DirectModelWrapper(self.proxy_models_[arm], is_direct=True)
+            else:
+                return _ZeroDelta(self.n_features_)
         
         X_arm = X_train[mask]
         Y_arm = Y_train[mask]
-        mu_proxy = self.proxy_models_[arm].predict(X_arm)
-        resid = Y_arm - mu_proxy
         
-        if use_global_scaler and self.global_scaler_ is not None:
-            # Fit in global scaled space for M compatibility
-            X_arm_scaled = self.global_scaler_.transform(X_arm)
-            lasso = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
-                           random_state=self.random_state, n_jobs=-1)
-            lasso.fit(X_arm_scaled, resid)
-            # FIX #4: Store alpha_ for diagnostics
-            return _ScaledDelta(
-                coef=lasso.coef_, 
-                scaler=self.global_scaler_, 
-                intercept=lasso.intercept_,
-                alpha=getattr(lasso, 'alpha_', None)
-            )
+        if self.correction_mode == 'direct':
+            # DIRECT MODE: Fit outcome model directly on Y (ignore proxy)
+            model = clone(self.correction_model)
+            model.fit(X_arm, Y_arm)
+            return _DirectModelWrapper(model, is_direct=True)
         else:
-            # Use pipeline with local scaler
-            delta = clone(self.correction_model)
-            delta.fit(X_arm, resid)
-            return delta
+            # RESIDUAL MODE (default): Fit correction on Y - proxy
+            mu_proxy = self.proxy_models_[arm].predict(X_arm)
+            resid = Y_arm - mu_proxy
+            
+            if use_global_scaler and self.global_scaler_ is not None:
+                # Fit in global scaled space for M compatibility
+                X_arm_scaled = self.global_scaler_.transform(X_arm)
+                lasso = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
+                               random_state=self.random_state, n_jobs=-1)
+                lasso.fit(X_arm_scaled, resid)
+                return _ScaledDelta(
+                    coef=lasso.coef_, 
+                    scaler=self.global_scaler_, 
+                    intercept=lasso.intercept_,
+                    alpha=getattr(lasso, 'alpha_', None)
+                )
+            else:
+                # Use pipeline with local scaler
+                delta = clone(self.correction_model)
+                delta.fit(X_arm, resid)
+                return delta
     
     def _fit_fold_joint_correction(self, X_train, A_train, Y_train, use_global_scaler=False):
         """
-        Fit a JOINT correction model δ(X, A) on all target data (both arms together).
+        Fit a JOINT model on all target data (both arms together).
         
-        Instead of fitting separate δ₀(X) and δ₁(X), this fits a single model
-        that takes treatment A as an additional feature: δ([X, A]).
+        Fits a single model that takes treatment A as an additional feature.
         
         Parameters
         ----------
@@ -1162,54 +1256,176 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
             
         Returns
         -------
-        delta_joint : correction model with .predict([X, A]) method
+        model : fitted model with .predict([X, A]) method
+            If correction_mode='residual': returns δ(X,A) where μ = proxy + δ
+            If correction_mode='direct': returns μ(X,A) directly
         """
         n_samples = len(X_train)
         
         if n_samples < 5:
             if self.verbose:
-                print(f"    Joint: Only {n_samples} samples, using zero correction")
+                print(f"    Joint: Only {n_samples} samples, using zero/fallback")
             return _ZeroJointDelta(self.n_features_)
-        
-        # Compute residuals: Y - proxy(X, A)
-        # Use arm-specific proxies to compute residuals
-        resid = np.zeros(n_samples)
-        for arm in [0, 1]:
-            mask = (A_train == arm)
-            if mask.sum() > 0:
-                resid[mask] = Y_train[mask] - self.proxy_models_[arm].predict(X_train[mask])
         
         # Create augmented features [X, A]
         X_aug = np.column_stack([X_train, A_train])
         
-        if use_global_scaler and self.global_scaler_ is not None:
-            # Scale X part only, leave A as-is
-            X_scaled = self.global_scaler_.transform(X_train)
-            X_aug_scaled = np.column_stack([X_scaled, A_train])
-            
-            lasso = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
-                           random_state=self.random_state, n_jobs=-1)
-            lasso.fit(X_aug_scaled, resid)
-            
-            return _ScaledJointDelta(
-                coef=lasso.coef_,
-                scaler=self.global_scaler_,
-                intercept=lasso.intercept_,
-                alpha=getattr(lasso, 'alpha_', None)
-            )
-        else:
-            # Fit with local scaling
+        if self.correction_mode == 'direct':
+            # DIRECT MODE: Fit outcome model directly on Y
             from sklearn.preprocessing import StandardScaler
             from sklearn.pipeline import Pipeline
             
-            # Create a pipeline for the joint model
             joint_model = Pipeline([
                 ('scaler', StandardScaler()),
                 ('lasso', LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
                                  random_state=self.random_state, n_jobs=-1))
             ])
-            joint_model.fit(X_aug, resid)
+            joint_model.fit(X_aug, Y_train)
             return joint_model
+        else:
+            # RESIDUAL MODE (default): Fit correction on Y - proxy
+            # Compute residuals using arm-specific proxies
+            resid = np.zeros(n_samples)
+            for arm in [0, 1]:
+                mask = (A_train == arm)
+                if mask.sum() > 0:
+                    resid[mask] = Y_train[mask] - self.proxy_models_[arm].predict(X_train[mask])
+            
+            if use_global_scaler and self.global_scaler_ is not None:
+                # Scale X part only, leave A as-is
+                X_scaled = self.global_scaler_.transform(X_train)
+                X_aug_scaled = np.column_stack([X_scaled, A_train])
+                
+                lasso = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
+                               random_state=self.random_state, n_jobs=-1)
+                lasso.fit(X_aug_scaled, resid)
+                
+                return _ScaledJointDelta(
+                    coef=lasso.coef_,
+                    scaler=self.global_scaler_,
+                    intercept=lasso.intercept_,
+                    alpha=getattr(lasso, 'alpha_', None)
+                )
+            else:
+                # Fit with local scaling
+                from sklearn.preprocessing import StandardScaler
+                from sklearn.pipeline import Pipeline
+                
+                joint_model = Pipeline([
+                    ('scaler', StandardScaler()),
+                    ('lasso', LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
+                                     random_state=self.random_state, n_jobs=-1))
+                ])
+                joint_model.fit(X_aug, resid)
+                return joint_model
+    
+    def _compute_pseudo_outcomes_no_crossfit(self, X_target, A_target, Y_target, 
+                                               propensity_target, variant, use_global_scaler):
+        """
+        Compute DR pseudo-outcomes WITHOUT cross-fitting.
+        
+        Fits nuisance models on ALL target data and computes pseudo-outcomes
+        on the same data. Simpler but can lead to overfitting.
+        
+        Parameters
+        ----------
+        X_target, A_target, Y_target : arrays
+            Target data
+        propensity_target : array
+            Treatment propensities
+        variant : str
+            Estimator variant
+        use_global_scaler : bool
+            Whether to use global scaler (for Option B)
+            
+        Returns
+        -------
+        pseudo_outcomes : array
+            DR pseudo-outcomes for all target samples
+        """
+        n_target = len(X_target)
+        
+        # Fit nuisance models on ALL data
+        if variant in ['target_only_dr', 'no_transfer']:
+            # Target-only: fit outcome models directly
+            mu_models = {}
+            for arm in [0, 1]:
+                mask_arm = (A_target == arm)
+                if mask_arm.sum() >= 5:
+                    m = clone(self.proxy_model)
+                    m.fit(X_target[mask_arm], Y_target[mask_arm])
+                    mu_models[arm] = m
+                else:
+                    mu_models[arm] = _ZeroProxy(self.n_features_)
+            
+            mu0 = mu_models[0].predict(X_target)
+            mu1 = mu_models[1].predict(X_target)
+            
+        elif variant == 'proxy_only':
+            mu0 = self.proxy_models_[0].predict(X_target)
+            mu1 = self.proxy_models_[1].predict(X_target)
+            
+        elif variant == 'anchor_only':
+            delta_0 = self._fit_fold_correction(
+                X_target, A_target, Y_target, arm=0, use_global_scaler=False
+            )
+            if self.correction_mode == 'direct' and isinstance(delta_0, _DirectModelWrapper):
+                mu0 = delta_0.predict(X_target)
+            else:
+                mu0 = self.proxy_models_[0].predict(X_target) + delta_0.predict(X_target)
+            mu1 = self.proxy_models_[1].predict(X_target)
+            
+        elif variant == 'proposed_A':
+            delta_0 = self._fit_fold_correction(
+                X_target, A_target, Y_target, arm=0, use_global_scaler=False
+            )
+            delta_1 = self._fit_fold_correction(
+                X_target, A_target, Y_target, arm=1, use_global_scaler=False
+            )
+            if self.correction_mode == 'direct':
+                mu0 = delta_0.predict(X_target)
+                mu1 = delta_1.predict(X_target)
+            else:
+                mu0 = self.proxy_models_[0].predict(X_target) + delta_0.predict(X_target)
+                mu1 = self.proxy_models_[1].predict(X_target) + delta_1.predict(X_target)
+            
+        elif variant == 'proposed_A_together':
+            delta_joint = self._fit_fold_joint_correction(
+                X_target, A_target, Y_target, use_global_scaler=False
+            )
+            X_aug_0 = np.column_stack([X_target, np.zeros(n_target)])
+            X_aug_1 = np.column_stack([X_target, np.ones(n_target)])
+            
+            if self.correction_mode == 'direct':
+                mu0 = delta_joint.predict(X_aug_0)
+                mu1 = delta_joint.predict(X_aug_1)
+            else:
+                mu0 = self.proxy_models_[0].predict(X_target) + delta_joint.predict(X_aug_0)
+                mu1 = self.proxy_models_[1].predict(X_target) + delta_joint.predict(X_aug_1)
+            
+        elif variant == 'proposed_B':
+            delta_0 = self._fit_fold_correction(
+                X_target, A_target, Y_target, arm=0, use_global_scaler=use_global_scaler
+            )
+            delta_1 = self._apply_transfer_operator(delta_0)
+            
+            if self.correction_mode == 'direct' and isinstance(delta_0, _DirectModelWrapper):
+                mu0 = delta_0.predict(X_target)
+                mu1 = self.proxy_models_[1].predict(X_target) + delta_1.predict(X_target)
+            else:
+                mu0 = self.proxy_models_[0].predict(X_target) + delta_0.predict(X_target)
+                mu1 = self.proxy_models_[1].predict(X_target) + delta_1.predict(X_target)
+        else:
+            raise ValueError(f"Invalid variant for no-crossfit: {variant}")
+        
+        # Compute DR pseudo-outcomes
+        tau = mu1 - mu0
+        e_clipped = np.clip(propensity_target, 1e-3, 1 - 1e-3)
+        mu_a = np.where(A_target == 1, mu1, mu0)
+        
+        pseudo_outcomes = tau + ((A_target - e_clipped) / (e_clipped * (1 - e_clipped))) * (Y_target - mu_a)
+        
+        return pseudo_outcomes
     
     def _track_stage2_diagnostics(self, delta_0, delta_1):
         """Track Stage-2 LASSO diagnostics from fold corrections."""

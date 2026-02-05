@@ -480,6 +480,74 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
             random_state=seed
         ),
         
+        # ═══════════════════════════════════════════════════════════════════
+        # DIRECT MODE VARIANTS: Fit on Y directly (not residuals)
+        # ═══════════════════════════════════════════════════════════════════
+        
+        # Direct mode: fit μ directly on target Y (no residual structure)
+        'ProposedA_Direct': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A',
+            correction_mode='direct',
+            random_state=seed
+        ),
+        
+        # Direct + joint correction
+        'ProposedA_Together_Direct': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A_together',
+            correction_mode='direct',
+            random_state=seed
+        ),
+        
+        # Direct + joint proxy
+        'ProposedA_JointProxy_Direct': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A',
+            proxy_mode='together',
+            correction_mode='direct',
+            random_state=seed
+        ),
+        
+        # Fully direct: joint proxy + joint correction + direct fitting
+        'ProposedA_FullyDirect': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A_together',
+            proxy_mode='together',
+            correction_mode='direct',
+            random_state=seed
+        ),
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # NO CROSS-FITTING VARIANTS: Fit on all data (no held-out)
+        # ═══════════════════════════════════════════════════════════════════
+        
+        # No cross-fitting with separate models
+        'ProposedA_NoCrossfit': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A',
+            cross_fitting=False,
+            random_state=seed
+        ),
+        
+        # No cross-fitting + direct mode
+        'ProposedA_Direct_NoCrossfit': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A',
+            correction_mode='direct',
+            cross_fitting=False,
+            random_state=seed
+        ),
+        
+        # No cross-fitting + joint correction
+        'ProposedA_Together_NoCrossfit': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A_together',
+            cross_fitting=False,
+            random_state=seed
+        ),
+        
+        # No cross-fitting + joint + direct
+        'ProposedA_Together_Direct_NoCrossfit': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A_together',
+            correction_mode='direct',
+            cross_fitting=False,
+            random_state=seed
+        ),
+        
         # Proposed Option B (target DR): needs target treated for Stage 3
         # NOTE: Despite Step B, this still requires target treated for DR!
         'ProposedB_LinearStepB': lambda: PlaceboAnchoredDRLearner(

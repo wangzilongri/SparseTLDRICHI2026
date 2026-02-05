@@ -347,6 +347,88 @@ METHOD_REGISTRY: Dict[str, MethodSpec] = {
         description="Proposed Option A with joint models (Stage 1 + Stage 2)"
     ),
     
+    # Direct mode variants: fit on Y directly (not residuals)
+    "ProposedA_Direct": MethodSpec(
+        method="ProposedA_Direct",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A with direct fitting (no residuals)"
+    ),
+    
+    "ProposedA_Together_Direct": MethodSpec(
+        method="ProposedA_Together_Direct",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A: joint correction + direct fitting"
+    ),
+    
+    "ProposedA_JointProxy_Direct": MethodSpec(
+        method="ProposedA_JointProxy_Direct",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A: joint proxy + direct fitting"
+    ),
+    
+    "ProposedA_FullyDirect": MethodSpec(
+        method="ProposedA_FullyDirect",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A: joint proxy + joint correction + direct fitting"
+    ),
+    
+    # No cross-fitting variants
+    "ProposedA_NoCrossfit": MethodSpec(
+        method="ProposedA_NoCrossfit",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A without cross-fitting"
+    ),
+    
+    "ProposedA_Direct_NoCrossfit": MethodSpec(
+        method="ProposedA_Direct_NoCrossfit",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A: direct fitting, no cross-fitting"
+    ),
+    
+    "ProposedA_Together_NoCrossfit": MethodSpec(
+        method="ProposedA_Together_NoCrossfit",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A: joint correction, no cross-fitting"
+    ),
+    
+    "ProposedA_Together_Direct_NoCrossfit": MethodSpec(
+        method="ProposedA_Together_Direct_NoCrossfit",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A: joint + direct + no cross-fitting"
+    ),
+    
     # Proposed Option B with linear Step B + TARGET-based DR
     # CRITICAL FIX: Stage 3 DR on target STILL requires target treated!
     "ProposedB_LinearStepB": MethodSpec(
