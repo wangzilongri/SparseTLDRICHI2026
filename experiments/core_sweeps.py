@@ -233,7 +233,10 @@ DEFAULT_METHODS_OPTION_A = [
     'AnchorPlugin',        # Placebo anchor, plug-in (no DR) - for comparison
     
     # Proposed methods
-    'ProposedA',           # Both corrections from target
+    'ProposedA',           # Both corrections from target (separate proxy, separate correction)
+    'ProposedA_Together',  # Separate proxy, joint correction δ(X, A)
+    'ProposedA_JointProxy', # Joint proxy μ(X, A), separate correction
+    'ProposedA_FullyJoint', # Joint proxy AND joint correction
     'ProposedB_LinearStepB',  # Step B + target-DR
     'ProposedB_SourceDR',  # Step B + source-DR (for comparison)
     
@@ -1606,8 +1609,12 @@ def _get_method_description(method: str) -> str:
         'NoTransfer': 'Uses only target placebo, no transfer',
         'ProxyOnly': 'Uses only source data, ignores target',
         'AnchorOnly': 'Uses only target placebo data',
-        'ProposedA': 'Proposed (Option A): requires target treated',
+        'ProposedA': 'Proposed (Option A): separate proxy μ₀,μ₁ + separate correction δ₀,δ₁',
+        'ProposedA_Together': 'Proposed (Option A): separate proxy + joint correction δ(X,A)',
+        'ProposedA_JointProxy': 'Proposed (Option A): joint proxy μ(X,A) + separate correction',
+        'ProposedA_FullyJoint': 'Proposed (Option A): joint proxy + joint correction (fully pooled)',
         'ProposedB_LinearStepB': 'Proposed (Option B): placebo-anchored with linear Step B',
+        'ProposedB_SourceDR': 'Proposed (Option B): source-DR for placebo-only target',
         'ProposedB_KernelStepB': 'Proposed (Option B): placebo-anchored with kernel Step B',
     }
     return descriptions.get(method, 'See documentation')

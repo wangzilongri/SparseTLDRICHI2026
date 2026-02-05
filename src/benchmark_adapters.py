@@ -460,6 +460,26 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
             random_state=seed
         ),
         
+        # Proposed Option A Together: joint correction model with A as feature
+        'ProposedA_Together': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A_together', 
+            random_state=seed
+        ),
+        
+        # Proposed Option A with joint proxy: single Stage 1 model μ(X, A)
+        'ProposedA_JointProxy': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A',
+            proxy_mode='together',
+            random_state=seed
+        ),
+        
+        # Proposed Option A fully joint: joint proxy AND joint correction
+        'ProposedA_FullyJoint': lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_A_together',
+            proxy_mode='together',
+            random_state=seed
+        ),
+        
         # Proposed Option B (target DR): needs target treated for Stage 3
         # NOTE: Despite Step B, this still requires target treated for DR!
         'ProposedB_LinearStepB': lambda: PlaceboAnchoredDRLearner(
@@ -564,6 +584,7 @@ def run_methods_efficiently(
         'AnchorOnly': 'anchor_only',
         'AnchorOnlyA': 'anchor_only_A',  # Added new variant
         'ProposedA': 'proposed_A',
+        'ProposedA_Together': 'proposed_A_together',  # Joint outcome model
         'ProposedB_LinearStepB': 'proposed_B',
         'ProposedB_RidgeStage2': 'proposed_B',  # Same variant, different stage2_mode
     }
@@ -576,7 +597,7 @@ def run_methods_efficiently(
     variants = [method_to_variant.get(m, 'proposed_B') for m in methods if m in method_to_variant]
     
     # Determine what needs to be fit (FIX #2: only fit what's needed)
-    need_proxy = any(v in ['proxy_only', 'anchor_only', 'anchor_only_A', 'proposed_A', 'proposed_B'] for v in variants)
+    need_proxy = any(v in ['proxy_only', 'anchor_only', 'anchor_only_A', 'proposed_A', 'proposed_A_together', 'proposed_B'] for v in variants)
     need_stepB = any(v == 'proposed_B' for v in variants)
     
     results = {}

@@ -314,6 +314,39 @@ METHOD_REGISTRY: Dict[str, MethodSpec] = {
         description="Proposed with direct target corrections (Option A)"
     ),
     
+    # Proposed Option A Together: joint correction model with treatment as feature
+    "ProposedA_Together": MethodSpec(
+        method="ProposedA_Together",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A with joint correction model (Stage 2)"
+    ),
+    
+    # Proposed Option A with joint proxy model
+    "ProposedA_JointProxy": MethodSpec(
+        method="ProposedA_JointProxy",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A with joint proxy model (Stage 1)"
+    ),
+    
+    # Proposed Option A fully joint: joint proxy AND joint correction
+    "ProposedA_FullyJoint": MethodSpec(
+        method="ProposedA_FullyJoint",
+        feasibility_restricted=Feasibility.INFEASIBLE_BY_DESIGN,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="Proposed Option A with joint models (Stage 1 + Stage 2)"
+    ),
+    
     # Proposed Option B with linear Step B + TARGET-based DR
     # CRITICAL FIX: Stage 3 DR on target STILL requires target treated!
     "ProposedB_LinearStepB": MethodSpec(

@@ -82,6 +82,85 @@ class _TransferredDelta:
         return X @ self.coef_ + self.intercept_
 
 
+class _ZeroJointDelta:
+    """Fallback predictor for joint model (predicts zeros)."""
+    def __init__(self, n_features):
+        # n_features + 1 for the treatment indicator
+        self.coef_ = np.zeros(n_features + 1)
+        self.intercept_ = 0.0
+        self.n_features = n_features
+    
+    def predict(self, X_aug):
+        """X_aug is [X, A] with A as the last column."""
+        return np.zeros(len(X_aug))
+
+
+class _ScaledJointDelta:
+    """Joint delta predictor that uses a global scaler for X (not A)."""
+    def __init__(self, coef, scaler, intercept=0.0, alpha=None):
+        self.coef_ = coef
+        self.scaler = scaler
+        self.intercept_ = intercept
+        self.alpha_ = alpha
+    
+    def predict(self, X_aug):
+        """X_aug is [X, A] with A as the last column.
+        
+        Scale X part using global scaler, leave A as-is.
+        """
+        X = X_aug[:, :-1]  # All but last column
+        A = X_aug[:, -1:]  # Last column (treatment)
+        
+        if self.scaler is not None:
+            X_scaled = self.scaler.transform(X)
+            X_aug_scaled = np.column_stack([X_scaled, A])
+            return X_aug_scaled @ self.coef_ + self.intercept_
+        return X_aug @ self.coef_ + self.intercept_
+
+
+class _JointDeltaWrapper:
+    """Wrapper to make joint model behave like arm-specific delta for predict_anchored()."""
+    def __init__(self, joint_model, arm):
+        self.joint_model = joint_model
+        self.arm = arm
+        # Extract coefficients for diagnostics (if accessible)
+        if hasattr(joint_model, 'named_steps') and 'lasso' in joint_model.named_steps:
+            self.coef_ = joint_model.named_steps['lasso'].coef_[:-1]  # X coefs only
+            self.intercept_ = joint_model.named_steps['lasso'].intercept_
+        else:
+            self.coef_ = np.array([])
+            self.intercept_ = 0.0
+    
+    def predict(self, X):
+        """Predict correction for this arm by augmenting X with arm indicator."""
+        n = len(X)
+        A = np.full(n, self.arm)
+        X_aug = np.column_stack([X, A])
+        return self.joint_model.predict(X_aug)
+
+
+class _JointProxyWrapper:
+    """Wrapper to make joint proxy model behave like arm-specific proxy for compatibility.
+    
+    This allows proxy_models_[0] and proxy_models_[1] to work seamlessly with the
+    joint model by automatically augmenting X with the appropriate treatment indicator.
+    """
+    def __init__(self, joint_model, arm):
+        self.joint_model = joint_model
+        self.arm = arm
+    
+    def predict(self, X):
+        """Predict outcome for this arm by augmenting X with arm indicator."""
+        n = len(X)
+        A = np.full(n, self.arm)
+        X_aug = np.column_stack([X, A])
+        return self.joint_model.predict(X_aug)
+    
+    def fit(self, X, y):
+        """No-op: joint model is already fit."""
+        return self
+
+
 # =============================================================================
 # Valid Variants
 # =============================================================================
@@ -104,6 +183,7 @@ VALID_VARIANTS = [
     # Proposed methods
     # ═══════════════════════════════════════════════════════════════════════════
     'proposed_A',       # Stage1 + Stage2(both arms from target) + DR Stage3 (needs target treated)
+    'proposed_A_together',  # Stage1 + Stage2(joint model) + DR Stage3 - outcome model fit jointly with A as feature
     'proposed_B',       # Stage1 + StepB + Stage2(B) + DR Stage3 on TARGET (needs target treated!)
     'proposed_B_source_dr',  # Stage1 + StepB + Stage2(B) + DR Stage3 on SOURCE (placebo-only target OK!)
     
@@ -136,27 +216,56 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         - 'no_transfer': No source data, target-only naive
         - 'proxy_only': Source proxy only, no target anchoring (delta=0)
         - 'anchor_only': Proxy + placebo anchor, no Step B (treated delta=0)
-        - 'proposed_A': Full method with direct target corrections
+        - 'proposed_A': Full method with direct target corrections (separate by arm)
+        - 'proposed_A_together': Full method with joint outcome model (see below)
         - 'proposed_B': Full method with Step B operator transfer
+        - 'proposed_B_source_dr': Option B with source-based DR (placebo-only target OK)
     stage2_mode : str, default='lasso'
         Model for Stage 2 corrections: 'lasso', 'ridge', 'elasticnet'
+    proxy_mode : str, default='separate'
+        How to fit Stage 1 proxy models on source data:
+        - 'separate': Fit separate models μ₀(X) and μ₁(X) for each treatment arm
+        - 'together': Fit a single joint model μ(X, A) with treatment as a feature
     n_folds : int, default=5
         Number of folds for cross-fitting in Stage 3
     save_fold_nuisance : bool, default=False
         Whether to save fold-level nuisance models (for diagnostics)
     random_state : int, default=42
     verbose : bool, default=False
+    
+    Notes
+    -----
+    **proposed_A vs proposed_A_together:**
+    
+    Both variants estimate corrections from target data when both treatment arms
+    are available, but differ in how they model the outcome:
+    
+    - **proposed_A** (separate): Fits separate correction models for each arm:
+        - δ₀(X): correction for placebo arm, fit on {(Xᵢ, Yᵢ) : Aᵢ = 0}
+        - δ₁(X): correction for treated arm, fit on {(Xᵢ, Yᵢ) : Aᵢ = 1}
+        - Predictions: μ₀(x) = proxy₀(x) + δ₀(x), μ₁(x) = proxy₁(x) + δ₁(x)
+    
+    - **proposed_A_together** (joint): Fits a single joint correction model with
+      treatment A as an additional feature:
+        - δ(X, A): single model fit on all target data {(Xᵢ, Aᵢ, Yᵢ)}
+        - Predictions: μ₀(x) = proxy₀(x) + δ(x, 0), μ₁(x) = proxy₁(x) + δ(x, 1)
+    
+    The joint model can capture treatment-covariate interactions through the
+    augmented feature space [X, A], and may have better sample efficiency when
+    corrections share structure across arms. The separate model allows fully
+    flexible arm-specific corrections.
     """
     
     def __init__(self, proxy_model=None, correction_model=None, cate_model=None,
-                 option='A', variant=None, stage2_mode='lasso', n_folds=5,
-                 save_fold_nuisance=False, random_state=42, verbose=False):
+                 option='A', variant=None, stage2_mode='lasso', proxy_mode='separate',
+                 n_folds=5, save_fold_nuisance=False, random_state=42, verbose=False):
         self.proxy_model = proxy_model
         self.correction_model = correction_model
         self.cate_model = cate_model
         self.option = option
         self.variant = variant
         self.stage2_mode = stage2_mode
+        self.proxy_mode = proxy_mode
         self.n_folds = n_folds
         self.save_fold_nuisance = save_fold_nuisance
         self.random_state = random_state
@@ -206,13 +315,14 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         
         return {
             'do_stage1': variant in ['proxy_only', 'anchor_only', 'anchor_plugin', 
-                                     'proposed_A', 'proposed_B', 'proposed_B_source_dr'],
+                                     'proposed_A', 'proposed_A_together', 'proposed_B', 'proposed_B_source_dr'],
             'do_stage2': variant in ['anchor_only', 'anchor_plugin',
-                                     'proposed_A', 'proposed_B', 'proposed_B_source_dr'],
+                                     'proposed_A', 'proposed_A_together', 'proposed_B', 'proposed_B_source_dr'],
             'do_stepB': variant in ['proposed_B', 'proposed_B_source_dr'],
             'do_stage3': variant not in ['anchor_plugin'],  # Plugin skips Stage 3
             'do_plugin': variant in ['anchor_plugin'],  # Use plug-in CATE
             'source_dr': variant in ['proposed_B_source_dr'],  # DR on source, not target
+            'joint_outcome': variant in ['proposed_A_together'],  # Fit joint outcome model (X, A) -> Y
         }
         
     def fit(self, X_source, A_source, Y_source, c_source,
@@ -373,20 +483,43 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
         return self
     
     def _fit_proxy_models(self, X_source, A_source, Y_source):
-        """Stage 1: Fit proxy models on pooled source data."""
+        """Stage 1: Fit proxy models on pooled source data.
+        
+        Supports two modes controlled by self.proxy_mode:
+        - 'separate': Fit separate models μ₀(X) and μ₁(X) for each arm
+        - 'together': Fit a single joint model μ(X, A) with treatment as a feature
+        """
         self.proxy_models_ = {}
         
-        for a in [0, 1]:
-            mask = (A_source == a)
-            if np.sum(mask) == 0:
-                raise ValueError(f"No samples with A={a} in source data")
+        if self.proxy_mode == 'together':
+            # Joint model: fit single model μ(X, A) on all source data
+            X_aug = np.column_stack([X_source, A_source])
             
-            model = clone(self.proxy_model)
-            model.fit(X_source[mask], Y_source[mask])
-            self.proxy_models_[a] = model
+            joint_model = clone(self.proxy_model)
+            joint_model.fit(X_aug, Y_source)
+            
+            # Store the joint model
+            self.proxy_model_joint_ = joint_model
+            
+            # Create wrappers for compatibility with existing code
+            self.proxy_models_[0] = _JointProxyWrapper(joint_model, arm=0)
+            self.proxy_models_[1] = _JointProxyWrapper(joint_model, arm=1)
             
             if self.verbose:
-                print(f"  Proxy model for A={a}: {np.sum(mask)} samples")
+                print(f"  Joint proxy model: {len(Y_source)} samples (mode=together)")
+        else:
+            # Separate models: fit μ₀(X) and μ₁(X) independently
+            for a in [0, 1]:
+                mask = (A_source == a)
+                if np.sum(mask) == 0:
+                    raise ValueError(f"No samples with A={a} in source data")
+                
+                model = clone(self.proxy_model)
+                model.fit(X_source[mask], Y_source[mask])
+                self.proxy_models_[a] = model
+                
+                if self.verbose:
+                    print(f"  Proxy model for A={a}: {np.sum(mask)} samples")
     
     def _fit_transfer_operator(self, X_source, A_source, Y_source, c_source):
         """
@@ -690,6 +823,26 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                 # Anchored predictions
                 mu0_val = self.proxy_models_[0].predict(X_val) + delta_0_fold.predict(X_val)
                 mu1_val = self.proxy_models_[1].predict(X_val) + delta_1_fold.predict(X_val)
+            
+            elif variant == 'proposed_A_together':
+                # Option A Together: Fit a single joint correction model δ(X, A)
+                # Instead of separate δ₀(X) and δ₁(X), we fit δ([X, A]) on all target data
+                delta_joint_fold = self._fit_fold_joint_correction(
+                    X_train, A_train, Y_train, use_global_scaler=False
+                )
+                
+                # For tracking purposes, use placeholder deltas
+                delta_0_fold = _ZeroDelta(self.n_features_)
+                delta_1_fold = _ZeroDelta(self.n_features_)
+                
+                # Anchored predictions using joint model
+                # Create augmented features: [X, A=0] and [X, A=1]
+                n_val = len(X_val)
+                X_aug_0 = np.column_stack([X_val, np.zeros(n_val)])
+                X_aug_1 = np.column_stack([X_val, np.ones(n_val)])
+                
+                mu0_val = self.proxy_models_[0].predict(X_val) + delta_joint_fold.predict(X_aug_0)
+                mu1_val = self.proxy_models_[1].predict(X_val) + delta_joint_fold.predict(X_aug_1)
                 
             elif variant == 'proposed_B':
                 # Option B: Placebo correction with global scaler, transfer for treated
@@ -993,6 +1146,71 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
             delta.fit(X_arm, resid)
             return delta
     
+    def _fit_fold_joint_correction(self, X_train, A_train, Y_train, use_global_scaler=False):
+        """
+        Fit a JOINT correction model δ(X, A) on all target data (both arms together).
+        
+        Instead of fitting separate δ₀(X) and δ₁(X), this fits a single model
+        that takes treatment A as an additional feature: δ([X, A]).
+        
+        Parameters
+        ----------
+        X_train, A_train, Y_train : arrays
+            Training data for this fold (all arms)
+        use_global_scaler : bool
+            If True, use global scaler
+            
+        Returns
+        -------
+        delta_joint : correction model with .predict([X, A]) method
+        """
+        n_samples = len(X_train)
+        
+        if n_samples < 5:
+            if self.verbose:
+                print(f"    Joint: Only {n_samples} samples, using zero correction")
+            return _ZeroJointDelta(self.n_features_)
+        
+        # Compute residuals: Y - proxy(X, A)
+        # Use arm-specific proxies to compute residuals
+        resid = np.zeros(n_samples)
+        for arm in [0, 1]:
+            mask = (A_train == arm)
+            if mask.sum() > 0:
+                resid[mask] = Y_train[mask] - self.proxy_models_[arm].predict(X_train[mask])
+        
+        # Create augmented features [X, A]
+        X_aug = np.column_stack([X_train, A_train])
+        
+        if use_global_scaler and self.global_scaler_ is not None:
+            # Scale X part only, leave A as-is
+            X_scaled = self.global_scaler_.transform(X_train)
+            X_aug_scaled = np.column_stack([X_scaled, A_train])
+            
+            lasso = LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
+                           random_state=self.random_state, n_jobs=-1)
+            lasso.fit(X_aug_scaled, resid)
+            
+            return _ScaledJointDelta(
+                coef=lasso.coef_,
+                scaler=self.global_scaler_,
+                intercept=lasso.intercept_,
+                alpha=getattr(lasso, 'alpha_', None)
+            )
+        else:
+            # Fit with local scaling
+            from sklearn.preprocessing import StandardScaler
+            from sklearn.pipeline import Pipeline
+            
+            # Create a pipeline for the joint model
+            joint_model = Pipeline([
+                ('scaler', StandardScaler()),
+                ('lasso', LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
+                                 random_state=self.random_state, n_jobs=-1))
+            ])
+            joint_model.fit(X_aug, resid)
+            return joint_model
+    
     def _track_stage2_diagnostics(self, delta_0, delta_1):
         """Track Stage-2 LASSO diagnostics from fold corrections."""
         for delta, arm_name in [(delta_0, 'delta_0'), (delta_1, 'delta_1')]:
@@ -1175,6 +1393,38 @@ class PlaceboAnchoredDRLearner(BaseEstimator, RegressorMixin):
                         self.delta_1_global_ = self._apply_transfer_operator(self.delta_0_global_)
                     else:
                         self.delta_1_global_ = _ZeroDelta(self.n_features_)
+            
+            elif variant == 'proposed_A_together':
+                # Joint correction: fit single model on all target data
+                n_target = len(X_target)
+                if n_target >= 5:
+                    # Compute residuals using arm-specific proxies
+                    resid = np.zeros(n_target)
+                    for arm in [0, 1]:
+                        mask = (A_target == arm)
+                        if mask.sum() > 0:
+                            resid[mask] = Y_target[mask] - self.proxy_models_[arm].predict(X_target[mask])
+                    
+                    # Create augmented features [X, A]
+                    X_aug = np.column_stack([X_target, A_target])
+                    
+                    # Fit joint model
+                    from sklearn.preprocessing import StandardScaler
+                    from sklearn.pipeline import Pipeline
+                    self.delta_joint_global_ = Pipeline([
+                        ('scaler', StandardScaler()),
+                        ('lasso', LassoCV(cv=5, fit_intercept=True, max_iter=10000, tol=1e-3,
+                                         random_state=self.random_state, n_jobs=-1))
+                    ])
+                    self.delta_joint_global_.fit(X_aug, resid)
+                    
+                    # Create wrapper deltas for compatibility with predict_anchored
+                    self.delta_0_global_ = _JointDeltaWrapper(self.delta_joint_global_, arm=0)
+                    self.delta_1_global_ = _JointDeltaWrapper(self.delta_joint_global_, arm=1)
+                else:
+                    self.delta_joint_global_ = _ZeroJointDelta(self.n_features_)
+                    self.delta_0_global_ = _ZeroDelta(self.n_features_)
+                    self.delta_1_global_ = _ZeroDelta(self.n_features_)
         
         # Report sparsity
         if self.verbose:
