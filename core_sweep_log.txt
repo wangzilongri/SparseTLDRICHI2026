@@ -1,0 +1,29 @@
+
+======================================================================
+Core Sweeps Benchmark Runner
+======================================================================
+Sweep: all
+Reps: 40000
+Seed: 42
+Output: results/sweeps2
+Methods: default
+Parallel jobs: -1 (all cores)
+Parallel sweeps: False
+======================================================================
+
+
+======================================================================
+Running gold sweep...
+======================================================================
+======================================================================
+Sweep: Target placebo (m₀) budget sweep
+Benchmark ID: gold_sweep
+Sweep param: m0 ∈ [25, 50, 100, 200, 500]
+Methods: ['NoTransfer', 'ProxyOnly', 'AnchorOnly', 'ProposedA', 'ProposedB_LinearStepB']
+Reps: 40000
+Parallel jobs: 127 (127 cores available)
+======================================================================
+Total tasks: 200000 (scenario × rep)
+Total method evaluations: 1000000
+
+Starting parallel execution with 127 workers...
