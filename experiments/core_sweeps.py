@@ -489,7 +489,7 @@ where $\\beta_{1,c} = M^* \\beta_{0,c} + \\nu_c$ with small $\\nu_c$.
     
     'gold_fair_dim': {
         'benchmark_id': 'gold_fair_dim_sweep',
-        'description': 'Fair DGP: Target size × Dimensionality grid (m₀ × p_dim)',
+        'description': 'Fair DGP: Target budget (m₀,m₁) × Dimensionality grid',
         'base_scenario': {
             'n_proxy_total': 20000,
             'C_sources': 10,
@@ -499,24 +499,29 @@ where $\\beta_{1,c} = M^* \\beta_{0,c} + \\nu_c$ with small $\\nu_c$.
             'intercept_drift_scale': 0.5,  # Controlled drift
         },
         'sweep_type': '2d',
-        'sweep_param': 'm0',
-        'sweep_values': [50, 100, 200, 500],  # Target sample size (m0 = m1)
+        'sweep_param': 'm1',  # Primary sweep is m1 (treated)
+        'sweep_values': [0, 50, 100, 200, 500],  # m1 values starting at 0
         'secondary_param': 'p_dim',
         'secondary_values': [10, 20, 50, 100],  # Feature dimensionality
-        # m1 tracks m0 (equal placebo/treated in target)
-        'coupled_params': {'m1': 'm0'},
+        # m0 = m1 + 50 (staggered: always 50 more placebo than treated)
+        'coupled_params': {'m0': ('m1', 50)},  # (source_param, offset)
         'methods': DEFAULT_METHODS_OPTION_A,
+        # Show (m0, m1) tuples on x-axis
+        'x_axis_label': 'Target budget (m0, m1)',
+        'show_budget_tuples': True,
         
         'motivation': """
 **Research Question:** How do target sample size and feature dimensionality jointly affect estimator performance under fair DGP settings?
 
 **Why This Matters:**
 This 2D grid explores the interaction between:
-1. **Target size (m₀ = m₁):** More target data → less need for transfer
+1. **Target budget (m₀, m₁):** More target data → less need for transfer
+   - m₀ = m₁ + 50 (staggered: always 50 more placebo than treated)
+   - Includes m₁=0 case (placebo-only target) to test Option B methods
 2. **Dimensionality (d):** Higher d → harder estimation, potentially more benefit from source data
 
 **Key Grid:**
-- Target: m₀ = m₁ ∈ {50, 100, 200, 500}
+- Target budgets: (50,0), (100,50), (150,100), (250,200), (550,500)
 - Dimension: d ∈ {10, 20, 50, 100}
 - Total: 4 × 4 = 16 scenarios
 
@@ -1424,9 +1429,17 @@ def run_sweep(
                 scenario_params[primary_param] = primary_val
                 scenario_params[secondary_param] = secondary_val
                 
-                # Handle coupled parameters (e.g., m1 = m0 for gold sweeps)
-                for target_param, source_param in coupled_params.items():
-                    scenario_params[target_param] = scenario_params.get(source_param, primary_val)
+                # Handle coupled parameters
+                # Supports: {'m1': 'm0'} (simple) or {'m0': ('m1', 50)} (with offset)
+                for target_param, coupling_spec in coupled_params.items():
+                    if isinstance(coupling_spec, tuple):
+                        # Offset coupling: (source_param, offset) → target = source + offset
+                        source_param, offset = coupling_spec
+                        source_val = scenario_params.get(source_param, primary_val)
+                        scenario_params[target_param] = source_val + offset
+                    else:
+                        # Simple coupling: target = source
+                        scenario_params[target_param] = scenario_params.get(coupling_spec, primary_val)
                 
                 scenario = Scenario(benchmark_id=benchmark_id, **scenario_params)
                 scenarios.append(scenario)
@@ -1441,10 +1454,17 @@ def run_sweep(
             if i < len(m1_values) and m1_values[i] is not None:
                 scenario_params['m1'] = m1_values[i]
             
-            # Handle coupled parameters (e.g., m1 = m0 for gold sweeps)
-            for target_param, source_param in coupled_params.items():
-                # target_param tracks source_param's value
-                scenario_params[target_param] = scenario_params.get(source_param, val)
+            # Handle coupled parameters
+            # Supports: {'m1': 'm0'} (simple) or {'m0': ('m1', 50)} (with offset)
+            for target_param, coupling_spec in coupled_params.items():
+                if isinstance(coupling_spec, tuple):
+                    # Offset coupling: (source_param, offset) → target = source + offset
+                    source_param, offset = coupling_spec
+                    source_val = scenario_params.get(source_param, val)
+                    scenario_params[target_param] = source_val + offset
+                else:
+                    # Simple coupling: target = source
+                    scenario_params[target_param] = scenario_params.get(coupling_spec, val)
             
             scenario = Scenario(benchmark_id=benchmark_id, **scenario_params)
             scenarios.append(scenario)
@@ -1751,10 +1771,54 @@ def _generate_heatmap_plots_2d(df_agg: pd.DataFrame, config: dict, output_dir: s
     primary_param = config['sweep_param']
     secondary_param = config['secondary_param']
     
+    # Check if we should show (m0, m1) tuples on x-axis
+    show_budget_tuples = config.get('show_budget_tuples', False)
+    coupled_params = config.get('coupled_params', {})
+    x_axis_label = config.get('x_axis_label', primary_param)
+    
     # Get unique values
     primary_values = sorted(df_agg[primary_param].dropna().unique())
     secondary_values = sorted(df_agg[secondary_param].dropna().unique())
     methods = df_agg['method'].unique()
+    
+    # Build x-axis labels
+    if show_budget_tuples and 'm0' in df_agg.columns and 'm1' in df_agg.columns:
+        # Get unique (m0, m1) tuples matching the primary values
+        # First, get the coupling relationship
+        m0_values = []
+        m1_values = []
+        for pv in primary_values:
+            # Find a row with this primary value to get the corresponding m0, m1
+            sample_row = df_agg[df_agg[primary_param] == pv].iloc[0] if len(df_agg[df_agg[primary_param] == pv]) > 0 else None
+            if sample_row is not None:
+                m0_values.append(int(sample_row['m0']))
+                m1_values.append(int(sample_row['m1']))
+            else:
+                # Compute from coupling if possible
+                if primary_param == 'm1' and 'm0' in coupled_params:
+                    coupling = coupled_params['m0']
+                    if isinstance(coupling, tuple):
+                        m1_values.append(int(pv))
+                        m0_values.append(int(pv + coupling[1]))
+                    else:
+                        m1_values.append(int(pv))
+                        m0_values.append(int(pv))
+                elif primary_param == 'm0' and 'm1' in coupled_params:
+                    coupling = coupled_params['m1']
+                    if isinstance(coupling, tuple):
+                        m0_values.append(int(pv))
+                        m1_values.append(int(pv + coupling[1]))
+                    else:
+                        m0_values.append(int(pv))
+                        m1_values.append(int(pv))
+                else:
+                    m0_values.append(int(pv))
+                    m1_values.append(int(pv))
+        
+        # Create tuple labels
+        x_tick_labels = [f'({m0},{m1})' for m0, m1 in zip(m0_values, m1_values)]
+    else:
+        x_tick_labels = [str(int(v)) for v in primary_values]
     
     # Metrics to plot: (column, display_name, colormap, lower_is_better)
     metrics = [
@@ -1811,13 +1875,13 @@ def _generate_heatmap_plots_2d(df_agg: pd.DataFrame, config: dict, output_dir: s
             # Plot heatmap (origin='lower' so smaller values at bottom)
             im = ax.imshow(matrix, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax, origin='lower')
             
-            # Set ticks
+            # Set ticks with custom labels
             ax.set_xticks(range(len(primary_values)))
-            ax.set_xticklabels([str(v) for v in primary_values])
+            ax.set_xticklabels(x_tick_labels, rotation=45 if show_budget_tuples else 0, ha='right' if show_budget_tuples else 'center')
             ax.set_yticks(range(len(secondary_values)))
-            ax.set_yticklabels([str(v) for v in secondary_values])
+            ax.set_yticklabels([str(int(v)) for v in secondary_values])
             
-            ax.set_xlabel(primary_param)
+            ax.set_xlabel(x_axis_label)
             ax.set_ylabel(secondary_param)
             ax.set_title(f'{method}')
             
@@ -1844,7 +1908,8 @@ def _generate_heatmap_plots_2d(df_agg: pd.DataFrame, config: dict, output_dir: s
         cbar = fig.colorbar(im, cax=cbar_ax)
         cbar.set_label(metric_name)
         
-        fig.suptitle(f'{metric_name} vs {primary_param} × {secondary_param}', fontsize=14, y=1.02)
+        # Title uses custom x_axis_label
+        fig.suptitle(f'{metric_name} vs {x_axis_label} × {secondary_param}', fontsize=14, y=1.02)
         
         # Save
         metric_short = metric_col.replace('_mean', '')
