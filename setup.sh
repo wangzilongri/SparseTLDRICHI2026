@@ -2,18 +2,62 @@
 
 # Setup script for Sparse_TL_DR_ICHI2026 project
 # Handles both Python and R dependencies
+#
+# Usage:
+#   ./setup.sh           # Normal setup (skips already-installed components)
+#   ./setup.sh --force   # Force reinstall everything
+#   ./setup.sh --help    # Show help
 
 set -e  # Exit on error
 
-echo "=================================="
-echo "Setting up Sparse_TL_DR_ICHI2026"
-echo "=================================="
+# =============================================================================
+# Parse Arguments
+# =============================================================================
 
+FORCE=false
+HELP=false
+
+for arg in "$@"; do
+    case $arg in
+        --force|-f)
+            FORCE=true
+            shift
+            ;;
+        --help|-h)
+            HELP=true
+            shift
+            ;;
+    esac
+done
+
+if [ "$HELP" = true ]; then
+    echo "Usage: ./setup.sh [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --force, -f    Force reinstall all components"
+    echo "  --help, -h     Show this help message"
+    echo ""
+    echo "The script automatically skips already-installed components."
+    echo "Use --force to reinstall everything."
+    exit 0
+fi
+
+# =============================================================================
 # Configuration
+# =============================================================================
+
 R_VERSION="4.4.2"
 R_MIN_VERSION="4.4"
 LOCAL_R_DIR="$HOME/local/R-${R_VERSION}"
 LOCAL_R_LIBS="$HOME/local/R_libs"
+MARKER_FILE=".setup_complete"
+
+echo "=================================="
+echo "Setting up Sparse_TL_DR_ICHI2026"
+if [ "$FORCE" = true ]; then
+    echo "(Force mode: reinstalling all components)"
+fi
+echo "=================================="
 
 # =============================================================================
 # Python Setup
@@ -39,24 +83,39 @@ fi
 echo "Activating virtual environment..."
 source venv/bin/activate
 
-# Upgrade pip
-echo "Upgrading pip..."
-pip install --upgrade pip --quiet
+# Check if Python packages need installation
+NEED_PIP_INSTALL=false
 
-# Install requirements
-echo "Installing Python dependencies..."
-if command -v pip &> /dev/null; then
-    pip install -r requirements.txt --quiet 2>/dev/null || \
-    pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt --quiet
+if [ "$FORCE" = true ]; then
+    NEED_PIP_INSTALL=true
+elif [ ! -f "$MARKER_FILE" ]; then
+    NEED_PIP_INSTALL=true
+elif ! python -c "import numpy; import pandas; import sklearn" 2>/dev/null; then
+    NEED_PIP_INSTALL=true
+fi
+
+if [ "$NEED_PIP_INSTALL" = true ]; then
+    # Upgrade pip
+    echo "Upgrading pip..."
+    pip install --upgrade pip --quiet
     
-    if [ $? -eq 0 ]; then
-        echo "✓ Python dependencies installed"
+    # Install requirements
+    echo "Installing Python dependencies..."
+    if command -v pip &> /dev/null; then
+        pip install -r requirements.txt --quiet 2>/dev/null || \
+        pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt --quiet
+        
+        if [ $? -eq 0 ]; then
+            echo "✓ Python dependencies installed"
+        else
+            echo "Warning: Some Python dependencies may have failed"
+        fi
     else
-        echo "Warning: Some Python dependencies may have failed"
+        echo "Error: pip not found"
+        exit 1
     fi
 else
-    echo "Error: pip not found"
-    exit 1
+    echo "✓ Python dependencies already installed (use --force to reinstall)"
 fi
 
 # =============================================================================
@@ -88,7 +147,7 @@ get_r_version() {
 
 # Check if local R exists
 if [ -f "$LOCAL_R_DIR/bin/Rscript" ]; then
-    echo "✓ Local R ${R_VERSION} found at $LOCAL_R_DIR"
+    echo "✓ Local R ${R_VERSION} already installed at $LOCAL_R_DIR"
     export PATH="$LOCAL_R_DIR/bin:$PATH"
 elif check_r_version; then
     echo "✓ System R is version 4.4+ (compatible)"
@@ -150,9 +209,18 @@ if command -v Rscript &> /dev/null && check_r_version; then
     export R_LIBS_USER="$LOCAL_R_LIBS"
     
     # Check if glmtrans is installed
-    if Rscript -e 'library(glmtrans)' 2>/dev/null; then
+    if [ "$FORCE" = true ]; then
+        echo "Force reinstalling glmtrans..."
+        Rscript -e "remove.packages('glmtrans', lib='$LOCAL_R_LIBS')" 2>/dev/null || true
+        NEED_GLMTRANS=true
+    elif Rscript -e 'library(glmtrans)' 2>/dev/null; then
         echo "✓ glmtrans is already installed"
+        NEED_GLMTRANS=false
     else
+        NEED_GLMTRANS=true
+    fi
+    
+    if [ "$NEED_GLMTRANS" = true ]; then
         echo "Installing glmtrans R package..."
         Rscript -e "install.packages('glmtrans', lib='$LOCAL_R_LIBS', repos='https://cloud.r-project.org', quiet=TRUE)" 2>/dev/null
         
@@ -189,6 +257,9 @@ else
     echo "⚠ R not found (glmtrans methods will use Python fallbacks)"
 fi
 
+# Mark setup as complete
+touch "$MARKER_FILE"
+
 # =============================================================================
 # Done
 # =============================================================================
@@ -206,4 +277,7 @@ echo "  python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 5"
 echo ""
 echo "To check glmtrans status:"
 echo "  cd src && python -m glmtrans_wrapper --status"
+echo ""
+echo "To force reinstall everything:"
+echo "  ./setup.sh --force"
 echo ""

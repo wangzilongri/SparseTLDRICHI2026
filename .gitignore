@@ -34,3 +34,9 @@ build/
 results/
 figures/
 outputs/
+
+# Setup markers
+.setup_complete
+
+# R libraries (local install)
+R_libs/
