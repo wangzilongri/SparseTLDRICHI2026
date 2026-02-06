@@ -38,7 +38,21 @@ except ImportError:
 
 # Path to the R script
 R_SCRIPT_PATH = Path(__file__).parent / "glmtrans_estimators.R"
-R_LIBS_PATH = Path(__file__).parent.parent / "R_libs"
+
+# R library path - can be overridden via environment variable
+# Priority: GLMTRANS_R_LIBS > R_LIBS_USER > default (project/R_libs)
+def _get_r_libs_path() -> Path:
+    """Get R library path, checking environment variables first."""
+    # Check for explicit glmtrans override
+    if os.environ.get('GLMTRANS_R_LIBS'):
+        return Path(os.environ['GLMTRANS_R_LIBS'])
+    # Check for standard R_LIBS_USER
+    if os.environ.get('R_LIBS_USER'):
+        return Path(os.environ['R_LIBS_USER'])
+    # Default to project-local R_libs directory
+    return Path(__file__).parent.parent / "R_libs"
+
+R_LIBS_PATH = _get_r_libs_path()
 
 
 # =============================================================================
@@ -219,11 +233,20 @@ def get_glmtrans_status() -> Dict[str, Any]:
         - r_installed: bool
         - glmtrans_installed: bool
         - r_libs_path: str
+        - r_libs_source: str (how the path was determined)
         - available: bool
         - message: str
     """
     r_installed = _check_r_installed()
     glmtrans_installed = _check_glmtrans_installed() if r_installed else False
+    
+    # Determine how R_LIBS_PATH was set
+    if os.environ.get('GLMTRANS_R_LIBS'):
+        r_libs_source = "GLMTRANS_R_LIBS env var"
+    elif os.environ.get('R_LIBS_USER'):
+        r_libs_source = "R_LIBS_USER env var"
+    else:
+        r_libs_source = "default (project/R_libs)"
     
     if not r_installed:
         message = "R is not installed. Install from https://cran.r-project.org/"
@@ -236,6 +259,7 @@ def get_glmtrans_status() -> Dict[str, Any]:
         'r_installed': r_installed,
         'glmtrans_installed': glmtrans_installed,
         'r_libs_path': str(R_LIBS_PATH),
+        'r_libs_source': r_libs_source,
         'available': r_installed and glmtrans_installed,
         'message': message
     }
@@ -1119,8 +1143,12 @@ Examples:
         print(f"R installed:        {'✓' if status['r_installed'] else '✗'}")
         print(f"glmtrans installed: {'✓' if status['glmtrans_installed'] else '✗'}")
         print(f"R libs path:        {status['r_libs_path']}")
+        print(f"  (source:          {status['r_libs_source']})")
         print(f"Available:          {'✓' if status['available'] else '✗'}")
         print(f"\nMessage: {status['message']}")
+        print("\nTo use a custom R library path, set one of:")
+        print("  export GLMTRANS_R_LIBS=/path/to/R/library  # highest priority")
+        print("  export R_LIBS_USER=/path/to/R/library      # standard R env var")
         sys.exit(0 if status['available'] else 1)
     
     elif args.setup:
