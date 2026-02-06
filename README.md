@@ -15,6 +15,16 @@ Three-stage doubly robust learner for transferring treatment effect estimates fr
 
 ### Installation
 
+**Option 1: Quick Setup (Recommended)**
+```bash
+# Run the setup script (handles Python + R)
+./setup.sh
+
+# Activate environment
+source activate.sh
+```
+
+**Option 2: Manual Setup**
 ```bash
 # Create and activate virtual environment
 python -m venv venv
@@ -25,6 +35,48 @@ source venv/bin/activate  # On Unix/Mac
 pip install -r requirements.txt
 ```
 
+### R/glmtrans Setup (Optional but Recommended)
+
+The `glmtrans` R package (Tian & Feng, JASA 2023) provides state-of-the-art transfer learning methods. **Requires R 4.4+**.
+
+**Check status:**
+```bash
+cd src && python -m glmtrans_wrapper --status
+```
+
+**If R 4.4+ is not installed:**
+```bash
+# Option A: Let setup.sh install R locally (no root needed)
+./setup.sh  # Will prompt to install R 4.4.2
+
+# Option B: Install R locally manually
+mkdir -p ~/local && cd ~/local
+wget https://cran.r-project.org/src/base/R-4/R-4.4.2.tar.gz
+tar -xzf R-4.4.2.tar.gz && cd R-4.4.2
+./configure --prefix=$HOME/local/R-4.4.2 --enable-R-shlib
+make -j 4 && make install
+export PATH=$HOME/local/R-4.4.2/bin:$PATH
+
+# Option C: Use conda
+conda create -n r44 r-base=4.4 -c conda-forge
+conda activate r44
+```
+
+**Install glmtrans package:**
+```bash
+Rscript -e 'install.packages("glmtrans", repos="https://cloud.r-project.org")'
+```
+
+**Using a custom R library path:**
+```bash
+# If glmtrans is installed elsewhere
+export GLMTRANS_R_LIBS=/path/to/R/library
+# or
+export R_LIBS_USER=/path/to/R/library
+```
+
+**Note:** If R/glmtrans is not available, the benchmark will automatically use Python-only fallback methods (`ProposedA_FullyDirect`, `ProposedB_SourceDR`).
+
 ### Run Experiments
 
 ```bash
@@ -33,6 +85,12 @@ python experiments/test_estimators.py
 
 # Full ablation study (20 runs)
 python experiments/ablation_study.py
+
+# Run benchmark sweeps
+python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 5 --output results/my_sweep
+
+# See all available sweeps
+python -m experiments.core_sweeps --help
 ```
 
 ### Basic Usage
