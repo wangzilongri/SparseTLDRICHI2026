@@ -457,6 +457,7 @@ predict_dr <- function(fit, X_new) {
 #' @param alpha Elastic-net mixing for final CATE (1=lasso, 0=ridge)
 #' @param nfolds_cv CV folds for glmnet
 #' @param prop_clip Propensity clipping bounds (default c(0.05, 0.95))
+#' @param seed Random seed for fold assignment (NULL = don't set seed)
 #' @param verbose Print progress
 #' @return List with cross-fitted CATE model and diagnostics
 fit_glmtrans_dr_crossfit <- function(X_source, A_source, Y_source, c_source,
@@ -466,6 +467,7 @@ fit_glmtrans_dr_crossfit <- function(X_source, A_source, Y_source, c_source,
                                       alpha = 1,
                                       nfolds_cv = 5,
                                       prop_clip = c(0.05, 0.95),
+                                      seed = NULL,
                                       verbose = FALSE) {
   
   X_target <- as.matrix(X_target)
@@ -481,12 +483,21 @@ fit_glmtrans_dr_crossfit <- function(X_source, A_source, Y_source, c_source,
   e_oof <- rep(NA, n)
   
   # Create fold assignments
-  set.seed(123)  # For reproducibility
+  # FIX (Problem B): Only set seed if explicitly provided
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   fold_ids <- sample(rep(1:n_folds, length.out = n))
   
   # =========================================================================
   # CROSS-FITTING: Train nuisances on fold k, predict on fold -k
   # =========================================================================
+  # FIX (Problem A): Store per-fold training statistics to avoid leakage
+  # These will be used for fallback imputation if model fitting fails
+  fold_mu0_fallback <- rep(NA, n)  # Fold-specific fallbacks for each point
+  fold_mu1_fallback <- rep(NA, n)
+  fold_e_fallback <- rep(NA, n)
+  
   for (k in 1:n_folds) {
     if (verbose) cat(sprintf("  Fold %d/%d...\n", k, n_folds))
     
@@ -500,8 +511,23 @@ fit_glmtrans_dr_crossfit <- function(X_source, A_source, Y_source, c_source,
     
     X_test <- X_target[test_idx, , drop = FALSE]
     
+    # -----------------------------------------------------------------------
+    # FIX (Problem A): Compute TRAINING-FOLD-ONLY statistics for fallback
+    # These are computed BEFORE fitting, using ONLY the training fold
+    # -----------------------------------------------------------------------
+    mu0_mean_k <- mean(Y_train[A_train == 0], na.rm = TRUE)
+    mu1_mean_k <- mean(Y_train[A_train == 1], na.rm = TRUE)
+    e_mean_k <- mean(A_train)
+    
+    # Store fold-specific fallbacks for this fold's test indices
+    fold_mu0_fallback[test_idx] <- mu0_mean_k
+    fold_mu1_fallback[test_idx] <- mu1_mean_k
+    fold_e_fallback[test_idx] <- e_mean_k
+    
+    # -----------------------------------------------------------------------
     # Fit glmtrans on training fold (uses sources + train target)
     # This is where transfer learning happens
+    # -----------------------------------------------------------------------
     plugin_fit_k <- tryCatch({
       fit_glmtrans_cate(
         X_source, A_source, Y_source, c_source,
@@ -534,8 +560,10 @@ fit_glmtrans_dr_crossfit <- function(X_source, A_source, Y_source, c_source,
       }
     }
     
+    # -----------------------------------------------------------------------
     # Fit propensity model on training fold (target only)
     # Use ridge logistic for stability (advisor recommendation)
+    # -----------------------------------------------------------------------
     if (sum(A_train == 1) >= 5 && sum(A_train == 0) >= 5) {
       prop_cv <- tryCatch({
         cv.glmnet(X_train, A_train, family = "binomial", alpha = 0, nfolds = nfolds_cv)
@@ -545,17 +573,29 @@ fit_glmtrans_dr_crossfit <- function(X_source, A_source, Y_source, c_source,
         e_oof[test_idx] <- as.vector(predict(prop_cv, X_test, s = "lambda.min", type = "response"))
       }
     }
+    # If propensity fit fails or sample too small, e_oof[test_idx] stays NA
+    # and will be filled with fold-specific e_mean_k below
   }
   
-  # Handle any missing predictions (fallback to in-sample if needed)
-  if (any(is.na(mu0_oof))) {
-    mu0_oof[is.na(mu0_oof)] <- mean(Y_target[A_target == 0], na.rm = TRUE)
+  # =========================================================================
+  # FIX (Problem A): Handle missing predictions using FOLD-SPECIFIC fallbacks
+  # This preserves cross-fitting validity by using only training-fold info
+  # =========================================================================
+  na_mu0 <- is.na(mu0_oof)
+  na_mu1 <- is.na(mu1_oof)
+  na_e <- is.na(e_oof)
+  
+  if (any(na_mu0)) {
+    if (verbose) cat(sprintf("  Imputing %d missing μ₀ predictions with fold-specific means\n", sum(na_mu0)))
+    mu0_oof[na_mu0] <- fold_mu0_fallback[na_mu0]
   }
-  if (any(is.na(mu1_oof))) {
-    mu1_oof[is.na(mu1_oof)] <- mean(Y_target[A_target == 1], na.rm = TRUE)
+  if (any(na_mu1)) {
+    if (verbose) cat(sprintf("  Imputing %d missing μ₁ predictions with fold-specific means\n", sum(na_mu1)))
+    mu1_oof[na_mu1] <- fold_mu1_fallback[na_mu1]
   }
-  if (any(is.na(e_oof))) {
-    e_oof[is.na(e_oof)] <- mean(A_target)
+  if (any(na_e)) {
+    if (verbose) cat(sprintf("  Imputing %d missing propensities with fold-specific rates\n", sum(na_e)))
+    e_oof[na_e] <- fold_e_fallback[na_e]
   }
   
   # =========================================================================
@@ -695,6 +735,9 @@ predict_dr_crossfit <- function(fit, X_new) {
 #'
 #' This is the ONLY place glmtrans theory applies in Option B.
 #' Returns a deterministic subset of source sites.
+#' 
+#' NOTE: This function is specifically for Option B (placebo-only target).
+#' It's named _optionb to avoid conflict with the general detection function.
 #'
 #' @param X_t0 Target control features (n_t0 x p)
 #' @param Y_t0 Target control outcomes (n_t0)
@@ -704,9 +747,9 @@ predict_dr_crossfit <- function(fit, X_new) {
 #' @param nfolds CV folds
 #' @param verbose Print progress
 #' @return Integer vector of transferable source IDs
-detect_transferable_sources <- function(X_t0, Y_t0, source_list, 
-                                         C0 = 2, alpha = 1, nfolds = 5,
-                                         verbose = FALSE) {
+detect_transferable_sources_optionb <- function(X_t0, Y_t0, source_list, 
+                                                 C0 = 2, alpha = 1, nfolds = 5,
+                                                 verbose = FALSE) {
   
   X_t0 <- as.matrix(X_t0)
   Y_t0 <- as.vector(Y_t0)
@@ -840,8 +883,8 @@ fit_glmtrans_option_b <- function(X_source, A_source, Y_source, c_source,
       X_t0 <- X_target[valid_idx, , drop = FALSE]
       Y_t0 <- Y_target_control[valid_idx]
       
-      # Run source detection
-      selected_ids <- detect_transferable_sources(
+      # Run source detection (uses Option B specific function)
+      selected_ids <- detect_transferable_sources_optionb(
         X_t0, Y_t0, source_list, 
         C0 = C0, alpha = alpha, nfolds = nfolds, verbose = verbose
       )

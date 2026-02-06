@@ -594,6 +594,7 @@ class GlmtransCATEEstimator:
             # Build fit function arguments based on method type
             if self.use_dr and self.crossfit_folds > 1:
                 # Cross-fitted DR - different argument names
+                # Note: seed = NULL means R uses current RNG state (caller controls randomness)
                 fit_args = f'''
   X_source, A_source, Y_source, c_source,
   X_target, A_target, Y_target,
@@ -601,6 +602,7 @@ class GlmtransCATEEstimator:
   n_folds = {self.crossfit_folds},
   alpha = {self.alpha},
   nfolds_cv = {self.nfolds},
+  seed = NULL,
   verbose = {'TRUE' if self.verbose else 'FALSE'}'''
             elif self.use_dr:
                 # Standard DR
