@@ -419,20 +419,374 @@ predict_dr <- function(fit, X_new) {
   return(as.vector(pred))
 }
 
-# =============================================================================
-# Option B: Glmtrans for Source Detection + Source-DR CATE
-# =============================================================================
-# This implements the theoretically correct Option B as suggested by the advisor:
-# 1. Use glmtrans ONLY on control arm for transferable source detection
-# 2. Restrict to selected sources (no weighting, just selection)
-# 3. Fit DR CATE learner on selected sources only
-# 4. Transport the learned CATE to target
-# 
-# This preserves:
-# - The theory of glmtrans (deterministic transferable subset selection)
-# - Feasibility for placebo-only target (no treated units required)
 
-#' Fit Option B: Glmtrans source detection + Source-DR CATE
+# =============================================================================
+# CROSS-FITTED Glmtrans DR (Addressing Advisor's Critique)
+# =============================================================================
+#
+# ADVISOR DIAGNOSIS (why original Glmtrans_DR underperforms):
+#
+# 1. NO CROSS-FITTING: μ̂ trained on same data as Γ computed → overfitting
+# 2. PROPENSITY TAX: Bad ê amplifies noise through inverse weights  
+# 3. DOUBLE SHRINKAGE: glmtrans shrinkage + Lasso on Γ → flattened τ̂
+# 4. DR ON SMALL TARGET: Sources only used for μ̂, not for τ̂ learning
+#
+# FIX (implemented below):
+# - Cross-fit nuisances when forming Γ (2-fold minimum)
+# - Stable propensity estimation with clipping
+# - Option to use ridge instead of Lasso for τ̂
+# - Diagnostic output for variance comparison
+# =============================================================================
+
+#' Cross-fitted Glmtrans DR CATE estimator (CORRECTED)
+#'
+#' Addresses the issues with naive Glmtrans_DR:
+#' - Uses K-fold cross-fitting for nuisance estimates
+#' - Stable propensity with clipping
+#' - Returns diagnostics for variance comparison
+#'
+#' @param X_source Source features
+#' @param A_source Source treatments
+#' @param Y_source Source outcomes
+#' @param c_source Source site indicators
+#' @param X_target Target features
+#' @param A_target Target treatments
+#' @param Y_target Target outcomes
+#' @param transfer_source_id Which sources to transfer
+#' @param n_folds Number of cross-fitting folds (default 2)
+#' @param alpha Elastic-net mixing for final CATE (1=lasso, 0=ridge)
+#' @param nfolds_cv CV folds for glmnet
+#' @param prop_clip Propensity clipping bounds (default c(0.05, 0.95))
+#' @param verbose Print progress
+#' @return List with cross-fitted CATE model and diagnostics
+fit_glmtrans_dr_crossfit <- function(X_source, A_source, Y_source, c_source,
+                                      X_target, A_target, Y_target,
+                                      transfer_source_id = "auto",
+                                      n_folds = 2,
+                                      alpha = 1,
+                                      nfolds_cv = 5,
+                                      prop_clip = c(0.05, 0.95),
+                                      verbose = FALSE) {
+  
+  X_target <- as.matrix(X_target)
+  A_target <- as.vector(A_target)
+  Y_target <- as.vector(Y_target)
+  n <- nrow(X_target)
+  
+  if (verbose) cat("Cross-fitted Glmtrans DR with", n_folds, "folds\n")
+  
+  # Initialize storage for out-of-fold predictions
+  mu0_oof <- rep(NA, n)
+  mu1_oof <- rep(NA, n)
+  e_oof <- rep(NA, n)
+  
+  # Create fold assignments
+  set.seed(123)  # For reproducibility
+  fold_ids <- sample(rep(1:n_folds, length.out = n))
+  
+  # =========================================================================
+  # CROSS-FITTING: Train nuisances on fold k, predict on fold -k
+  # =========================================================================
+  for (k in 1:n_folds) {
+    if (verbose) cat(sprintf("  Fold %d/%d...\n", k, n_folds))
+    
+    # Split target data
+    train_idx <- fold_ids != k
+    test_idx <- fold_ids == k
+    
+    X_train <- X_target[train_idx, , drop = FALSE]
+    A_train <- A_target[train_idx]
+    Y_train <- Y_target[train_idx]
+    
+    X_test <- X_target[test_idx, , drop = FALSE]
+    
+    # Fit glmtrans on training fold (uses sources + train target)
+    # This is where transfer learning happens
+    plugin_fit_k <- tryCatch({
+      fit_glmtrans_cate(
+        X_source, A_source, Y_source, c_source,
+        X_train, A_train, Y_train,
+        transfer_source_id = transfer_source_id,
+        alpha = 1,  # Use Lasso for outcome models
+        nfolds = nfolds_cv,
+        verbose = FALSE
+      )
+    }, error = function(e) {
+      if (verbose) cat(sprintf("    Warning: glmtrans failed in fold %d: %s\n", k, e$message))
+      NULL
+    })
+    
+    # Get out-of-fold predictions for μ₀, μ₁
+    if (!is.null(plugin_fit_k)) {
+      if (!is.null(plugin_fit_k$mu0_fit)) {
+        if (isTRUE(plugin_fit_k$mu0_fit$is_glmnet)) {
+          mu0_oof[test_idx] <- as.vector(predict(plugin_fit_k$mu0_fit$model, X_test, s = "lambda.min"))
+        } else {
+          mu0_oof[test_idx] <- predict_glmtrans(plugin_fit_k$mu0_fit, X_test)
+        }
+      }
+      if (!is.null(plugin_fit_k$mu1_fit)) {
+        if (isTRUE(plugin_fit_k$mu1_fit$is_glmnet)) {
+          mu1_oof[test_idx] <- as.vector(predict(plugin_fit_k$mu1_fit$model, X_test, s = "lambda.min"))
+        } else {
+          mu1_oof[test_idx] <- predict_glmtrans(plugin_fit_k$mu1_fit, X_test)
+        }
+      }
+    }
+    
+    # Fit propensity model on training fold (target only)
+    # Use ridge logistic for stability (advisor recommendation)
+    if (sum(A_train == 1) >= 5 && sum(A_train == 0) >= 5) {
+      prop_cv <- tryCatch({
+        cv.glmnet(X_train, A_train, family = "binomial", alpha = 0, nfolds = nfolds_cv)
+      }, error = function(e) NULL)
+      
+      if (!is.null(prop_cv)) {
+        e_oof[test_idx] <- as.vector(predict(prop_cv, X_test, s = "lambda.min", type = "response"))
+      }
+    }
+  }
+  
+  # Handle any missing predictions (fallback to in-sample if needed)
+  if (any(is.na(mu0_oof))) {
+    mu0_oof[is.na(mu0_oof)] <- mean(Y_target[A_target == 0], na.rm = TRUE)
+  }
+  if (any(is.na(mu1_oof))) {
+    mu1_oof[is.na(mu1_oof)] <- mean(Y_target[A_target == 1], na.rm = TRUE)
+  }
+  if (any(is.na(e_oof))) {
+    e_oof[is.na(e_oof)] <- mean(A_target)
+  }
+  
+  # =========================================================================
+  # PROPENSITY CLIPPING (critical for stability)
+  # =========================================================================
+  e_clipped <- pmax(pmin(e_oof, prop_clip[2]), prop_clip[1])
+  
+  # Diagnostics: check for weight explosion
+  inv_weights <- ifelse(A_target == 1, 1/e_clipped, 1/(1 - e_clipped))
+  max_weight <- max(inv_weights)
+  
+  if (verbose) {
+    cat(sprintf("  Propensity range: [%.3f, %.3f]\n", min(e_clipped), max(e_clipped)))
+    cat(sprintf("  Max inverse weight: %.2f\n", max_weight))
+    if (max_weight > 20) {
+      cat("  WARNING: Large inverse weights detected - DR may be unstable\n")
+    }
+  }
+  
+  # =========================================================================
+  # COMPUTE DR PSEUDO-OUTCOMES (using cross-fitted nuisances)
+  # =========================================================================
+  # Γᵢ = μ̂₁(Xᵢ) - μ̂₀(Xᵢ) + (Aᵢ - ê(Xᵢ))/(ê(Xᵢ)(1-ê(Xᵢ))) · (Yᵢ - μ̂_{Aᵢ}(Xᵢ))
+  residual <- ifelse(A_target == 1, Y_target - mu1_oof, Y_target - mu0_oof)
+  pseudo_outcome <- (mu1_oof - mu0_oof) + 
+                    (A_target - e_clipped) / (e_clipped * (1 - e_clipped)) * residual
+  
+  # Also compute plug-in CATE for comparison
+  plugin_cate <- mu1_oof - mu0_oof
+  
+  # Variance diagnostics (advisor's suggestion)
+  var_pseudo <- var(pseudo_outcome)
+  var_plugin <- var(plugin_cate)
+  
+  if (verbose) {
+    cat(sprintf("  Var(Γ_DR): %.4f\n", var_pseudo))
+    cat(sprintf("  Var(μ̂₁-μ̂₀): %.4f\n", var_plugin))
+    cat(sprintf("  Ratio: %.2f\n", var_pseudo / var_plugin))
+    if (var_pseudo > 2 * var_plugin) {
+      cat("  WARNING: DR pseudo-outcomes much noisier than plug-in\n")
+    }
+  }
+  
+  # =========================================================================
+  # FIT CATE MODEL ON PSEUDO-OUTCOMES
+  # =========================================================================
+  # Using specified alpha (can use ridge for less shrinkage)
+  cate_cv <- cv.glmnet(X_target, pseudo_outcome, alpha = alpha, nfolds = nfolds_cv)
+  
+  # =========================================================================
+  # PACKAGE RESULTS
+  # =========================================================================
+  result <- list(
+    # Main output
+    cate_model = cate_cv,
+    ate_hat = mean(pseudo_outcome),
+    
+    # Cross-fitted predictions (for external use)
+    mu0_oof = mu0_oof,
+    mu1_oof = mu1_oof,
+    e_oof = e_clipped,
+    pseudo_outcome = pseudo_outcome,
+    plugin_cate = plugin_cate,
+    
+    # Diagnostics
+    diagnostics = list(
+      var_pseudo = var_pseudo,
+      var_plugin = var_plugin,
+      var_ratio = var_pseudo / var_plugin,
+      max_inv_weight = max_weight,
+      prop_range = range(e_clipped),
+      n_folds = n_folds
+    )
+  )
+  
+  class(result) <- "glmtrans_dr_crossfit"
+  
+  if (verbose) {
+    cat(sprintf("  ATE estimate: %.4f\n", result$ate_hat))
+    cat("✓ Cross-fitted DR complete.\n")
+  }
+  
+  return(result)
+}
+
+#' Predict CATE from cross-fitted DR model
+predict_dr_crossfit <- function(fit, X_new) {
+  X_new <- as.matrix(X_new)
+  pred <- predict(fit$cate_model, X_new, s = "lambda.min")
+  return(as.vector(pred))
+}
+
+
+# =============================================================================
+# Option B: Glmtrans for Source Detection + Source-DR CATE (THEORY-CLEAN)
+# =============================================================================
+#
+# ADVISOR GUIDANCE (critical for paper defensibility):
+# 
+# "glmtrans theory justifies *source selection*, not arm-level transport of 
+#  treatment effects."
+#
+# This implementation follows the EXACT construction the advisor provided:
+#
+#   Stage 0: Use glmtrans ONLY on control arm to detect transferable sources
+#            -> Returns deterministic subset Ŝ₀ ⊂ {1,...,K}
+#            -> Uses ONLY Y_target(0), NO target treated needed
+#
+#   Stage 1: Restrict to selected sources (NO weighting, just selection)
+#            -> D_src^good = ∪_{k ∈ Ŝ₀} D_k
+#
+#   Stage 2: Fit DR CATE on selected sources
+#            -> μ̂₀^src, μ̂₁^src fitted on selected source data
+#            -> DR pseudo-outcomes computed on SOURCES
+#            -> τ̂^src(x) fitted on source pseudo-outcomes
+#
+#   Stage 3: Transport to target
+#            -> τ̂_target(x) := τ̂^src(x)  (direct transport, no correction)
+#
+# WHAT THIS DOES NOT DO (following advisor's "do not" list):
+#   ✗ Does NOT use glmtrans coefficients as μ̂₁ in Option B
+#   ✗ Does NOT run glmtrans jointly on A∈{0,1} when m₁=0
+#   ✗ Does NOT infer treated-arm similarity from placebo similarity
+#
+# Paper description (advisor-approved):
+#   "When the target site contains only control units, glmtrans cannot be 
+#    applied directly to the treated arm. We therefore use glmtrans solely 
+#    as a deterministic screening procedure on the control arm to identify 
+#    transferable source sites. Conditional on this selected subset, we 
+#    estimate CATEs using a doubly robust learner trained entirely on source 
+#    data and transport the resulting CATE model to the target."
+#
+# Reference: Tian & Feng (2023) JASA - Transfer learning under high-dimensional GLMs
+# =============================================================================
+
+#' Stage 0: Detect transferable sources using glmtrans on CONTROL ARM ONLY
+#'
+#' This is the ONLY place glmtrans theory applies in Option B.
+#' Returns a deterministic subset of source sites.
+#'
+#' @param X_t0 Target control features (n_t0 x p)
+#' @param Y_t0 Target control outcomes (n_t0)
+#' @param source_list List of source site data (each with x, y, w)
+#' @param C0 Threshold multiplier (default 2, from glmtrans paper)
+#' @param alpha Elastic-net mixing (1=lasso)
+#' @param nfolds CV folds
+#' @param verbose Print progress
+#' @return Integer vector of transferable source IDs
+detect_transferable_sources <- function(X_t0, Y_t0, source_list, 
+                                         C0 = 2, alpha = 1, nfolds = 5,
+                                         verbose = FALSE) {
+  
+  X_t0 <- as.matrix(X_t0)
+  Y_t0 <- as.vector(Y_t0)
+  
+  if (length(Y_t0) < 10) {
+    if (verbose) cat("  Insufficient target control data, using all sources.\n")
+    return(seq_along(source_list))
+  }
+  
+  # Target placebo data
+  target <- list(x = X_t0, y = Y_t0)
+  
+  # Extract source CONTROLS only (this is where glmtrans theory applies)
+  source_controls <- lapply(source_list, function(s) {
+    ctrl_mask <- s$w == 0
+    list(x = s$x[ctrl_mask, , drop = FALSE], 
+         y = s$y[ctrl_mask])
+  })
+  
+  # Filter out empty sources
+  valid_sources <- sapply(source_controls, function(s) length(s$y) >= 10)
+  if (sum(valid_sources) == 0) {
+    if (verbose) cat("  No valid source controls, using all sources.\n")
+    return(seq_along(source_list))
+  }
+  
+  source_controls <- source_controls[valid_sources]
+  valid_ids <- which(valid_sources)
+  
+  tryCatch({
+    # Use glmtrans with auto detection on CONTROL ARM
+    fit <- glmtrans::glmtrans(
+      target = target,
+      source = source_controls,
+      family = "gaussian",
+      transfer.source.id = "auto",  # Let glmtrans do its source selection
+      alpha = alpha,
+      nfolds = nfolds,
+      cores = 1
+    )
+    
+    # Extract selected sources (glmtrans returns indices into source_controls)
+    selected_indices <- fit$transfer.source.id
+    if (is.null(selected_indices) || length(selected_indices) == 0) {
+      if (verbose) cat("  glmtrans selected no sources, using all.\n")
+      return(seq_along(source_list))
+    }
+    
+    # Map back to original source IDs
+    selected_sources <- valid_ids[selected_indices]
+    
+    if (verbose) {
+      cat(sprintf("  glmtrans selected %d/%d sources: %s\n", 
+                  length(selected_sources), length(source_list),
+                  paste(selected_sources, collapse = ", ")))
+    }
+    
+    return(selected_sources)
+    
+  }, error = function(e) {
+    if (verbose) cat(sprintf("  glmtrans detection failed: %s. Using all sources.\n", e$message))
+    return(seq_along(source_list))
+  })
+}
+
+
+#' Stage 1: Restrict to selected sources (NO weighting)
+#'
+#' Simply subsets the source data. No reweighting, no soft selection.
+#' This is essential for maintaining glmtrans theory.
+#'
+#' @param source_list List of source site data
+#' @param selected_ids Integer vector of selected source IDs
+#' @return Restricted source list
+restrict_to_selected_sources <- function(source_list, selected_ids) {
+  source_list[selected_ids]
+}
+
+
+#' Fit Option B: Glmtrans source detection + Source-DR CATE (THEORY-CLEAN)
 #'
 #' @param X_source Source features (n_source x p)
 #' @param A_source Source treatment indicators (n_source)
@@ -440,14 +794,14 @@ predict_dr <- function(fit, X_new) {
 #' @param c_source Source site indicators (n_source)
 #' @param X_target Target features (n_target x p)
 #' @param Y_target_control Target control outcomes (placebo only, can have NAs)
+#' @param C0 Threshold for source detection (default 2)
 #' @param alpha Elastic-net mixing (1=lasso, 0=ridge)
 #' @param nfolds CV folds
 #' @param verbose Print progress
 #' @return List with CATE model trained on selected sources
 fit_glmtrans_option_b <- function(X_source, A_source, Y_source, c_source,
                                    X_target, Y_target_control = NULL,
-                                   alpha = 1,
-                                   nfolds = 5,
+                                   C0 = 2, alpha = 1, nfolds = 5,
                                    verbose = FALSE) {
   
   X_source <- as.matrix(X_source)
@@ -459,160 +813,116 @@ fit_glmtrans_option_b <- function(X_source, A_source, Y_source, c_source,
   n_source <- nrow(X_source)
   n_target <- nrow(X_target)
   p <- ncol(X_source)
+  site_ids <- sort(unique(c_source))
   
   # =========================================================================
-  # Stage 0: Transferable source detection on CONTROL ARM ONLY
+  # STAGE 0: Transferable source detection on CONTROL ARM ONLY
+  # =========================================================================
+  # This is the ONLY place glmtrans theory applies.
+  # Uses only Y_target(0), exactly as glmtrans was designed.
   # =========================================================================
   if (verbose) cat("Stage 0: Detecting transferable sources (control arm only)...\n")
   
-  # Separate source data by treatment arm
-  ctrl_mask <- A_source == 0
-  X_source_ctrl <- X_source[ctrl_mask, , drop = FALSE]
-  Y_source_ctrl <- Y_source[ctrl_mask]
-  c_source_ctrl <- c_source[ctrl_mask]
+  # Build source list (each site with x, y, w)
+  source_list <- lapply(site_ids, function(sid) {
+    mask <- c_source == sid
+    list(
+      x = X_source[mask, , drop = FALSE],
+      y = Y_source[mask],
+      w = A_source[mask]
+    )
+  })
   
-  # Format source control data by site
-  source_ctrl_list <- format_source_data(X_source_ctrl, Y_source_ctrl, c_source_ctrl)
-  
-  # If we have target control data, use it for detection
-  # Otherwise, use target X with synthetic fallback
+  # Extract target control data (if available)
   if (!is.null(Y_target_control) && length(Y_target_control) > 0) {
-    # Filter to non-NA values
     valid_idx <- !is.na(Y_target_control)
-    if (sum(valid_idx) > 10) {
-      X_target_ctrl <- X_target[valid_idx, , drop = FALSE]
-      Y_target_ctrl <- Y_target_control[valid_idx]
-      target_ctrl <- format_data(X_target_ctrl, Y_target_ctrl)
+    if (sum(valid_idx) >= 10) {
+      X_t0 <- X_target[valid_idx, , drop = FALSE]
+      Y_t0 <- Y_target_control[valid_idx]
+      
+      # Run source detection
+      selected_ids <- detect_transferable_sources(
+        X_t0, Y_t0, source_list, 
+        C0 = C0, alpha = alpha, nfolds = nfolds, verbose = verbose
+      )
     } else {
-      # Not enough target control data, use all sources
       if (verbose) cat("  Insufficient target control data, using all sources.\n")
-      selected_sources <- unique(c_source)
-      target_ctrl <- NULL
+      selected_ids <- seq_along(source_list)
     }
   } else {
-    # No target control data at all - use all sources (cannot detect)
     if (verbose) cat("  No target control data, using all sources.\n")
-    selected_sources <- unique(c_source)
-    target_ctrl <- NULL
+    selected_ids <- seq_along(source_list)
   }
   
-  # Run glmtrans source detection if we have target control data
-  if (exists("target_ctrl") && !is.null(target_ctrl)) {
-    tryCatch({
-      # Run glmtrans on control arm
-      ctrl_fit <- glmtrans::glmtrans(
-        target = target_ctrl,
-        source = source_ctrl_list,
-        family = "gaussian",
-        transfer.source.id = "all",  # First fit with all to get detection info
-        alpha = alpha,
-        nfolds = nfolds,
-        cores = 1
-      )
-      
-      # Use source detection algorithm
-      # Transferable source if its loss <= C0 * target-only loss
-      C0 <- 2  # Threshold multiplier (from glmtrans paper)
-      
-      # Get individual source performances
-      site_ids <- unique(c_source_ctrl)
-      n_sites <- length(site_ids)
-      
-      # Fit target-only model
-      target_only_cv <- cv.glmnet(target_ctrl$x, target_ctrl$y, 
-                                   alpha = alpha, nfolds = nfolds)
-      target_loss <- min(target_only_cv$cvm)
-      
-      selected_sources <- c()
-      for (k in seq_along(site_ids)) {
-        site_k <- site_ids[k]
-        mask_k <- c_source_ctrl == site_k
-        X_k <- X_source_ctrl[mask_k, , drop = FALSE]
-        Y_k <- Y_source_ctrl[mask_k]
-        
-        if (length(Y_k) < 10) next  # Skip small sites
-        
-        # Test this source on target data
-        cv_k <- cv.glmnet(X_k, Y_k, alpha = alpha, nfolds = min(nfolds, length(Y_k)))
-        pred_k <- predict(cv_k, target_ctrl$x, s = "lambda.min")
-        loss_k <- mean((target_ctrl$y - pred_k)^2)
-        
-        if (loss_k <= C0 * target_loss) {
-          selected_sources <- c(selected_sources, site_k)
-        }
-      }
-      
-      if (length(selected_sources) == 0) {
-        if (verbose) cat("  No sources passed detection, using all.\n")
-        selected_sources <- site_ids
-      }
-      
-      if (verbose) {
-        cat(sprintf("  Selected %d/%d sources: %s\n", 
-                    length(selected_sources), n_sites, 
-                    paste(selected_sources, collapse = ", ")))
-      }
-      
-    }, error = function(e) {
-      if (verbose) cat(sprintf("  Source detection failed: %s. Using all sources.\n", e$message))
-      selected_sources <<- unique(c_source)
-    })
-  }
+  # Map selected_ids back to site_ids
+  selected_sources <- site_ids[selected_ids]
   
   # =========================================================================
-  # Step 1: Restrict to selected sources
+  # STAGE 1: Restrict to selected sources (NO WEIGHTING)
   # =========================================================================
-  if (verbose) cat("Step 1: Restricting to selected sources...\n")
+  # Simply subset. No soft selection, no importance weighting.
+  # This maintains the deterministic nature of glmtrans selection.
+  # =========================================================================
+  if (verbose) cat("Stage 1: Restricting to selected sources...\n")
   
   selected_mask <- c_source %in% selected_sources
   X_src_good <- X_source[selected_mask, , drop = FALSE]
   A_src_good <- A_source[selected_mask]
   Y_src_good <- Y_source[selected_mask]
-  c_src_good <- c_source[selected_mask]
   
   if (verbose) {
-    cat(sprintf("  Using %d/%d source observations from selected sites.\n",
-                nrow(X_src_good), n_source))
+    cat(sprintf("  Using %d/%d source observations from %d/%d sites.\n",
+                nrow(X_src_good), n_source, 
+                length(selected_sources), length(site_ids)))
   }
   
   # =========================================================================
-  # Step 2: Fit DR CATE on selected sources
+  # STAGE 2: Fit DR CATE on selected sources
   # =========================================================================
-  if (verbose) cat("Step 2: Fitting DR CATE on selected sources...\n")
+  # DR learning happens WHERE IDENTIFICATION HOLDS: on the sources.
+  # No target treated data is used or needed.
+  # =========================================================================
+  if (verbose) cat("Stage 2: Fitting DR CATE on selected sources...\n")
   
-  # Separate by treatment
-  ctrl_good <- A_src_good == 0
-  trt_good <- A_src_good == 1
+  # Separate by treatment arm
+  ctrl_mask <- A_src_good == 0
+  trt_mask <- A_src_good == 1
   
-  X_src_ctrl <- X_src_good[ctrl_good, , drop = FALSE]
-  Y_src_ctrl <- Y_src_good[ctrl_good]
-  X_src_trt <- X_src_good[trt_good, , drop = FALSE]
-  Y_src_trt <- Y_src_good[trt_good]
+  X_src_ctrl <- X_src_good[ctrl_mask, , drop = FALSE]
+  Y_src_ctrl <- Y_src_good[ctrl_mask]
+  X_src_trt <- X_src_good[trt_mask, , drop = FALSE]
+  Y_src_trt <- Y_src_good[trt_mask]
   
-  # Fit outcome models on sources
+  # Fit outcome models μ̂₀, μ̂₁ on SOURCES
   mu0_cv <- cv.glmnet(X_src_ctrl, Y_src_ctrl, alpha = alpha, nfolds = nfolds)
   mu1_cv <- cv.glmnet(X_src_trt, Y_src_trt, alpha = alpha, nfolds = nfolds)
   
-  # Estimate propensity on sources
+  # Estimate propensity on sources (assumed constant within sources)
   e_hat <- mean(A_src_good)
   e_hat <- pmax(pmin(e_hat, 0.99), 0.01)
   
-  # Get predictions on all selected source data
+  # Get outcome predictions on all selected source data
   mu0_src <- as.vector(predict(mu0_cv, X_src_good, s = "lambda.min"))
   mu1_src <- as.vector(predict(mu1_cv, X_src_good, s = "lambda.min"))
   
-  # Compute DR pseudo-outcomes on sources
-  # Γ = (A/e)(Y - μ₁) + μ₁ - ((1-A)/(1-e))(Y - μ₀) - μ₀
-  pseudo_src <- (A_src_good / e_hat) * (Y_src_good - mu1_src) + mu1_src -
-                ((1 - A_src_good) / (1 - e_hat)) * (Y_src_good - mu0_src) - mu0_src
+  # Compute DR pseudo-outcomes on SOURCES
+  # Γᵢ = μ̂₁(Xᵢ) - μ̂₀(Xᵢ) + (Aᵢ - ê)/(ê(1-ê)) · (Yᵢ - μ̂_{Aᵢ}(Xᵢ))
+  residual <- ifelse(A_src_good == 1, 
+                     Y_src_good - mu1_src, 
+                     Y_src_good - mu0_src)
+  pseudo_src <- (mu1_src - mu0_src) + 
+                (A_src_good - e_hat) / (e_hat * (1 - e_hat)) * residual
   
-  # Fit CATE model on source pseudo-outcomes
+  # Fit CATE model τ̂^src(x) on source pseudo-outcomes
   cate_cv <- cv.glmnet(X_src_good, pseudo_src, alpha = alpha, nfolds = nfolds)
   
   # =========================================================================
-  # Step 3: Package results for transport to target
+  # STAGE 3: Transport to target
   # =========================================================================
-  if (verbose) cat("Step 3: Packaging for target transport...\n")
+  # Direct transport: τ̂_target(x) := τ̂^src(x)
+  # No further correction (we have no target treated data to correct with)
+  # =========================================================================
+  if (verbose) cat("Stage 3: Transporting CATE to target...\n")
   
   # Get predictions on target
   tau_target <- as.vector(predict(cate_cv, X_target, s = "lambda.min"))
@@ -620,17 +930,19 @@ fit_glmtrans_option_b <- function(X_source, A_source, Y_source, c_source,
   mu1_target <- as.vector(predict(mu1_cv, X_target, s = "lambda.min"))
   
   result <- list(
-    # Models
+    # Models (for prediction on new data)
     mu0_model = mu0_cv,
     mu1_model = mu1_cv,
     cate_model = cate_cv,
     
-    # Source detection info
+    # Source detection info (for paper reporting)
     selected_sources = selected_sources,
+    n_sources_total = length(site_ids),
     n_sources_used = length(selected_sources),
+    n_obs_total = n_source,
     n_obs_used = nrow(X_src_good),
     
-    # Target predictions
+    # Target predictions (main output)
     tau_target = tau_target,
     mu0_target = mu0_target,
     mu1_target = mu1_target,

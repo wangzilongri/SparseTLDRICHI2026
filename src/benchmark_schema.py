@@ -653,7 +653,18 @@ METHOD_REGISTRY: Dict[str, MethodSpec] = {
         uses_target_placebo=True,
         uses_target_treated=True,
         uses_source_data=True,
-        description="glmtrans with DR pseudo-outcomes"
+        description="glmtrans with DR pseudo-outcomes (no cross-fitting)"
+    ),
+    
+    # Cross-fitted DR (addresses advisor's critique)
+    "Glmtrans_DR_CrossFit": MethodSpec(
+        method="Glmtrans_DR_CrossFit",
+        feasibility_restricted=Feasibility.ORACLE_TARGET_TREATED,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="glmtrans with cross-fitted DR (recommended)"
     ),
     
     "Glmtrans_ElasticNet": MethodSpec(

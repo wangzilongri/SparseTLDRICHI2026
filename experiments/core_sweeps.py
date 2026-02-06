@@ -251,8 +251,9 @@ DEFAULT_METHODS_OPTION_A = [
     # glmtrans transfer learning (Tian & Feng 2023)
     # RECOMMENDED: Replaces ProposedA variants
     'Glmtrans_Auto',       # Auto source detection (plug-in)
-    'Glmtrans_All',        # All sources (plug-in)
-    'Glmtrans_DR',         # DR with auto detection
+    #'Glmtrans_All',        # All sources (plug-in)
+    'Glmtrans_DR_CrossFit',# RECOMMENDED: Cross-fitted DR (fixes finite-sample issues)
+    #'Glmtrans_DR',        # Original DR (no cross-fitting - may underperform plug-in)
     'Glmtrans_OptionB',    # Source-DR (for comparison, doesn't use target treated)
     
     # Anchor ablations
@@ -260,14 +261,13 @@ DEFAULT_METHODS_OPTION_A = [
     'AnchorPlugin',        # Placebo anchor, plug-in
     
     # Fallback methods (work without R/glmtrans)
-    'ProposedA_FullyDirect',  # Python-only fallback
-    'ProposedB_SourceDR',     # Python-only fallback
+    #'ProposedA_FullyDirect',  # Python-only fallback
+    #'ProposedB_SourceDR',     # Python-only fallback
     
     # Transport baselines
     'IPWTransport',           # Weighted outcome models
     'EntropyBalancing',       # Entropy balancing weights
-    'OutcomeModelTransport',  # Unweighted outcome models
-    'DRLearner_PooledWithSite', 'DRLearner_PooledNoSite',
+    'OutcomeModelTransport'  # Unweighted outcome models
 ]
 
 # Default for backward compatibility
@@ -2388,18 +2388,68 @@ Same as Glmtrans_Auto but skip source detection:
     },
     
     'Glmtrans_DR': {
-        'short_desc': 'glmtrans with DR pseudo-outcomes',
+        'short_desc': 'glmtrans with DR pseudo-outcomes (NO cross-fitting)',
         'category': 'Transfer Learning',
         'uses_target_placebo': True,
         'uses_target_treated': True,
         'uses_source': True,
         'pseudo_code': '''
-1. Fit μ̂₀, μ̂₁ using glmtrans (auto detection)
-2. Compute DR pseudo-outcomes on target:
+WARNING: May underperform plug-in (Glmtrans_Auto) due to:
+  - No cross-fitting → overfitting in nuisance estimates
+  - Propensity tax → noisy weights amplify variance
+  - Double shrinkage → glmtrans + Lasso flattens τ̂
+
+1. Fit μ̂₀, μ̂₁ using glmtrans (auto detection) on SAME target data
+2. Estimate ê = mean(A_target) [constant propensity]
+3. Compute DR pseudo-outcomes on target:
    Γᵢ = (Aᵢ/ê)(Yᵢ - μ̂₁) + μ̂₁ - ((1-Aᵢ)/(1-ê))(Yᵢ - μ̂₀) - μ̂₀
-3. Fit τ̂(x) on (X_target, Γ) using Lasso
+4. Fit τ̂(x) on (X_target, Γ) using Lasso
+
+USE Glmtrans_DR_CrossFit INSTEAD for better finite-sample behavior.
 ''',
-        'reference': 'glmtrans + DR combination'
+        'reference': 'glmtrans + DR combination (not recommended)'
+    },
+    
+    'Glmtrans_DR_CrossFit': {
+        'short_desc': 'glmtrans with CROSS-FITTED DR (RECOMMENDED)',
+        'category': 'Transfer Learning',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'description': '''
+Addresses advisor's critique of naive Glmtrans_DR:
+
+PROBLEMS WITH NAIVE DR (why Glmtrans_DR underperforms):
+  1. NO CROSS-FITTING: μ̂ trained on same data as Γ computed → overfitting
+  2. PROPENSITY TAX: Bad ê amplifies noise through inverse weights  
+  3. DOUBLE SHRINKAGE: glmtrans shrinkage + Lasso on Γ → flattened τ̂
+  4. DR ON SMALL TARGET: Sources only used for μ̂, not for τ̂ learning
+
+FIXES IN THIS VERSION:
+  ✓ K-fold cross-fitting for μ̂₀, μ̂₁, ê estimates
+  ✓ Ridge logistic for stable propensity estimation
+  ✓ Propensity clipping [0.05, 0.95] to prevent weight explosion
+  ✓ Diagnostics output (Var(Γ) vs Var(μ̂₁-μ̂₀))
+''',
+        'pseudo_code': '''
+For k = 1, ..., K folds:
+  1. Split target into train (fold ≠ k) and test (fold = k)
+  2. Fit glmtrans on train target + ALL sources
+  3. Get OUT-OF-FOLD predictions μ̂₀[test], μ̂₁[test]
+  4. Fit ridge logistic propensity on train target
+  5. Get OUT-OF-FOLD ê[test]
+
+After cross-fitting:
+  6. Clip propensities: ê_clipped = clip(ê, 0.05, 0.95)
+  7. Compute DR pseudo-outcomes (using OOF estimates):
+     Γᵢ = μ̂₁(Xᵢ) - μ̂₀(Xᵢ) + (Aᵢ-ê)/(ê(1-ê)) · residual
+  8. Fit τ̂(x) on (X_target, Γ) using Lasso
+
+Diagnostics:
+  - Var(Γ) / Var(μ̂₁-μ̂₀): If >> 1, DR is hurting
+  - Max inverse weight: If > 20, weights are unstable
+''',
+        'reference': 'Advisor-recommended cross-fitted DR construction'
     },
     
     'Glmtrans_ElasticNet': {
@@ -2422,30 +2472,65 @@ Same as Glmtrans_Auto but with α=0.5:
         'uses_target_placebo': True,
         'uses_target_treated': False,  # KEY: Does NOT require target treated
         'uses_source': True,
-        'pseudo_code': '''
-Stage 0 (Source Detection - Control Arm Only):
-  - Run glmtrans on control arm: target placebo vs source controls
-  - Identify transferable sources: Ŝ₀ = {k : loss_k ≤ C₀ · loss_target}
-  - This uses only Y_target(0), NO target treated needed
+        'description': '''
+THEORY-CLEAN OPTION B (Advisor-Approved)
 
-Step 1 (Restrict to Selected Sources):
-  - Form restricted source data: D_src^good = ∪_{k ∈ Ŝ₀} D_k
-  - No weighting, just selection (deterministic)
+When the target site contains only control units, glmtrans cannot be applied 
+directly to the treated arm. We therefore use glmtrans solely as a DETERMINISTIC 
+SCREENING PROCEDURE on the control arm to identify transferable source sites. 
+Conditional on this selected subset, we estimate CATEs using a doubly robust 
+learner trained entirely on source data and transport the resulting CATE model 
+to the target.
 
-Step 2 (Source-DR CATE):
-  - Fit μ̂₀^src, μ̂₁^src on selected sources
-  - Estimate ê^src on selected sources
-  - Compute DR pseudo-outcomes on SOURCES:
-    Γᵢ = μ̂₁(Xᵢ) - μ̂₀(Xᵢ) + (Aᵢ-ê)/(ê(1-ê)) · residual
-  - Fit τ̂^src(x) on source pseudo-outcomes
+KEY THEORETICAL INSIGHT:
+  "glmtrans theory justifies *source selection*, not arm-level transport 
+   of treatment effects." (Advisor)
+  
+  glmtrans provides a deterministic, data-dependent subset Ŝ₀ such that:
+  - Sources in Ŝ₀ are "close enough" to target in outcome model risk
+  - Non-transferable sources are excluded
+  
+  This guarantee is about OUTCOME MODEL RISK (per arm), it does NOT:
+  - Estimate CATE
+  - Transport treatment effects
+  - Rely on treated outcomes in target
 
-Step 3 (Transport to Target):
-  - τ̂_target(x) := τ̂^src(x)  (direct transport)
-  - No further correction (no target treated data)
-
-KEY: Theoretically valid for placebo-only target (m₁=0)
+WHAT THIS METHOD DOES NOT DO (following advisor's "do not" list):
+  ✗ Does NOT use glmtrans coefficients as μ̂₁ in Option B
+  ✗ Does NOT run glmtrans jointly on A∈{0,1} when m₁=0
+  ✗ Does NOT infer treated-arm similarity from placebo similarity
 ''',
-        'reference': 'Advisor construction: glmtrans screening + source-DR transport'
+        'pseudo_code': '''
+Stage 0 (Source Detection - Control Arm ONLY):
+  # This is the ONLY place glmtrans theory applies
+  1. Target placebo: (X_t, Y_t(0))
+  2. Source controls: [(X_sk[A=0], Y_sk(0)) for k in 1..K]
+  3. Run glmtrans(target, sources, family="gaussian", transfer.source.id="auto")
+  4. Return selected sources: Ŝ₀ ⊂ {1,...,K}
+  # Uses ONLY Y_target(0) - exactly as glmtrans was designed
+
+Stage 1 (Restrict to Selected Sources - NO WEIGHTING):
+  # Simply subset. No soft selection, no importance weighting.
+  D_src^good = ∪_{k ∈ Ŝ₀} D_k
+
+Stage 2 (Source-DR CATE):
+  # DR learning happens WHERE IDENTIFICATION HOLDS: on sources
+  1. Fit μ̂₀^src on X_good[A=0], Y_good[A=0]
+  2. Fit μ̂₁^src on X_good[A=1], Y_good[A=1]  
+  3. ê = mean(A) on selected sources
+  4. DR pseudo-outcomes on SOURCES:
+     Γᵢ = μ̂₁(Xᵢ) - μ̂₀(Xᵢ) + (Aᵢ-ê)/(ê(1-ê)) · (Yᵢ - μ̂_{Aᵢ}(Xᵢ))
+  5. Fit τ̂^src(x) = E[Γ|X=x] on source pseudo-outcomes
+
+Stage 3 (Transport to Target):
+  # Direct transport - relies on structural similarity encoded by Ŝ₀
+  τ̂_target(x) := τ̂^src(x)
+  # No further correction (we have no target treated data)
+
+VALID FOR: Placebo-only target (m₁=0)
+IDENTIFICATION: Via transferable source selection + DR on sources
+''',
+        'reference': 'Advisor construction based on Tian & Feng (2023) JASA'
     },
     
     # -------------------------------------------------------------------------

@@ -469,6 +469,12 @@ class GlmtransCATEEstimator:
         CV folds for lambda selection
     use_dr : bool
         Use doubly robust pseudo-outcomes
+    crossfit_folds : int
+        Number of cross-fitting folds for DR (0 = no cross-fitting)
+        When > 1, uses fit_glmtrans_dr_crossfit which addresses:
+        - Overfitting from in-sample nuisance estimation
+        - Propensity weight explosion
+        - Variance inflation in pseudo-outcomes
     verbose : bool
         Print R output
         
@@ -486,12 +492,14 @@ class GlmtransCATEEstimator:
         alpha: float = 1.0,
         nfolds: int = 5,
         use_dr: bool = False,
+        crossfit_folds: int = 0,
         verbose: bool = False
     ):
         self.transfer_source_id = transfer_source_id
         self.alpha = alpha
         self.nfolds = nfolds
         self.use_dr = use_dr
+        self.crossfit_folds = crossfit_folds
         self.verbose = verbose
         
         # Check R availability
@@ -569,12 +577,50 @@ class GlmtransCATEEstimator:
             np.savetxt(f"{tmpdir}/propensity.csv", propensity_target, delimiter=",")
             
             # R script to fit CATE model
-            if self.use_dr:
+            # Determine which function to use based on DR and cross-fitting settings
+            if self.use_dr and self.crossfit_folds > 1:
+                # Cross-fitted DR (addresses overfitting, weight explosion)
+                fit_func = "fit_glmtrans_dr_crossfit"
+                predict_func = "predict_dr_crossfit"
+            elif self.use_dr:
+                # Standard DR (no cross-fitting - may overfit in small samples)
                 fit_func = "fit_glmtrans_dr"
                 predict_func = "predict_dr"
             else:
+                # Plug-in CATE (no DR)
                 fit_func = "fit_glmtrans_cate"
                 predict_func = "predict_cate"
+            
+            # Build fit function arguments based on method type
+            if self.use_dr and self.crossfit_folds > 1:
+                # Cross-fitted DR - different argument names
+                fit_args = f'''
+  X_source, A_source, Y_source, c_source,
+  X_target, A_target, Y_target,
+  transfer_source_id = "{self.transfer_source_id}",
+  n_folds = {self.crossfit_folds},
+  alpha = {self.alpha},
+  nfolds_cv = {self.nfolds},
+  verbose = {'TRUE' if self.verbose else 'FALSE'}'''
+            elif self.use_dr:
+                # Standard DR
+                fit_args = f'''
+  X_source, A_source, Y_source, c_source,
+  X_target, A_target, Y_target,
+  propensity = propensity,
+  transfer_source_id = "{self.transfer_source_id}",
+  alpha = {self.alpha},
+  nfolds = {self.nfolds},
+  verbose = {'TRUE' if self.verbose else 'FALSE'}'''
+            else:
+                # Plug-in CATE
+                fit_args = f'''
+  X_source, A_source, Y_source, c_source,
+  X_target, A_target, Y_target,
+  transfer_source_id = "{self.transfer_source_id}",
+  alpha = {self.alpha},
+  nfolds = {self.nfolds},
+  verbose = {'TRUE' if self.verbose else 'FALSE'}'''
             
             r_script = f'''
 # Set up library paths
@@ -595,14 +641,7 @@ Y_target <- as.vector(read.csv("{tmpdir}/Y_target.csv", header=FALSE)$V1)
 propensity <- as.vector(read.csv("{tmpdir}/propensity.csv", header=FALSE)$V1)
 
 # Fit model
-fit <- {fit_func}(
-  X_source, A_source, Y_source, c_source,
-  X_target, A_target, Y_target,
-  {'propensity = propensity,' if self.use_dr else ''}
-  transfer_source_id = "{self.transfer_source_id}",
-  alpha = {self.alpha},
-  nfolds = {self.nfolds},
-  verbose = {'TRUE' if self.verbose else 'FALSE'}
+fit <- {fit_func}({fit_args}
 )
 
 # Predict CATE on target
@@ -620,10 +659,21 @@ if (!is.null(fit$mu1_fit) && !isTRUE(fit$mu1_fit$is_glmnet)) {{
   write.csv(fit$mu1_fit$beta, "{tmpdir}/mu1_beta.csv", row.names=FALSE)
 }}
 
-# For DR, also save CATE model
-if (class(fit)[1] == "glmtrans_dr") {{
+# For DR models, also save CATE model and diagnostics
+if (class(fit)[1] %in% c("glmtrans_dr", "glmtrans_dr_crossfit")) {{
   beta_cate <- as.vector(coef(fit$cate_model, s = "lambda.min"))
   write.csv(beta_cate, "{tmpdir}/cate_beta.csv", row.names=FALSE)
+  
+  # Save diagnostics for cross-fitted version
+  if (!is.null(fit$diagnostics)) {{
+    diag_df <- data.frame(
+      var_pseudo = fit$diagnostics$var_pseudo,
+      var_plugin = fit$diagnostics$var_plugin,
+      var_ratio = fit$diagnostics$var_ratio,
+      max_inv_weight = fit$diagnostics$max_inv_weight
+    )
+    write.csv(diag_df, "{tmpdir}/dr_diagnostics.csv", row.names=FALSE)
+  }}
 }}
 '''
             
@@ -963,11 +1013,30 @@ def create_glmtrans_factories(seed: int = 42) -> Dict[str, Any]:
             nfolds=5
         ),
         
-        # Glmtrans with DR pseudo-outcomes
+        # Glmtrans with DR pseudo-outcomes (ORIGINAL - may overfit)
+        # WARNING: No cross-fitting. May underperform plug-in when:
+        #   - Target sample is small
+        #   - Dimensionality is high  
+        #   - Overlap is imperfect
+        # Use Glmtrans_DR_CrossFit for better finite-sample behavior
         'Glmtrans_DR': lambda: GlmtransCATEEstimator(
             transfer_source_id='auto',
             alpha=1.0,
             use_dr=True,
+            crossfit_folds=0,  # No cross-fitting
+            nfolds=5
+        ),
+        
+        # Glmtrans with CROSS-FITTED DR (RECOMMENDED)
+        # Addresses advisor's critique of naive DR:
+        #   - Cross-fits nuisances to maintain orthogonality
+        #   - Clips propensity weights to prevent explosion
+        #   - Diagnostics for variance comparison vs plug-in
+        'Glmtrans_DR_CrossFit': lambda: GlmtransCATEEstimator(
+            transfer_source_id='auto',
+            alpha=1.0,
+            use_dr=True,
+            crossfit_folds=2,  # 2-fold cross-fitting
             nfolds=5
         ),
         
