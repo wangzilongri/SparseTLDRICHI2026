@@ -759,6 +759,85 @@ Arm intercepts: α_{a,c} ~ N(0, σ_α²)
     },
     
     # =========================================================================
+    # A5 VIOLATION SWEEP (Reviewer sensitivity analysis)
+    # =========================================================================
+    'a5_violation': {
+        'benchmark_id': 'a5_violation_sweep',
+        'description': 'A5 Assumption Violation: Sparsity × Nonlinearity heatmap',
+        'base_scenario': {
+            # Fixed good target budget
+            'm0': 550,
+            'm1': 500,
+            # Fixed source data
+            'n_proxy_total': 20000,
+            'C_sources': 10,
+            'p_dim': 50,
+            # Fair DGP settings (other assumptions hold)
+            'nontransfer_scale': 0.1,
+            'use_fair_dgp': True,
+            'overlap_lambda': 0.25,
+            'intercept_drift_scale': 0.5,
+            # A5 defaults that will be overridden
+            'a5_decay_alpha': 2.0,       # Fast decay (sparse)
+            'a5_violation_eta': 0.0,     # No dense residual
+            'a5_nonlin_type': 'additive',  # Smooth nonlinearity (tanh-like)
+        },
+        'sweep_type': '2d',
+        'sweep_param': 'a5_sparsity_ratio',  # Primary: sparsity
+        'sweep_values': [0.05, 0.20, 1.0],   # Sparse → Dense
+        'secondary_param': 'a5_nonlin_lambda',  # Secondary: nonlinearity
+        'secondary_values': [0.0, 0.5, 1.0],    # Linear → Nonlinear
+        'methods': DEFAULT_METHODS_OPTION_A,
+        # Axis labels for heatmaps
+        'x_axis_label': 'Sparsity ratio (s/p)',
+        'y_axis_label': 'Nonlinearity (λ)',
+        
+        'motivation': """
+**Research Question:** How does our method degrade when Assumption A5 (sparse linear correction) is violated?
+
+**Why This Matters:**
+A5 states that the site-specific deviation δ(x) = x^T β is sparse and linear.
+This 2D grid tests violations along two axes:
+
+1. **Sparsity violation (s/p):** β has more non-zero entries
+   - s/p = 0.05: Sparse (A5 holds) - 5% of features have non-zero coefficients
+   - s/p = 0.20: Moderate violation - 20% non-zero
+   - s/p = 1.0: Dense (A5 violated) - all features contribute
+
+2. **Nonlinearity violation (λ):** Deviation becomes nonlinear
+   - λ = 0: δ(x) = x^T β (linear, A5 holds)
+   - λ = 0.5: δ(x) = 0.5·x^T β + 0.5·g(x) (mixture)
+   - λ = 1.0: δ(x) = g(x) (fully nonlinear, A5 violated)
+   
+Where g(x) = Σ_j tanh(x_j) is a smooth additive nonlinearity.
+
+**Key Control:** Var(δ(X)) is held constant across all settings.
+This ensures we're testing structural misspecification, not signal strength.
+
+**Expected Outcome:**
+- Strong performance at (0.05, 0): A5 holds
+- Graceful degradation as we move away from origin
+- Convergence toward TargetOnlyDR at (1.0, 1.0)
+
+**Grid:** 3 × 3 = 9 scenarios
+""",
+        'dgp_description': """
+**A5 Violation DGP:**
+
+Uses FairSyntheticRCTConfig with controlled A5 violations:
+- **Sparsity control:** `a5_sparsity_ratio` = s/p
+- **Nonlinearity control:** `a5_nonlin_lambda` = λ
+- **Nonlinear function:** g(x) = Σ tanh(x_j) (smooth additive)
+- **Variance normalized:** Var(δ(X)) ≡ 1 regardless of (s/p, λ)
+
+All other assumptions (A1-A4, A6) are held at fair values:
+- SNR ≈ 3-4 (good cross-arm transfer)
+- Overlap AUC ≈ 0.7-0.8 (moderate overlap)
+- Intercept drift SD = 0.5 (controlled)
+"""
+    },
+    
+    # =========================================================================
     # L1-TCL SWEEP (from arXiv 2305.09126v3)
     # =========================================================================
     'l1tcl': {
@@ -1101,8 +1180,11 @@ def _create_nan_result(benchmark_id, scenario, rep, method_name, feasibility, se
         'n_proxy_total': scenario.n_proxy_total,
         'C_sources': scenario.C_sources,
         'nontransfer_scale': scenario.nontransfer_scale,
-        # Secondary sweep param (e.g., p_dim)
         'p_dim': getattr(scenario, 'p_dim', None),
+        # A5 violation parameters
+        'a5_sparsity_ratio': getattr(scenario, 'a5_sparsity_ratio', None),
+        'a5_nonlin_lambda': getattr(scenario, 'a5_nonlin_lambda', None),
+        'a5_nonlin_type': getattr(scenario, 'a5_nonlin_type', None),
         # Fair DGP params
         'overlap_lambda': getattr(scenario, 'overlap_lambda', None),
         'intercept_drift_scale': getattr(scenario, 'intercept_drift_scale', None),
@@ -1284,15 +1366,18 @@ def _run_single_rep(
             'feasibility': feasibility,
             'seed': seed,
             
-            # Scenario params
+            # Scenario params (always include sweep params)
             config['sweep_param']: getattr(scenario, config['sweep_param']),
             'm0': scenario.m0,
             'm1': getattr(scenario, 'm1', None),
             'n_proxy_total': scenario.n_proxy_total,
             'C_sources': scenario.C_sources,
             'nontransfer_scale': scenario.nontransfer_scale,
-            # Secondary sweep param (e.g., p_dim for 2D sweeps)
             'p_dim': getattr(scenario, 'p_dim', None),
+            # A5 violation parameters
+            'a5_sparsity_ratio': getattr(scenario, 'a5_sparsity_ratio', None),
+            'a5_nonlin_lambda': getattr(scenario, 'a5_nonlin_lambda', None),
+            'a5_nonlin_type': getattr(scenario, 'a5_nonlin_type', None),
             
             # ─────────────────────────────────────────────────────────────────
             # Point Estimation Metrics
@@ -1895,16 +1980,24 @@ def _generate_heatmap_plots_2d(df_agg: pd.DataFrame, config: dict, output_dir: s
         return [f'({m0},{m1})' for m0, m1 in zip(m0_vals, m1_vals)]
     
     # Build x-axis labels
+    def format_tick_value(v):
+        """Format a tick value, preserving decimals if needed."""
+        if isinstance(v, float) and v != int(v):
+            # Has meaningful decimals - keep them
+            return f'{v:.2f}'.rstrip('0').rstrip('.')
+        else:
+            return str(int(v))
+    
     if show_budget_tuples and primary_param in ('m0', 'm1') and 'm0' in df_agg.columns and 'm1' in df_agg.columns:
         x_tick_labels = build_budget_tuple_labels(primary_values, primary_param)
     else:
-        x_tick_labels = [str(int(v)) for v in primary_values]
+        x_tick_labels = [format_tick_value(v) for v in primary_values]
     
     # Build y-axis labels (secondary param)
     if show_budget_tuples and secondary_param in ('m0', 'm1') and 'm0' in df_agg.columns and 'm1' in df_agg.columns:
         y_tick_labels = build_budget_tuple_labels(secondary_values, secondary_param)
     else:
-        y_tick_labels = [str(int(v)) for v in secondary_values]
+        y_tick_labels = [format_tick_value(v) for v in secondary_values]
     
     # Metrics to plot: (column, display_name, colormap, lower_is_better)
     metrics = [
@@ -3365,10 +3458,11 @@ Examples:
                        choices=['gold', 'gold_option_a', 'proxy', 'imbalance', 
                                 'gold_fair', 'gold_fair_dim', 'gold_fair_sources',
                                 'snr_ladder', 'overlap_ladder', 'drift_ladder',
+                                'a5_violation',
                                 'l1tcl', 'l1tcl_source_size', 'l1tcl_dim', 'l1tcl_sparsity', 
                                 'l1tcl_gold', 'l1tcl_gold_dim', 'l1tcl_full',
                                 'all', 'all_fair'],
-                       help='Sweep to run (default: all). Fair sweeps: gold_fair, gold_fair_dim, gold_fair_sources, snr_ladder, overlap_ladder, drift_ladder. '
+                       help='Sweep to run (default: all). Fair sweeps: gold_fair, gold_fair_dim, gold_fair_sources, snr_ladder, overlap_ladder, drift_ladder, a5_violation. '
                             'L1-TCL sweeps: l1tcl, l1tcl_source_size, l1tcl_dim, l1tcl_sparsity, l1tcl_gold, l1tcl_gold_dim, l1tcl_full')
     parser.add_argument('--n_rep', type=int, default=20,
                        help='Number of MC replicates (default: 20)')
@@ -3418,7 +3512,7 @@ Examples:
         )
     elif args.sweep == 'all_fair':
         # Run all fair sweeps
-        fair_sweeps = ['gold_fair', 'gold_fair_dim', 'gold_fair_sources', 'snr_ladder', 'overlap_ladder', 'drift_ladder']
+        fair_sweeps = ['gold_fair', 'gold_fair_dim', 'gold_fair_sources', 'snr_ladder', 'overlap_ladder', 'drift_ladder', 'a5_violation']
         for sweep_name in fair_sweeps:
             if not args.quiet:
                 print(f"\n{'='*70}")

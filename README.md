@@ -87,11 +87,105 @@ python experiments/test_estimators.py
 python experiments/ablation_study.py
 
 # Run benchmark sweeps
-python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 5 --output results/my_sweep
+python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 20 --output results/my_sweep
+
+# Run all fair sweeps
+python -m experiments.core_sweeps --sweep all_fair --n_rep 20 --output results/fair_sweeps
 
 # See all available sweeps
 python -m experiments.core_sweeps --help
 ```
+
+---
+
+## Available Benchmark Sweeps
+
+### Fair DGP Sweeps (Recommended)
+
+These sweeps use a **fair DGP** designed for honest method comparison with controlled assumptions.
+
+| Sweep | Command | Grid | Description |
+|-------|---------|------|-------------|
+| **gold_fair_dim** | `--sweep gold_fair_dim` | 5×4 (m₁×p) | Target budget × Dimensionality. Varies m₁∈{0,50,100,200,500} with m₀=m₁+50, p∈{10,20,50,100}. Generates heatmaps with (m₀,m₁) tuples. |
+| **gold_fair_sources** | `--sweep gold_fair_sources` | 5×5 (C×m₁) | Source sites × Target budget. Varies C∈{2,5,10,20,50} sites (1000 samples each), m₁∈{0,50,100,200,500}. Tests multi-site heterogeneity value. |
+| **gold_fair** | `--sweep gold_fair` | 4×4 (m₀×m₁) | Classic target budget grid. Varies m₀∈{50,100,200,500}, m₁∈{0,50,100,200}. |
+| **snr_ladder** | `--sweep snr_ladder` | 1D (6 pts) | SNR stress test. Varies nontransfer_scale∈{0,0.05,0.1,0.2,0.3,0.4}. Tests where cross-arm transfer breaks down. |
+| **overlap_ladder** | `--sweep overlap_ladder` | 1D (5 pts) | Overlap stress test. Varies overlap_λ∈{0,0.25,0.5,0.75,1.0}. Tests covariate shift sensitivity. |
+| **drift_ladder** | `--sweep drift_ladder` | 1D (5 pts) | Intercept drift stress. Varies drift_scale∈{0,0.5,1.0,2.0,4.0}. Tests arm baseline variance. |
+| **all_fair** | `--sweep all_fair` | All above | Runs all fair sweeps sequentially. |
+
+### L1-TCL Sweeps (Alternative DGP)
+
+Based on arXiv 2305.09126v3. Uses constant ATE with propensity score transfer.
+
+| Sweep | Command | Grid | Description |
+|-------|---------|------|-------------|
+| **l1tcl** | `--sweep l1tcl` | 1D (5 pts) | Basic L1-TCL. Varies target size m∈{50,100,200,500,1000}. |
+| **l1tcl_dim** | `--sweep l1tcl_dim` | 1D (4 pts) | Dimensionality. Varies p∈{10,20,50,100}. |
+| **l1tcl_sparsity** | `--sweep l1tcl_sparsity` | 1D (5 pts) | PS sparsity. Varies s/p∈{0.02,0.06,0.1,0.14,0.2}. |
+| **l1tcl_gold** | `--sweep l1tcl_gold` | 2D (5×4) | Target budget × m₁ grid. |
+| **l1tcl_gold_dim** | `--sweep l1tcl_gold_dim` | 2D (5×4) | Target budget × Dimensionality. |
+| **l1tcl_full** | `--sweep l1tcl_full` | 2D (4×4) | Full d×s grid for paper replication. |
+
+### Legacy Sweeps
+
+| Sweep | Command | Description |
+|-------|---------|-------------|
+| **gold** | `--sweep gold` | Original target budget grid (no fair DGP). |
+| **gold_option_a** | `--sweep gold_option_a` | Option A specific sweep. |
+| **proxy** | `--sweep proxy` | Proxy sample size sweep. |
+| **imbalance** | `--sweep imbalance` | Site imbalance sweep. |
+
+### Example Commands
+
+```bash
+# Run the main 2D heatmap sweep (recommended first experiment)
+python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 20 --n_jobs 10 \
+    --output results/gold_fair_dim
+
+# Run source site scaling experiment
+python -m experiments.core_sweeps --sweep gold_fair_sources --n_rep 20 --n_jobs 10 \
+    --output results/gold_fair_sources
+
+# Run stress tests (SNR, overlap, drift)
+python -m experiments.core_sweeps --sweep snr_ladder --n_rep 50 --output results/snr_stress
+python -m experiments.core_sweeps --sweep overlap_ladder --n_rep 50 --output results/overlap_stress
+python -m experiments.core_sweeps --sweep drift_ladder --n_rep 50 --output results/drift_stress
+
+# Run on remote cluster with more parallelism
+python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 100 --n_jobs 40 \
+    --output results/gold_fair_dim_production
+```
+
+### A5 Violation Sweeps (Sensitivity Analysis)
+
+For testing robustness when Assumption A5 (sparse linear correction) is violated. **See full documentation: [`docs/A5_VIOLATION_SWEEPS.md`](docs/A5_VIOLATION_SWEEPS.md)**
+
+**Integrated sweep (recommended):**
+
+```bash
+# Run the 2D heatmap sweep: Sparsity × Nonlinearity
+python -m experiments.core_sweeps --sweep a5_violation --n_rep 50 --output results/a5_violation
+```
+
+| Axis | Values | Meaning |
+|------|--------|---------|
+| Sparsity (s/p) | `{0.05, 0.20, 1.0}` | Sparse → Dense coefficients |
+| Nonlinearity (λ) | `{0.0, 0.5, 1.0}` | Linear → Nonlinear correction |
+
+**Expected outcome:**
+- Strong at (0.05, 0): A5 holds
+- Graceful degradation as violations increase
+- Convergence toward TargetOnlyDR at (1.0, 1.0)
+
+**Manual sweeps** (for more fine-grained control):
+
+| Config | Varies | Tests |
+|--------|--------|-------|
+| `a5_sparsity` | s/p ratio | Dense vs sparse coefficients |
+| `a5_decay` | Decay α | Approximate sparsity |
+| `a5_dense_residual` | η ratio | Dense noise injection |
+| `a5_nonlinear_additive` | λ | Smooth nonlinear violations |
 
 ### Basic Usage
 

@@ -121,11 +121,25 @@ def create_data_generator() -> Callable:
         if scenario.a6_rank_true is not None:
             config_kwargs['transfer_rank'] = scenario.a6_rank_true
         
-        # Sparsity (A5)
+        # Sparsity (A5) - legacy parameter
         if scenario.a5_effective_sparsity is not None:
             # Convert fraction to number of nonzeros
             p = config_kwargs.get('n_features', 5)
             config_kwargs['dev_sparsity'] = max(1, int(scenario.a5_effective_sparsity * p))
+        
+        # A5 violation parameters (new)
+        if scenario.a5_sparsity_ratio is not None:
+            config_kwargs['a5_sparsity_ratio'] = scenario.a5_sparsity_ratio
+        if scenario.a5_decay_alpha is not None:
+            config_kwargs['a5_decay_alpha'] = scenario.a5_decay_alpha
+        if scenario.a5_violation_eta is not None:
+            config_kwargs['a5_violation_eta'] = scenario.a5_violation_eta
+        if scenario.a5_nonlin_lambda is not None:
+            config_kwargs['a5_nonlin_lambda'] = scenario.a5_nonlin_lambda
+        if scenario.a5_nonlin_type is not None:
+            config_kwargs['a5_nonlin_type'] = scenario.a5_nonlin_type
+        if scenario.a5_nonlin_strength is not None:
+            config_kwargs['a5_nonlin_strength'] = scenario.a5_nonlin_strength
         
         # Feature dimension
         if scenario.p_dim is not None:
@@ -142,11 +156,18 @@ def create_data_generator() -> Callable:
             config_kwargs['nu_coefficient_corr'] = scenario.nu_coefficient_corr
         
         # Choose DGP: fair or standard
+        # Use fair DGP if explicitly requested or if any fair-DGP-specific parameters are set
         use_fair = scenario.use_fair_dgp or any([
             scenario.overlap_lambda is not None,
             scenario.intercept_drift_scale is not None,
             scenario.nu_support_overlap is not None,
             scenario.nu_coefficient_corr is not None,
+            # A5 violation parameters also require fair DGP
+            scenario.a5_sparsity_ratio is not None,
+            scenario.a5_decay_alpha is not None,
+            scenario.a5_violation_eta is not None,
+            scenario.a5_nonlin_lambda is not None,
+            scenario.a5_nonlin_type is not None,
         ])
         
         if use_fair and FAIR_DGP_AVAILABLE:

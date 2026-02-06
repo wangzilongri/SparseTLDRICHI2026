@@ -98,6 +98,53 @@ class FairSyntheticRCTConfig:
     transfer_strength: float = 1.0
     transfer_structure: str = "low_rank"
     
+    # ═══════════════════════════════════════════════════════════════════════
+    # A5 VIOLATION PARAMETERS (Reviewer sensitivity analysis)
+    # ═══════════════════════════════════════════════════════════════════════
+    # These control how badly A5 (sparse linear correction) is violated.
+    # Default values = A5 holds. Sweep these to test robustness.
+    
+    # --- A. Non-sparse bias violations ---
+    
+    # A5.1: Sparsity ratio s/p (0.05 = sparse, 1.0 = dense)
+    # Interpolates from sparse (A5 holds) to dense (A5 violated)
+    # The L2 norm is held constant, only sparsity changes
+    a5_sparsity_ratio: float = 0.05  # Default: sparse (5% of features)
+    
+    # A5.2: Coefficient decay α for approximate sparsity
+    # |β|_(j) ∝ j^(-α), α→∞ = sparse, α=0 = flat/dense
+    # Values: {2.0, 1.0, 0.5, 0.0} where 2.0 ≈ sparse, 0.0 = uniform
+    a5_decay_alpha: float = 2.0  # Default: near-sparse (fast decay)
+    
+    # A5.3: Violation strength η = ||β^⊥||_2 / ||β^(s)||_2
+    # β = β^(s) + β^⊥ where β^(s) is s-sparse, β^⊥ is dense residual
+    # η=0 means purely sparse, η=2 means dense component dominates
+    a5_violation_eta: float = 0.0  # Default: no dense residual
+    
+    # --- B. Nonlinear bias violations ---
+    
+    # A5.4: Nonlinearity mixture weight λ
+    # δ(x) = (1-λ)·x^T β + λ·g(x)
+    # λ=0 = linear (A5 holds), λ=1 = fully nonlinear (A5 violated)
+    a5_nonlin_lambda: float = 0.0  # Default: linear
+    
+    # A5.5: Nonlinear function type
+    # 'additive': g(x) = Σ_j a_j·sin(ω·x_j)  (smooth, still "simple")
+    # 'interaction': g(x) = Σ_{j,k} a_jk·x_j·x_k  (pairwise interactions)
+    # 'threshold': g(x) = Σ_j a_j·1{x_j > t_j}  (discontinuous)
+    a5_nonlin_type: str = 'additive'
+    
+    # A5.6: Nonlinear support size (how many features g touches)
+    # None = use a5_sparsity_ratio * p
+    a5_nonlin_support: Optional[int] = None
+    
+    # A5.7: Nonlinear strength (controls Var(g(X)) relative to Var(x^T β))
+    # This ensures nonlinear component has comparable signal to linear
+    a5_nonlin_strength: float = 1.0
+    
+    # A5.8: Frequency for additive sinusoidal nonlinearity
+    a5_nonlin_omega: float = 2.0
+    
     # Proxy
     proxy_nonlinear_scale: float = 0.3  # Reduced for cleaner signal
     
@@ -118,6 +165,7 @@ class FairSyntheticRCTGenerator:
     2. Controllable overlap via mixture
     3. Structured (sparse) nontransfer component
     4. Reports fairness diagnostics (SNR, AUC, drift)
+    5. A5 violation controls (non-sparse and nonlinear deviations)
     """
     
     def __init__(self, config: FairSyntheticRCTConfig = None):
@@ -126,6 +174,11 @@ class FairSyntheticRCTGenerator:
         
         p = self.config.n_features
         C = self.config.n_source_sites
+        
+        # ═════════════════════════════════════════════════════════════════
+        # A5 violation: Generate nonlinear basis coefficients (shared)
+        # ═════════════════════════════════════════════════════════════════
+        self._setup_a5_nonlinear_basis()
         
         # ═════════════════════════════════════════════════════════════════
         # Sparsity allocation
@@ -199,19 +252,33 @@ class FairSyntheticRCTGenerator:
             }
             
             # ─────────────────────────────────────────────────────────────
-            # Sparse placebo deviation β_{0,c}
+            # Placebo deviation β_{0,c} with A5 violation controls
             # ─────────────────────────────────────────────────────────────
-            beta0_c = np.zeros(p)
-            beta0_c[self.shared_support] = self.rng.normal(
-                0, self.config.dev_scale, size=len(self.shared_support)
+            # Check if using A5 violation parameters (non-default values)
+            use_a5_beta = (
+                self.config.a5_sparsity_ratio != 0.05 or 
+                self.config.a5_decay_alpha != 2.0 or
+                self.config.a5_violation_eta != 0.0
             )
             
-            if s_idio > 0 and len(remaining) > 0:
-                idio_size = min(s_idio, len(remaining))
-                idio_support = self.rng.choice(remaining, size=idio_size, replace=False)
-                beta0_c[idio_support] = self.rng.normal(
-                    0, self.config.dev_scale * 0.5, size=idio_size
+            if use_a5_beta:
+                # Use controlled A5 violation coefficients
+                # Target L2 norm based on dev_scale and expected sparse support
+                target_norm = self.config.dev_scale * np.sqrt(s_total)
+                beta0_c = self._generate_a5_deviation_beta(target_l2_norm=target_norm)
+            else:
+                # Original sparse generation (for backward compatibility)
+                beta0_c = np.zeros(p)
+                beta0_c[self.shared_support] = self.rng.normal(
+                    0, self.config.dev_scale, size=len(self.shared_support)
                 )
+                
+                if s_idio > 0 and len(remaining) > 0:
+                    idio_size = min(s_idio, len(remaining))
+                    idio_support = self.rng.choice(remaining, size=idio_size, replace=False)
+                    beta0_c[idio_support] = self.rng.normal(
+                        0, self.config.dev_scale * 0.5, size=idio_size
+                    )
             
             # ─────────────────────────────────────────────────────────────
             # CHANGE 4: Structured nontransfer component ν_c
@@ -269,20 +336,178 @@ class FairSyntheticRCTGenerator:
             self.beta1[c] = beta1_c
             self.nu[c] = nu_c
     
+    def _setup_a5_nonlinear_basis(self):
+        """
+        Set up the nonlinear basis functions for A5 violations.
+        
+        This creates shared nonlinear basis coefficients that will be used
+        when a5_nonlin_lambda > 0 to add nonlinear deviations.
+        """
+        p = self.config.n_features
+        
+        # Determine nonlinear support size
+        if self.config.a5_nonlin_support is not None:
+            nonlin_support_size = min(self.config.a5_nonlin_support, p)
+        else:
+            nonlin_support_size = max(5, int(self.config.a5_sparsity_ratio * p))
+        
+        # Select which features the nonlinearity touches
+        self.a5_nonlin_features = self.rng.choice(p, size=nonlin_support_size, replace=False)
+        
+        # Generate coefficients for each nonlinear type
+        nonlin_type = self.config.a5_nonlin_type
+        strength = self.config.a5_nonlin_strength
+        
+        if nonlin_type == 'additive':
+            # g(x) = Σ_j a_j · sin(ω · x_j)
+            self.a5_nonlin_coef = self.rng.normal(0, strength, size=nonlin_support_size)
+            
+        elif nonlin_type == 'interaction':
+            # g(x) = Σ_{j<k} a_jk · x_j · x_k
+            n_pairs = min(nonlin_support_size * (nonlin_support_size - 1) // 2, 50)
+            if nonlin_support_size >= 2:
+                # Generate interaction pairs
+                pairs = []
+                for i, fi in enumerate(self.a5_nonlin_features):
+                    for j, fj in enumerate(self.a5_nonlin_features):
+                        if i < j:
+                            pairs.append((fi, fj))
+                if len(pairs) > n_pairs:
+                    pair_idx = self.rng.choice(len(pairs), size=n_pairs, replace=False)
+                    pairs = [pairs[i] for i in pair_idx]
+                self.a5_interaction_pairs = pairs
+                self.a5_interaction_coef = self.rng.normal(0, strength / np.sqrt(max(1, len(pairs))), 
+                                                           size=len(pairs))
+            else:
+                self.a5_interaction_pairs = []
+                self.a5_interaction_coef = np.array([])
+                
+        elif nonlin_type == 'threshold':
+            # g(x) = Σ_j a_j · 1{x_j > t_j}
+            self.a5_nonlin_coef = self.rng.normal(0, strength, size=nonlin_support_size)
+            self.a5_thresholds = self.rng.normal(0, 0.5, size=nonlin_support_size)
+        
+        else:
+            raise ValueError(f"Unknown a5_nonlin_type: {nonlin_type}")
+    
+    def _compute_a5_nonlinear(self, X: np.ndarray) -> np.ndarray:
+        """
+        Compute the nonlinear component g(X) for A5 violations.
+        
+        Returns:
+            g(X) array of shape (n_samples,)
+        """
+        nonlin_type = self.config.a5_nonlin_type
+        omega = self.config.a5_nonlin_omega
+        
+        if nonlin_type == 'additive':
+            # g(x) = Σ_j a_j · sin(ω · x_j)
+            X_sub = X[:, self.a5_nonlin_features]
+            g = np.sum(self.a5_nonlin_coef * np.sin(omega * X_sub), axis=1)
+            
+        elif nonlin_type == 'interaction':
+            # g(x) = Σ_{j,k} a_jk · x_j · x_k
+            g = np.zeros(X.shape[0])
+            for (fi, fj), coef in zip(self.a5_interaction_pairs, self.a5_interaction_coef):
+                g += coef * X[:, fi] * X[:, fj]
+                
+        elif nonlin_type == 'threshold':
+            # g(x) = Σ_j a_j · 1{x_j > t_j}
+            X_sub = X[:, self.a5_nonlin_features]
+            indicators = (X_sub > self.a5_thresholds).astype(float)
+            g = np.sum(self.a5_nonlin_coef * indicators, axis=1)
+        
+        else:
+            g = np.zeros(X.shape[0])
+        
+        return g
+    
+    def _generate_a5_deviation_beta(self, target_l2_norm: float = 1.0) -> np.ndarray:
+        """
+        Generate deviation coefficients β with controlled sparsity pattern.
+        
+        Uses the A5 violation parameters to create:
+        1. Controlled sparsity ratio (a5_sparsity_ratio)
+        2. Decaying coefficients (a5_decay_alpha)  
+        3. Dense residual component (a5_violation_eta)
+        
+        Args:
+            target_l2_norm: Target L2 norm for the coefficient vector
+            
+        Returns:
+            beta: Coefficient vector of shape (p,)
+        """
+        p = self.config.n_features
+        sparsity_ratio = self.config.a5_sparsity_ratio
+        decay_alpha = self.config.a5_decay_alpha
+        violation_eta = self.config.a5_violation_eta
+        
+        # Number of "main" non-zero coefficients
+        s = max(1, int(sparsity_ratio * p))
+        
+        # Step 1: Generate sparse component β^(s) with decaying magnitudes
+        support = self.rng.choice(p, size=s, replace=False)
+        
+        # Generate magnitudes with power-law decay: |β|_(j) ∝ j^(-α)
+        if decay_alpha > 0:
+            ranks = np.arange(1, s + 1)
+            magnitudes = ranks ** (-decay_alpha)
+        else:
+            # α = 0: uniform magnitudes (maximally dense within support)
+            magnitudes = np.ones(s)
+        
+        # Random signs
+        signs = self.rng.choice([-1, 1], size=s)
+        sparse_coef = signs * magnitudes
+        
+        # Normalize sparse component to unit L2
+        sparse_coef = sparse_coef / (np.linalg.norm(sparse_coef) + 1e-10)
+        
+        # Build sparse beta
+        beta_sparse = np.zeros(p)
+        beta_sparse[support] = sparse_coef
+        
+        # Step 2: Add dense residual component β^⊥ if η > 0
+        if violation_eta > 0:
+            # Generate dense noise orthogonal-ish to sparse support
+            beta_dense = self.rng.normal(0, 1, size=p)
+            # Zero out sparse support to make it "orthogonal"
+            beta_dense[support] = 0
+            # Normalize to have ||β^⊥||_2 / ||β^(s)||_2 = η
+            if np.linalg.norm(beta_dense) > 1e-10:
+                beta_dense = beta_dense / np.linalg.norm(beta_dense) * violation_eta
+            
+            beta = beta_sparse + beta_dense
+        else:
+            beta = beta_sparse
+        
+        # Step 3: Rescale to target L2 norm
+        if np.linalg.norm(beta) > 1e-10:
+            beta = beta * target_l2_norm / np.linalg.norm(beta)
+        
+        return beta
+    
     def _mu(self, X: np.ndarray, site_id: int, arm: int) -> np.ndarray:
         """
-        Compute μ_{a,c}(x) = α_{a,c} + x^T b_a + nonlin(x) + x^T β_{a,c}.
+        Compute μ_{a,c}(x) = α_{a,c} + x^T b_a + nonlin(x) + δ_{a,c}(x).
         
-        NEW: Includes arm-specific intercept α_{a,c}.
+        Where the site-specific deviation δ_{a,c}(x) is:
+            δ(x) = (1 - λ) · x^T β_{a,c} + λ · g(x)
+        
+        - λ = a5_nonlin_lambda controls linear vs nonlinear mixture
+        - g(x) is the nonlinear function (additive, interaction, or threshold)
+        
+        NEW: Includes arm-specific intercept α_{a,c} and A5 violation controls.
         """
         p = self.config.n_features
         
         # Arm-specific intercept (CHANGE 3)
         alpha = self.arm_intercepts[site_id][arm]
         
+        # Get linear deviation coefficient
         if arm == 0:
             base = X @ self.b0_proxy
-            dev = X @ self.beta0[site_id]
+            beta_dev = self.beta0[site_id]
             
             if self.config.proxy_nonlinear_scale > 0:
                 c0, c1 = self.proxy_nonlin_coef0
@@ -291,13 +516,37 @@ class FairSyntheticRCTGenerator:
                 )
         else:
             base = X @ self.b1_proxy
-            dev = X @ self.beta1[site_id]
+            beta_dev = self.beta1[site_id]
             
             if self.config.proxy_nonlinear_scale > 0:
                 c0, c1 = self.proxy_nonlin_coef1
                 base = base + self.config.proxy_nonlinear_scale * (
                     c0 * np.sin(X[:, 0]) + c1 * 0.5 * X[:, 1]**2
                 )
+        
+        # ═══════════════════════════════════════════════════════════════════
+        # A5 VIOLATION: Mixture of linear and nonlinear deviation
+        # δ(x) = (1 - λ) · x^T β + λ · g(x)
+        # ═══════════════════════════════════════════════════════════════════
+        lam = self.config.a5_nonlin_lambda
+        
+        # Linear component: x^T β
+        dev_linear = X @ beta_dev
+        
+        if lam > 0:
+            # Nonlinear component: g(x)
+            dev_nonlin = self._compute_a5_nonlinear(X)
+            
+            # Normalize nonlinear component to match linear variance
+            # This ensures λ controls the *relative* contribution
+            var_linear = np.var(dev_linear) + 1e-10
+            var_nonlin = np.var(dev_nonlin) + 1e-10
+            dev_nonlin = dev_nonlin * np.sqrt(var_linear / var_nonlin)
+            
+            # Mixture
+            dev = (1 - lam) * dev_linear + lam * dev_nonlin
+        else:
+            dev = dev_linear
         
         return alpha + base + dev
     
@@ -431,6 +680,56 @@ class FairSyntheticRCTGenerator:
         diag['E_mu0'] = float(np.mean(target_data['mu0_true']))
         diag['E_mu1'] = float(np.mean(target_data['mu1_true']))
         diag['E_tau'] = float(np.mean(target_data['tau_true']))
+        
+        # ═════════════════════════════════════════════════════════════════
+        # A5 Violation Diagnostics (sparsity and nonlinearity)
+        # ═════════════════════════════════════════════════════════════════
+        p = self.config.n_features
+        
+        # A5.1: Effective sparsity (fraction of coefficients with significant mass)
+        beta0_t_abs = np.abs(beta0_t)
+        total_mass = np.sum(beta0_t_abs)
+        if total_mass > 1e-10:
+            # Count features that contribute at least 1% of total mass
+            significant_threshold = 0.01 * total_mass
+            n_significant = np.sum(beta0_t_abs > significant_threshold / p)
+            diag['a5_effective_sparsity'] = float(n_significant / p)
+        else:
+            diag['a5_effective_sparsity'] = 0.0
+        
+        # A5.2: Decay rate (how concentrated is the mass in top coefficients)
+        sorted_abs = np.sort(beta0_t_abs)[::-1]
+        cumsum = np.cumsum(sorted_abs) / (np.sum(sorted_abs) + 1e-10)
+        # Find how many coefficients needed for 90% of mass
+        n_for_90 = np.searchsorted(cumsum, 0.9) + 1
+        diag['a5_n_for_90pct_mass'] = int(n_for_90)
+        diag['a5_mass_concentration'] = float(n_for_90 / p)  # 0 = concentrated, 1 = diffuse
+        
+        # A5.3: Nonlinearity contribution
+        diag['a5_nonlin_lambda'] = self.config.a5_nonlin_lambda
+        diag['a5_nonlin_type'] = self.config.a5_nonlin_type
+        
+        # Compute variance decomposition if nonlinearity is present
+        if self.config.a5_nonlin_lambda > 0:
+            X_test = target_data['X']
+            dev_linear = X_test @ beta0_t
+            dev_nonlin = self._compute_a5_nonlinear(X_test)
+            
+            var_linear = np.var(dev_linear)
+            var_nonlin = np.var(dev_nonlin)
+            
+            diag['a5_var_linear'] = float(var_linear)
+            diag['a5_var_nonlinear'] = float(var_nonlin)
+            diag['a5_nonlin_var_ratio'] = float(var_nonlin / (var_linear + 1e-10))
+        else:
+            diag['a5_var_linear'] = float(np.var(target_data['X'] @ beta0_t))
+            diag['a5_var_nonlinear'] = 0.0
+            diag['a5_nonlin_var_ratio'] = 0.0
+        
+        # Store A5 config values for reference
+        diag['a5_sparsity_ratio_config'] = self.config.a5_sparsity_ratio
+        diag['a5_decay_alpha_config'] = self.config.a5_decay_alpha
+        diag['a5_violation_eta_config'] = self.config.a5_violation_eta
         
         # ═════════════════════════════════════════════════════════════════
         # Fairness assessment
@@ -582,6 +881,183 @@ FAIR_SWEEP_CONFIGS = {
         'fixed': {
             'intercept_drift_scale': 0.5,
         },
+    },
+}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# A5 VIOLATION SWEEP CONFIGS (Reviewer sensitivity analysis)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# These sweeps test how methods degrade when Assumption A5 (sparse linear
+# correction) is violated. Two axes: non-sparse and nonlinear.
+#
+# Recommended minimal grid (reviewer-proof):
+#   - Sparsity ratio: s/p ∈ {0.05, 0.2, 1.0}
+#   - Nonlinearity mix: λ ∈ {0, 0.5, 1}
+#   - Nonlinear family: {additive, interaction}
+# That's 3 × 3 × 2 = 18 settings per MC rep
+
+A5_SWEEP_CONFIGS = {
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # A. Non-sparse bias violations
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    'a5_sparsity': {
+        'description': 'Sweep sparsity ratio s/p (A5 violation via dense coefficients)',
+        'narrative': 'Interpolate from sparse (A5 holds) to dense (A5 violated), L2 norm fixed.',
+        'fixed': {
+            'overlap_lambda': 0.25,  # Fair overlap
+            'intercept_drift_scale': 0.5,  # Low drift
+            'nontransfer_scale_target': 0.1,  # Fair SNR
+            'a5_decay_alpha': 2.0,  # Keep decay fast
+            'a5_violation_eta': 0.0,  # No dense residual
+            'a5_nonlin_lambda': 0.0,  # Pure linear
+        },
+        'sweep': {
+            'a5_sparsity_ratio': [0.02, 0.05, 0.10, 0.20, 0.50, 1.00],
+        },
+        'diagnostic_key': 'a5_effective_sparsity',
+        'a5_holds_when': 'sparsity_ratio <= 0.1',
+    },
+    
+    'a5_decay': {
+        'description': 'Sweep coefficient decay α (approximate sparsity)',
+        'narrative': 'Test "compressible" vs truly sparse; α→∞ = sparse, α=0 = flat/dense.',
+        'fixed': {
+            'overlap_lambda': 0.25,
+            'intercept_drift_scale': 0.5,
+            'nontransfer_scale_target': 0.1,
+            'a5_sparsity_ratio': 0.2,  # 20% support
+            'a5_violation_eta': 0.0,
+            'a5_nonlin_lambda': 0.0,
+        },
+        'sweep': {
+            'a5_decay_alpha': [2.0, 1.0, 0.5, 0.0],  # 2.0 = near-sparse, 0.0 = uniform
+        },
+        'diagnostic_key': 'a5_mass_concentration',
+        'a5_holds_when': 'decay_alpha >= 1.0',
+    },
+    
+    'a5_dense_residual': {
+        'description': 'Sweep violation strength η = ||β^⊥||/||β^(s)|| (dense noise)',
+        'narrative': 'Progressively inject non-sparse components while keeping sparse part.',
+        'fixed': {
+            'overlap_lambda': 0.25,
+            'intercept_drift_scale': 0.5,
+            'nontransfer_scale_target': 0.1,
+            'a5_sparsity_ratio': 0.05,  # Sparse main component
+            'a5_decay_alpha': 2.0,
+            'a5_nonlin_lambda': 0.0,
+        },
+        'sweep': {
+            'a5_violation_eta': [0.0, 0.25, 0.5, 1.0, 2.0],
+        },
+        'diagnostic_key': 'a5_effective_sparsity',
+        'a5_holds_when': 'violation_eta <= 0.25',
+    },
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # B. Nonlinear bias violations
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    'a5_nonlinear_additive': {
+        'description': 'Sweep nonlinearity mixture λ with additive g(x) = Σ sin(ωx_j)',
+        'narrative': 'Test mild smooth mis-specification. Still "simple" but violates linearity.',
+        'fixed': {
+            'overlap_lambda': 0.25,
+            'intercept_drift_scale': 0.5,
+            'nontransfer_scale_target': 0.1,
+            'a5_sparsity_ratio': 0.05,  # Sparse linear part
+            'a5_decay_alpha': 2.0,
+            'a5_violation_eta': 0.0,
+            'a5_nonlin_type': 'additive',
+            'a5_nonlin_omega': 2.0,
+        },
+        'sweep': {
+            'a5_nonlin_lambda': [0.0, 0.25, 0.5, 0.75, 1.0],
+        },
+        'diagnostic_key': 'a5_nonlin_var_ratio',
+        'a5_holds_when': 'nonlin_lambda <= 0.25',
+    },
+    
+    'a5_nonlinear_interaction': {
+        'description': 'Sweep nonlinearity mixture λ with interactions g(x) = Σ x_j·x_k',
+        'narrative': 'Test epistatic/interaction violations. Harder to capture with linear methods.',
+        'fixed': {
+            'overlap_lambda': 0.25,
+            'intercept_drift_scale': 0.5,
+            'nontransfer_scale_target': 0.1,
+            'a5_sparsity_ratio': 0.05,
+            'a5_decay_alpha': 2.0,
+            'a5_violation_eta': 0.0,
+            'a5_nonlin_type': 'interaction',
+        },
+        'sweep': {
+            'a5_nonlin_lambda': [0.0, 0.25, 0.5, 0.75, 1.0],
+        },
+        'diagnostic_key': 'a5_nonlin_var_ratio',
+        'a5_holds_when': 'nonlin_lambda <= 0.25',
+    },
+    
+    'a5_nonlinear_threshold': {
+        'description': 'Sweep nonlinearity mixture λ with threshold g(x) = Σ 1{x_j > t_j}',
+        'narrative': 'Test discontinuous violations. Hardest case for smooth methods.',
+        'fixed': {
+            'overlap_lambda': 0.25,
+            'intercept_drift_scale': 0.5,
+            'nontransfer_scale_target': 0.1,
+            'a5_sparsity_ratio': 0.05,
+            'a5_decay_alpha': 2.0,
+            'a5_violation_eta': 0.0,
+            'a5_nonlin_type': 'threshold',
+        },
+        'sweep': {
+            'a5_nonlin_lambda': [0.0, 0.25, 0.5, 0.75, 1.0],
+        },
+        'diagnostic_key': 'a5_nonlin_var_ratio',
+        'a5_holds_when': 'nonlin_lambda <= 0.25',
+    },
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # C. Combined sweeps (reviewer-proof minimal grid)
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    'a5_sparsity_x_nonlin': {
+        'description': '2D grid: sparsity × nonlinearity (additive)',
+        'narrative': 'Compact 3×3 grid covering both violation axes.',
+        'fixed': {
+            'overlap_lambda': 0.25,
+            'intercept_drift_scale': 0.5,
+            'nontransfer_scale_target': 0.1,
+            'a5_decay_alpha': 2.0,
+            'a5_violation_eta': 0.0,
+            'a5_nonlin_type': 'additive',
+        },
+        'sweep': {
+            'a5_sparsity_ratio': [0.05, 0.2, 1.0],
+            'a5_nonlin_lambda': [0.0, 0.5, 1.0],
+        },
+        'total_scenarios': '3 × 3 = 9',
+    },
+    
+    'a5_full_grid': {
+        'description': 'Full A5 sensitivity: sparsity × nonlinearity × nonlin_type',
+        'narrative': 'Complete reviewer-proof grid: 3 × 3 × 2 = 18 scenarios.',
+        'fixed': {
+            'overlap_lambda': 0.25,
+            'intercept_drift_scale': 0.5,
+            'nontransfer_scale_target': 0.1,
+            'a5_decay_alpha': 2.0,
+            'a5_violation_eta': 0.0,
+        },
+        'sweep': {
+            'a5_sparsity_ratio': [0.05, 0.2, 1.0],
+            'a5_nonlin_lambda': [0.0, 0.5, 1.0],
+            'a5_nonlin_type': ['additive', 'interaction'],
+        },
+        'total_scenarios': '3 × 3 × 2 = 18',
     },
 }
 

@@ -71,9 +71,13 @@ class Scenario:
     shift_strength: Optional[float] = None      # Covariate shift knob
     overlap_strength: Optional[float] = None    # Overlap/positivity knob
     
-    # A5 knobs (correction misspecification)
-    a5_effective_sparsity: Optional[float] = None  # k/p or power-law alpha
-    a5_nonlin_type: Optional[str] = None           # NonlinType value
+    # A5 knobs (correction misspecification / violation sensitivity)
+    a5_effective_sparsity: Optional[float] = None  # k/p or power-law alpha (legacy)
+    a5_sparsity_ratio: Optional[float] = None      # s/p sparsity ratio (0.05=sparse, 1.0=dense)
+    a5_decay_alpha: Optional[float] = None         # Coefficient decay rate (2.0=sparse, 0.0=flat)
+    a5_violation_eta: Optional[float] = None       # Dense residual ratio ||β^⊥||/||β^(s)||
+    a5_nonlin_lambda: Optional[float] = None       # Linear/nonlinear mixture (0=linear, 1=nonlinear)
+    a5_nonlin_type: Optional[str] = None           # 'additive', 'interaction', 'threshold'
     a5_nonlin_strength: Optional[float] = None     # Scale of nonlinear term
     
     # A6 knobs (transfer misspecification)
@@ -719,7 +723,8 @@ SCENARIO_PARAM_COLS = [
     'm0', 'm1', 'n_proxy_total', 'C_sources', 'p_dim',
     'imbalance_ratio', 'dirichlet_alpha',
     'shift_strength', 'overlap_strength',
-    'a5_effective_sparsity', 'a5_nonlin_type', 'a5_nonlin_strength',
+    'a5_effective_sparsity', 'a5_sparsity_ratio', 'a5_decay_alpha', 'a5_violation_eta',
+    'a5_nonlin_lambda', 'a5_nonlin_type', 'a5_nonlin_strength',
     'a6_rank_true', 'a6_rank_fit', 'a6_nonlin_rho', 'nontransfer_scale',
     'K_treatments', 'graph_type',
     'noise_scale', 'noise_df', 'contamination_prob'
