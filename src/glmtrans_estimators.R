@@ -15,23 +15,34 @@
 # Dependencies
 # =============================================================================
 
-# Set up local library path
-local_lib <- file.path(dirname(getwd()), "R_libs")
-if (dir.exists(local_lib)) {
-  .libPaths(c(local_lib, .libPaths()))
+# Set up local library paths (check multiple common locations)
+possible_libs <- c(
+  Sys.getenv("R_LIBS_USER"),
+  file.path(Sys.getenv("HOME"), "local/R_libs"),
+  file.path(Sys.getenv("HOME"), "R_libs"),
+  file.path(dirname(getwd()), "R_libs")
+)
+for (lib_path in possible_libs) {
+  if (nzchar(lib_path) && dir.exists(lib_path)) {
+    .libPaths(c(lib_path, .libPaths()))
+  }
 }
 
-# Check and install glmtrans if needed
-if (!requireNamespace("glmtrans", quietly = TRUE)) {
-  message("Installing glmtrans package...")
-  if (!dir.exists(local_lib)) dir.create(local_lib, recursive = TRUE)
-  install.packages("glmtrans", lib = local_lib, repos = "https://cloud.r-project.org")
-  .libPaths(c(local_lib, .libPaths()))
-}
-
-suppressPackageStartupMessages({
-  library(glmtrans)
-  library(glmnet)
+# Try to load glmtrans - do NOT auto-install (causes race conditions in parallel)
+# If this fails, the user needs to fix their R installation manually
+tryCatch({
+  suppressPackageStartupMessages({
+    library(glmtrans)
+    library(glmnet)
+  })
+}, error = function(e) {
+  stop(paste0(
+    "Failed to load glmtrans package. Error: ", conditionMessage(e), "\n\n",
+    "To fix this, run the following in R (not during a parallel sweep):\n",
+    "  install.packages('rlang', type='source')  # Fix common dependency issue\n",
+    "  install.packages('glmtrans', type='source')\n\n",
+    "Current .libPaths():\n  ", paste(.libPaths(), collapse="\n  ")
+  ))
 })
 
 # =============================================================================
