@@ -437,21 +437,29 @@ def find_best_methods(
         if mean_col not in df.columns:
             continue
         
-        if lower_is_better.get(metric, True):
-            best_idx = df[mean_col].idxmin()
-        else:
-            best_idx = df[mean_col].idxmax()
-        
-        if pd.isna(best_idx):
+        # Skip if all values are NaN
+        if df[mean_col].isna().all():
             continue
         
-        best_row = df.loc[best_idx]
-        results[metric] = {
-            'method': best_row['method'],
-            'value': best_row[mean_col],
-            'sd': best_row.get(f'{metric}_sd', np.nan),
-            'scenario_id': best_row.get('scenario_id')
-        }
+        try:
+            if lower_is_better.get(metric, True):
+                best_idx = df[mean_col].idxmin()
+            else:
+                best_idx = df[mean_col].idxmax()
+            
+            if pd.isna(best_idx):
+                continue
+            
+            best_row = df.loc[best_idx]
+            results[metric] = {
+                'method': best_row['method'],
+                'value': best_row[mean_col],
+                'sd': best_row.get(f'{metric}_sd', np.nan),
+                'scenario_id': best_row.get('scenario_id')
+            }
+        except (ValueError, KeyError):
+            # Handle edge cases where idxmin/idxmax fails
+            continue
     
     return results
 

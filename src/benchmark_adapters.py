@@ -40,6 +40,12 @@ def create_data_generator() -> Callable:
     except ImportError:
         FAIR_DGP_AVAILABLE = False
     
+    # Import L1-TCL DGP (toy and extended versions)
+    from synthetic_data_v2 import (
+        L1TCLConfig, L1TCLGenerator,
+        L1TCLExtendedConfig, L1TCLExtendedGenerator
+    )
+    
     def data_generator(scenario: Scenario, seed: int) -> Dict[str, Any]:
         """
         Generate synthetic data based on scenario configuration.
@@ -56,6 +62,20 @@ def create_data_generator() -> Callable:
         data : dict
             Dictionary with all data needed for estimation and evaluation
         """
+        # ═══════════════════════════════════════════════════════════════════════
+        # Check for L1-TCL DGP (special case: different structure)
+        # ═══════════════════════════════════════════════════════════════════════
+        use_l1tcl = getattr(scenario, 'use_l1tcl_dgp', None) or (
+            scenario.benchmark_id is not None and 'l1tcl' in scenario.benchmark_id.lower()
+        )
+        
+        if use_l1tcl:
+            return _generate_l1tcl_data(scenario, seed)
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Standard DGP (multi-site, heterogeneous CATE)
+        # ═══════════════════════════════════════════════════════════════════════
+        
         # Map scenario params to SyntheticRCTConfig
         config_kwargs = {
             'random_state': seed,
@@ -183,6 +203,150 @@ def create_data_generator() -> Callable:
             
             # Generator for diagnostics
             'generator': generator,
+        }
+        
+        return data
+    
+    def _generate_l1tcl_data(scenario: Scenario, seed: int) -> Dict[str, Any]:
+        """
+        Generate data using L1-TCL DGP (arXiv 2305.09126v3).
+        
+        Supports two modes:
+        1. Toy DGP (2 covariates, single source) - when p_dim=2 or C_sources=1
+        2. Extended DGP (variable d, s, multi-site) - otherwise
+        
+        Parameters
+        ----------
+        scenario : Scenario
+        seed : int
+        
+        Returns
+        -------
+        data : dict
+        """
+        # Determine if we should use extended or toy DGP
+        p_dim = scenario.p_dim if scenario.p_dim is not None else 20
+        n_sources = scenario.C_sources if scenario.C_sources is not None else 10
+        
+        # Use toy DGP only if explicitly 2 features AND 1 source
+        use_toy = (p_dim == 2 and n_sources == 1)
+        
+        # Target sample size
+        m0 = scenario.m0 if scenario.m0 is not None else 100
+        m1 = scenario.m1 if scenario.m1 is not None else 0
+        n_target = m0 + m1
+        
+        if use_toy:
+            # ═══════════════════════════════════════════════════════════════════
+            # TOY DGP (original 2-covariate version)
+            # ═══════════════════════════════════════════════════════════════════
+            l1tcl_kwargs = {'random_state': seed, 'n_target': n_target}
+            if scenario.n_proxy_total is not None:
+                l1tcl_kwargs['n_source'] = scenario.n_proxy_total
+            
+            config = L1TCLConfig(**l1tcl_kwargs)
+            generator = L1TCLGenerator(config)
+            source_data, target_data = generator.generate_full_dataset()
+            
+            # Eval data
+            eval_generator = L1TCLGenerator(L1TCLConfig(
+                n_target=1000,
+                random_state=seed + 10000,
+                **{k: getattr(config, k) for k in [
+                    'mu1_target', 'mu2_target', 'beta1_target', 'beta2_target',
+                    'tau_target', 'alpha_target', 'noise_std'
+                ]}
+            ))
+            _, eval_target = eval_generator.generate_full_dataset()
+            dgp_type = 'l1tcl_toy'
+        else:
+            # ═══════════════════════════════════════════════════════════════════
+            # EXTENDED DGP (variable d, s, multi-site)
+            # ═══════════════════════════════════════════════════════════════════
+            ext_kwargs = {
+                'random_state': seed,
+                'n_features': p_dim,
+                'n_target': n_target,
+                'n_source_sites': n_sources,
+            }
+            
+            # PS sparsity (from scenario if available)
+            ps_sparsity = getattr(scenario, 'a5_effective_sparsity', None)
+            if ps_sparsity is not None:
+                # Convert fraction to integer sparsity
+                ext_kwargs['ps_sparsity'] = max(1, int(ps_sparsity * p_dim))
+            else:
+                # Default: ~15% sparsity
+                ext_kwargs['ps_sparsity'] = max(1, p_dim // 7)
+            
+            # Source samples per site
+            if scenario.n_proxy_total is not None:
+                ext_kwargs['n_source_per_site'] = scenario.n_proxy_total // n_sources
+            
+            config = L1TCLExtendedConfig(**ext_kwargs)
+            generator = L1TCLExtendedGenerator(config)
+            source_data, target_data = generator.generate_full_dataset()
+            
+            # Eval data - generate fresh target-domain data
+            eval_config = L1TCLExtendedConfig(
+                n_features=config.n_features,
+                ps_sparsity=config.ps_sparsity,
+                n_target=1000,
+                n_source_sites=1,  # Don't need sources for eval
+                random_state=seed + 10000,
+                tau_target=config.tau_target,
+                alpha_scale=config.alpha_scale,
+                noise_std=config.noise_std,
+            )
+            eval_gen = L1TCLExtendedGenerator(eval_config)
+            # Copy target-specific parameters
+            eval_gen.beta_target = generator.beta_target
+            eval_gen.alpha = generator.alpha
+            eval_gen.site_shifts[0] = generator.site_shifts[0]
+            _, eval_target = eval_gen.generate_full_dataset()
+            dgp_type = 'l1tcl_extended'
+        
+        # Compute actual m0/m1
+        actual_m0 = int(np.sum(target_data['A'] == 0))
+        actual_m1 = int(np.sum(target_data['A'] == 1))
+        has_target_treated = actual_m1 > 0
+        
+        # Propensity
+        propensity = actual_m1 / (actual_m0 + actual_m1) if actual_m1 > 0 else 0.5
+        
+        # Package for benchmark runner
+        data = {
+            # Source data
+            'X_source': source_data['X'],
+            'A_source': source_data['A'],
+            'Y_source': source_data['Y'],
+            'c_source': source_data['c'],
+            
+            # Target estimation data
+            'X_target': target_data['X'],
+            'A_target': target_data['A'],
+            'Y_target': target_data['Y'],
+            
+            # Target evaluation data
+            'X_target_eval': eval_target['X'],
+            'tau_true': eval_target['tau_true'],  # Constant!
+            'mu0_true': eval_target['mu0_true'],
+            'mu1_true': eval_target['mu1_true'],
+            'ate_true': float(np.mean(eval_target['tau_true'])),
+            
+            # Propensity
+            'propensity_target': np.full(len(target_data['X']), propensity),
+            
+            # Feasibility flags
+            'has_target_treated': has_target_treated,
+            'actual_m0': actual_m0,
+            'actual_m1': actual_m1,
+            
+            # Generator for diagnostics
+            'generator': generator,
+            
+            # L1-TCL specific flag
+            'dgp_type': dgp_type,
         }
         
         return data

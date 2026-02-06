@@ -620,6 +620,325 @@ Arm intercepts: α_{a,c} ~ N(0, σ_α²)
 - overlap_lambda = 0.25 (moderate overlap)
 """
     },
+    
+    # =========================================================================
+    # L1-TCL SWEEP (from arXiv 2305.09126v3)
+    # =========================================================================
+    'l1tcl': {
+        'benchmark_id': 'l1tcl_sweep',
+        'description': 'L1-TCL DGP sweep (constant ATE, PS transfer)',
+        'base_scenario': {
+            'n_proxy_total': 1000,      # Source sample size
+            'C_sources': 1,             # Single source domain (L1-TCL structure)
+            'p_dim': 2,                 # Only 2 covariates in L1-TCL
+            'use_l1tcl_dgp': True,      # Use L1-TCL generator
+        },
+        'sweep_type': '2d',             # 2D grid: m0 × m1
+        'sweep_param': 'm0',
+        'sweep_values': [50, 100, 200, 500],
+        'm1_values': [0, 50, 100, 200],  # 0 = propensity-only, >0 = use treated
+        'methods': DEFAULT_METHODS_OPTION_A,
+        
+        'motivation': """
+**Research Question:** How do CATE estimators perform on the L1-TCL DGP, which differs fundamentally from our main DGP?
+
+**Why This Matters:**
+L1-TCL (arXiv 2305.09126v3) focuses on propensity score transfer with:
+1. Constant ATE τ (no heterogeneous treatment effects)
+2. Only 2 covariates (X₁, X₂)
+3. Single source domain
+4. Different propensity score parameters between domains
+5. Linear outcome model: Y = τZ + αX₂ + ε
+
+This tests our methods on a fundamentally different DGP where:
+- Ranking metrics (tau_corr, Qini) are meaningless (constant τ)
+- PEHE reduces to ATE error (since τ(x) = τ for all x)
+- The challenge is PS estimation, not outcome model transfer
+
+**DGP Structure (from paper):**
+- Treatment: P(Z=1|X₁,X₂) = sigmoid(β₁X₁ + β₂X₂)
+- Outcome: Y = τZ + αX₂ + ε
+- Target: μ₁=0, μ₂=2, β₁=0.1, β₂=-0.1, τ=-2/30≈-0.067
+- Source: μ₁=0, μ₂=1, β₁=0.1, β₂=-0.2 (different PS!)
+""",
+        
+        'expected_findings': """
+**Expected Results:**
+1. All methods should have similar ranking (meaningless due to constant τ)
+2. PEHE ≈ ATE error (no heterogeneity)
+3. Methods leveraging source data should improve ATE estimation
+4. When m₁=0 (no target treated), only methods using source treated work
+5. IPW-based transport methods may perform well on this DGP
+
+**Key Comparisons:**
+- ProposedA variants vs transport baselines
+- Effect of target sample size (limited data regime)
+- Source data value for PS estimation
+""",
+    },
+    
+    'l1tcl_source_size': {
+        'benchmark_id': 'l1tcl_source_size_sweep',
+        'description': 'L1-TCL DGP: Source sample size sweep',
+        'base_scenario': {
+            'm0': 100,                  # Fixed limited target
+            'm1': 0,                    # Propensity-only (no treated in target)
+            'C_sources': 1,
+            'p_dim': 2,
+            'use_l1tcl_dgp': True,
+        },
+        'sweep_type': '1d',
+        'sweep_param': 'n_proxy_total',
+        'sweep_values': [100, 250, 500, 1000, 2000, 5000],
+        'methods': DEFAULT_METHODS_OPTION_B,  # Disconnected target
+        
+        'motivation': """
+**Research Question:** How does source sample size affect ATE estimation in the limited target data regime?
+
+**Why This Matters:**
+L1-TCL emphasizes the value of source data when target is limited (n=100).
+With m₁=0 (no target treated), methods must leverage source for treatment effect.
+
+**Expected:** ATE error decreases as source size increases (better PS estimates).
+""",
+        
+        'expected_findings': """
+**Expected:**
+1. ProposedB_SourceDR benefits from larger source (better transfer)
+2. Transport methods (IPWTransport) benefit from better source PS
+3. Diminishing returns after source size >> target size
+""",
+    },
+    
+    # =========================================================================
+    # L1-TCL EXTENDED SWEEPS (matching their full experimental setup)
+    # =========================================================================
+    
+    'l1tcl_dim': {
+        'benchmark_id': 'l1tcl_dim_sweep',
+        'description': 'L1-TCL Extended: Dimensionality sweep (d)',
+        'base_scenario': {
+            'm0': 100,
+            'm1': 100,
+            'n_proxy_total': 5000,      # 10 sites × 500 per site
+            'C_sources': 10,            # Multi-site like our main DGP
+            'a5_effective_sparsity': 0.15,  # ~15% sparsity in PS diff
+            'use_l1tcl_dgp': True,
+        },
+        'sweep_type': '1d',
+        'sweep_param': 'p_dim',
+        'sweep_values': [10, 20, 50, 75, 100],  # Paper: d ∈ {10, 20, 50, 75, 100}
+        'methods': DEFAULT_METHODS_OPTION_A,
+        
+        'motivation': """
+**Research Question:** How does covariate dimensionality affect transfer learning performance?
+
+**Why This Matters:**
+L1-TCL paper sweeps d ∈ {10, 20, 50, 75, 100}. Higher dimension means:
+1. More parameters to estimate in PS model
+2. Harder to detect sparse differences
+3. Curse of dimensionality in outcome modeling
+
+**Key Difference from Paper:**
+We use 10 source sites (like our main DGP) instead of single source.
+This tests whether multi-site pooling helps in high dimensions.
+""",
+        
+        'expected_findings': """
+**Expected:**
+1. Higher d → more variance in all methods
+2. Methods with regularization (Lasso) should degrade gracefully
+3. Multi-site pooling may help more in high dimensions
+""",
+    },
+    
+    'l1tcl_sparsity': {
+        'benchmark_id': 'l1tcl_sparsity_sweep',
+        'description': 'L1-TCL Extended: PS sparsity sweep (s)',
+        'base_scenario': {
+            'm0': 100,
+            'm1': 100,
+            'n_proxy_total': 5000,
+            'C_sources': 10,
+            'p_dim': 50,                # Fixed medium dimensionality
+            'use_l1tcl_dgp': True,
+        },
+        'sweep_type': '1d',
+        'sweep_param': 'a5_effective_sparsity',
+        # Paper: s ∈ {1, 3, 5, 7, 10} for d=50 → fractions: 0.02, 0.06, 0.1, 0.14, 0.2
+        'sweep_values': [0.02, 0.06, 0.1, 0.14, 0.2],
+        'methods': DEFAULT_METHODS_OPTION_A,
+        
+        'motivation': """
+**Research Question:** How does the sparsity of source-target difference affect transfer?
+
+**Why This Matters:**
+L1-TCL assumes Δβ = β_target - β_source is s-sparse.
+- Low s: Source and target PS models are similar → transfer helps
+- High s: Source and target differ more → transfer may hurt
+
+Paper sweeps s ∈ {1, 3, 5, 7, 10} with d=50.
+""",
+        
+        'expected_findings': """
+**Expected:**
+1. Lower sparsity (s) → better transfer performance
+2. As s increases, methods relying on source PS degrade
+3. Target-only methods unaffected by s
+4. L1-regularized methods should handle moderate sparsity well
+""",
+    },
+    
+    'l1tcl_gold': {
+        'benchmark_id': 'l1tcl_gold_sweep',
+        'description': 'L1-TCL Extended: Target sample size sweep (gold budget)',
+        'base_scenario': {
+            'n_proxy_total': 5000,      # 10 sites × 500 per site
+            'C_sources': 10,            # Multi-site like our main DGP
+            'p_dim': 50,                # Fixed medium dimensionality
+            'a5_effective_sparsity': 0.1,  # ~10% sparsity in PS diff
+            'use_l1tcl_dgp': True,
+        },
+        'sweep_type': '1d',
+        'sweep_param': 'm0',
+        # Paper: n ∈ {100, 200, 500} for target sample size
+        # We add smaller sizes to test low-data regime
+        'sweep_values': [25, 50, 100, 200, 500],
+        # m1 tracks m0 (equal placebo/treated in target)
+        'coupled_params': {'m1': 'm0'},
+        'methods': DEFAULT_METHODS_OPTION_A,
+        
+        'motivation': """
+**Research Question:** How does target sample size affect transfer learning performance?
+
+**Why This Matters:**
+L1-TCL paper sweeps n (target size) ∈ {100, 200, 500}. Smaller target means:
+1. Less anchor data to correct source bias
+2. Higher variance in target-only estimators
+3. Transfer from source becomes more valuable
+
+**Key Parameters:**
+- Target: m₀ = m₁ ∈ {25, 50, 100, 200, 500} (equal placebo/treated)
+- Source: 10 sites × 500 = 5000 total (fixed)
+- Dimension: d = 50 (fixed)
+- PS sparsity: ~10% (fixed)
+
+This tests the fundamental trade-off: when is it better to rely on (potentially biased) 
+source data vs. (high-variance) small target data?
+""",
+        
+        'dgp_description': """
+**L1-TCL DGP (Extended)**:
+- Covariates: X ~ N(0, I_d) with d=50
+- Propensity: P(Z=1|X) = sigmoid(X^T β) 
+- Source-target difference: Δβ is 10%-sparse
+- Outcome: Y = τZ + α^T X + ε with constant τ = -0.067
+- 10 source sites with covariate shift between them
+""",
+        
+        'expected_findings': """
+**Expected:**
+1. Small target (m₀=25): Transfer methods dominate, target-only fails
+2. Medium target (m₀=100): Transfer still helps but gap narrows
+3. Large target (m₀=500): Target-only methods become competitive
+4. ProposedB_SourceDR should shine in low-data regime
+5. DR-Learner baselines need sufficient target data
+""",
+    },
+    
+    'l1tcl_full': {
+        'benchmark_id': 'l1tcl_full_sweep',
+        'description': 'L1-TCL Extended: Full d × s grid (paper replication)',
+        'base_scenario': {
+            'm0': 100,
+            'm1': 100,
+            'n_proxy_total': 5000,
+            'C_sources': 10,
+            'use_l1tcl_dgp': True,
+        },
+        'sweep_type': '2d',
+        'sweep_param': 'p_dim',
+        'sweep_values': [10, 20, 50, 100],  # d values
+        'secondary_param': 'a5_effective_sparsity',
+        # s/d ratios: we want s ∈ {1, 3, 5, 7} as fractions
+        'secondary_values': [0.05, 0.1, 0.15, 0.2],  # ~s/d
+        'methods': DEFAULT_METHODS_OPTION_A,
+        
+        'motivation': """
+**Research Question:** Full replication of L1-TCL d × s grid with our multi-site setup.
+
+**Key Grid:**
+- Dimension d ∈ {10, 20, 50, 100}
+- Sparsity fraction s/d ∈ {0.05, 0.1, 0.15, 0.2}
+
+This allows direct comparison with L1-TCL paper results while using our multi-site structure.
+""",
+        
+        'expected_findings': """
+**Expected:** 
+Methods should show similar patterns to L1-TCL paper:
+1. Transfer helps most when s is small relative to d
+2. High d + high s is hardest regime
+3. Multi-site pooling may provide additional benefit
+""",
+    },
+    
+    'l1tcl_gold_dim': {
+        'benchmark_id': 'l1tcl_gold_dim_sweep',
+        'description': 'L1-TCL Extended: Gold budget × Dimensionality grid (m0 × d)',
+        'base_scenario': {
+            'n_proxy_total': 5000,      # 10 sites × 500 per site
+            'C_sources': 10,            # Multi-site like our main DGP
+            'a5_effective_sparsity': 0.1,  # ~10% sparsity in PS diff (fixed)
+            'use_l1tcl_dgp': True,
+        },
+        'sweep_type': '2d',
+        'sweep_param': 'm0',
+        'sweep_values': [50, 100, 200, 500],  # Gold budget (m0 = m1)
+        'secondary_param': 'p_dim',
+        'secondary_values': [10, 20, 50, 100],  # Dimensionality
+        # m1 tracks m0 (equal placebo/treated in target)
+        'coupled_params': {'m1': 'm0'},
+        'methods': DEFAULT_METHODS_OPTION_A,
+        
+        'motivation': """
+**Research Question:** How do target sample size and dimensionality jointly affect transfer learning?
+
+**Why This Matters:**
+This 2D grid explores the interaction between:
+1. **Gold budget (m0)**: More target data → less need for transfer
+2. **Dimensionality (d)**: Higher d → harder estimation, more benefit from source data
+
+**Key Grid:**
+- Target: m₀ = m₁ ∈ {50, 100, 200, 500}
+- Dimension: d ∈ {10, 20, 50, 100}
+- Total: 4 × 4 = 16 scenarios
+
+**Critical Trade-offs:**
+- Small m0 + low d: Transfer dominates (easy problem, limited target data)
+- Small m0 + high d: Transfer critical (hard problem, limited target data)
+- Large m0 + low d: Target-only competitive (easy problem, ample target data)
+- Large m0 + high d: Interesting regime - does transfer still help?
+""",
+        
+        'dgp_description': """
+**L1-TCL DGP (Extended)**:
+- Covariates: X ~ N(0, I_d) with d ∈ {10, 20, 50, 100}
+- Propensity: P(Z=1|X) = sigmoid(X^T β) 
+- Source-target difference: Δβ is 10%-sparse
+- Outcome: Y = τZ + α^T X + ε with constant τ = -0.067
+- 10 source sites with 500 samples each (5000 total)
+""",
+        
+        'expected_findings': """
+**Expected:**
+1. **Transfer advantage decreases with m0**: Gap between ProposedB and target-only narrows
+2. **Transfer advantage increases with d**: High-dim needs more data, source helps more
+3. **Interaction effect**: Transfer most valuable in (small m0, high d) quadrant
+4. **ProposedB_SourceDR**: Should dominate in low-data/high-dim regime
+5. **DR-Learner**: Competitive only when m0 ≥ 200 and d ≤ 20
+""",
+    },
 }
 
 
@@ -949,15 +1268,28 @@ def run_sweep(
         print(f"Benchmark ID: {benchmark_id}")
         sweep_type = config.get('sweep_type', '1d')
         if sweep_type == 'grid_2d':
-            print(f"Sweep type: 2D grid")
+            print(f"Sweep type: 2D grid (m0 × m1)")
             print(f"m0 values: {config['sweep_values']}")
             print(f"m1 values: {config.get('m1_values', [])}")
             print(f"Total scenarios: {len(config['sweep_values']) * len(config.get('m1_values', [1]))}")
+        elif sweep_type == '2d':
+            primary = config['sweep_param']
+            secondary = config['secondary_param']
+            n_primary = len(config['sweep_values'])
+            n_secondary = len(config['secondary_values'])
+            print(f"Sweep type: 2D grid ({primary} × {secondary})")
+            print(f"{primary} values: {config['sweep_values']}")
+            print(f"{secondary} values: {config['secondary_values']}")
+            print(f"Total scenarios: {n_primary} × {n_secondary} = {n_primary * n_secondary}")
+            if config.get('coupled_params'):
+                print(f"Coupled params: {config['coupled_params']}")
         else:
             print(f"Sweep param: {config['sweep_param']} ∈ {config['sweep_values']}")
             m1_vals = config.get('m1_values')
             if m1_vals and any(v is not None and v > 0 for v in m1_vals):
                 print(f"m1 values: {m1_vals} (Option A enabled)")
+            if config.get('coupled_params'):
+                print(f"Coupled params: {config['coupled_params']}")
         print(f"Methods: {methods}")
         print(f"Reps: {n_rep}")
         print(f"Parallel jobs: {actual_n_jobs}" + (" (sequential)" if actual_n_jobs == 1 else f" ({multiprocessing.cpu_count()} cores available)"))
@@ -967,6 +1299,7 @@ def run_sweep(
     scenarios = []
     sweep_type = config.get('sweep_type', '1d')
     m1_values = config.get('m1_values', [None] * len(config['sweep_values']))
+    coupled_params = config.get('coupled_params', {})
     
     if sweep_type == 'grid_2d':
         # 2D grid: cartesian product of sweep_values (m0) × m1_values
@@ -977,6 +1310,26 @@ def run_sweep(
                 scenario_params['m1'] = m1_val if m1_val is not None else 0
                 scenario = Scenario(benchmark_id=benchmark_id, **scenario_params)
                 scenarios.append(scenario)
+    
+    elif sweep_type == '2d':
+        # 2D grid: cartesian product of sweep_values × secondary_values
+        primary_param = config['sweep_param']
+        secondary_param = config['secondary_param']
+        secondary_values = config['secondary_values']
+        
+        for primary_val in config['sweep_values']:
+            for secondary_val in secondary_values:
+                scenario_params = config['base_scenario'].copy()
+                scenario_params[primary_param] = primary_val
+                scenario_params[secondary_param] = secondary_val
+                
+                # Handle coupled parameters (e.g., m1 = m0 for gold sweeps)
+                for target_param, source_param in coupled_params.items():
+                    scenario_params[target_param] = scenario_params.get(source_param, primary_val)
+                
+                scenario = Scenario(benchmark_id=benchmark_id, **scenario_params)
+                scenarios.append(scenario)
+    
     else:
         # 1D sweep: m1 co-varies with index
         for i, val in enumerate(config['sweep_values']):
@@ -986,6 +1339,11 @@ def run_sweep(
             # Set m1 if specified (enables Option A methods when m1 > 0)
             if i < len(m1_values) and m1_values[i] is not None:
                 scenario_params['m1'] = m1_values[i]
+            
+            # Handle coupled parameters (e.g., m1 = m0 for gold sweeps)
+            for target_param, source_param in coupled_params.items():
+                # target_param tracks source_param's value
+                scenario_params[target_param] = scenario_params.get(source_param, val)
             
             scenario = Scenario(benchmark_id=benchmark_id, **scenario_params)
             scenarios.append(scenario)
@@ -1402,7 +1760,9 @@ def generate_sweep_report(
             ('policy_regret', 'lower', 'Policy Regret'),
         ]
         
-        best = find_best_methods(df_agg, metrics=[m for m, _, _ in metrics_info])
+        # Build lower_is_better dict from metrics_info
+        lower_is_better = {m: (d == 'lower') for m, d, _ in metrics_info}
+        best = find_best_methods(df_agg, metrics=[m for m, _, _ in metrics_info], lower_is_better=lower_is_better)
         f.write("| Metric | Best Method | Value | Direction |\n")
         f.write("|--------|-------------|-------|----------|\n")
         for metric, direction, display_name in metrics_info:
@@ -1651,11 +2011,24 @@ def _generate_findings(sweep_name: str, df_agg: pd.DataFrame, config: dict) -> L
     sweep_param = config['sweep_param']
     sweep_values = config['sweep_values']
     
-    # Find best method overall
-    best_pehe_idx = df_agg['pehe_mean'].idxmin()
-    best_method = df_agg.loc[best_pehe_idx, 'method'] if not pd.isna(best_pehe_idx) else "Unknown"
-    best_pehe = df_agg.loc[best_pehe_idx, 'pehe_mean'] if not pd.isna(best_pehe_idx) else np.nan
-    findings.append(f"**Best overall PEHE:** {best_method} achieves lowest average PEHE ({best_pehe:.3f})")
+    # Check if it's an L1-TCL DGP (constant tau means ranking metrics are NaN)
+    is_l1tcl = 'l1tcl' in sweep_name.lower() or config.get('base_scenario', {}).get('use_l1tcl_dgp', False)
+    
+    # Find best method overall by PEHE (or ATE error if PEHE is all NaN)
+    if 'pehe_mean' in df_agg.columns and not df_agg['pehe_mean'].isna().all():
+        best_pehe_idx = df_agg['pehe_mean'].idxmin()
+        if pd.notna(best_pehe_idx):
+            best_method = df_agg.loc[best_pehe_idx, 'method']
+            best_pehe = df_agg.loc[best_pehe_idx, 'pehe_mean']
+            findings.append(f"**Best overall PEHE:** {best_method} achieves lowest average PEHE ({best_pehe:.3f})")
+    
+    # Also report ATE error winner
+    if 'ate_abs_err_mean' in df_agg.columns and not df_agg['ate_abs_err_mean'].isna().all():
+        best_ate_idx = df_agg['ate_abs_err_mean'].idxmin()
+        if pd.notna(best_ate_idx):
+            best_ate_method = df_agg.loc[best_ate_idx, 'method']
+            best_ate = df_agg.loc[best_ate_idx, 'ate_abs_err_mean']
+            findings.append(f"**Best overall ATE Error:** {best_ate_method} achieves lowest average ATE error ({best_ate:.4f})")
     
     # Check if Proposed beats ProxyOnly
     proposed_pehe = df_agg[df_agg['method'].str.contains('Proposed', na=False)]['pehe_mean'].mean()
@@ -1667,24 +2040,39 @@ def _generate_findings(sweep_name: str, df_agg: pd.DataFrame, config: dict) -> L
         else:
             findings.append(f"**Proposed vs ProxyOnly:** ProxyOnly outperforms Proposed in this setting")
     
-    # Check trend with sweep parameter
-    for method in df_agg['method'].unique():
-        method_data = df_agg[df_agg['method'] == method].sort_values(sweep_param)
-        if len(method_data) >= 2:
-            first_pehe = method_data.iloc[0]['pehe_mean']
-            last_pehe = method_data.iloc[-1]['pehe_mean']
-            if not np.isnan(first_pehe) and not np.isnan(last_pehe):
-                if last_pehe < first_pehe * 0.8:  # >20% improvement
-                    findings.append(f"**{method}:** PEHE improves substantially as {sweep_param} increases")
-                elif last_pehe > first_pehe * 1.2:  # >20% degradation
-                    findings.append(f"**{method}:** PEHE degrades as {sweep_param} increases")
+    # Policy regret winner
+    if 'policy_regret_mean' in df_agg.columns and not df_agg['policy_regret_mean'].isna().all():
+        best_regret_idx = df_agg['policy_regret_mean'].idxmin()
+        if pd.notna(best_regret_idx):
+            best_regret_method = df_agg.loc[best_regret_idx, 'method']
+            best_regret = df_agg.loc[best_regret_idx, 'policy_regret_mean']
+            findings.append(f"**Lowest policy regret:** {best_regret_method} ({best_regret:.4f})")
     
-    # Check ranking correlation
-    best_corr_idx = df_agg['tau_corr_mean'].idxmax()
-    if not pd.isna(best_corr_idx):
-        best_corr_method = df_agg.loc[best_corr_idx, 'method']
-        best_corr = df_agg.loc[best_corr_idx, 'tau_corr_mean']
-        findings.append(f"**Best ranking:** {best_corr_method} achieves highest Spearman correlation ({best_corr:.3f})")
+    # Check trend with sweep parameter for top method
+    if 'ate_abs_err_mean' in df_agg.columns:
+        top_method = df_agg.groupby('method')['ate_abs_err_mean'].mean().idxmin()
+        if pd.notna(top_method):
+            method_data = df_agg[df_agg['method'] == top_method].sort_values(sweep_param)
+            if len(method_data) >= 2:
+                first_err = method_data.iloc[0]['ate_abs_err_mean']
+                last_err = method_data.iloc[-1]['ate_abs_err_mean']
+                if not np.isnan(first_err) and not np.isnan(last_err):
+                    if last_err > first_err * 1.5:  # >50% degradation
+                        findings.append(f"**Scaling:** {top_method} ATE error increases with higher {sweep_param}")
+                    elif last_err < first_err * 0.67:  # >33% improvement
+                        findings.append(f"**Scaling:** {top_method} ATE error decreases with higher {sweep_param}")
+                    else:
+                        findings.append(f"**Scaling:** {top_method} maintains stable performance across {sweep_param} values")
+    
+    # Check ranking correlation (skip for L1-TCL)
+    if not is_l1tcl and 'tau_corr_mean' in df_agg.columns and not df_agg['tau_corr_mean'].isna().all():
+        best_corr_idx = df_agg['tau_corr_mean'].idxmax()
+        if pd.notna(best_corr_idx):
+            best_corr_method = df_agg.loc[best_corr_idx, 'method']
+            best_corr = df_agg.loc[best_corr_idx, 'tau_corr_mean']
+            findings.append(f"**Best ranking:** {best_corr_method} achieves highest Spearman correlation ({best_corr:.3f})")
+    elif is_l1tcl:
+        findings.append("**Note:** Ranking metrics (Spearman, Qini) are NaN for L1-TCL DGP due to constant τ")
     
     if not findings:
         findings.append("*No significant patterns detected. Review plots for visual inspection.*")
@@ -1845,8 +2233,11 @@ Examples:
     parser.add_argument('--sweep', type=str, default='all',
                        choices=['gold', 'gold_option_a', 'proxy', 'imbalance', 
                                 'gold_fair', 'snr_ladder', 'overlap_ladder', 'drift_ladder',
+                                'l1tcl', 'l1tcl_source_size', 'l1tcl_dim', 'l1tcl_sparsity', 
+                                'l1tcl_gold', 'l1tcl_gold_dim', 'l1tcl_full',
                                 'all', 'all_fair'],
-                       help='Sweep to run (default: all). Fair sweeps: gold_fair, snr_ladder, overlap_ladder, drift_ladder')
+                       help='Sweep to run (default: all). Fair sweeps: gold_fair, snr_ladder, overlap_ladder, drift_ladder. '
+                            'L1-TCL sweeps: l1tcl, l1tcl_source_size, l1tcl_dim, l1tcl_sparsity, l1tcl_gold, l1tcl_gold_dim, l1tcl_full')
     parser.add_argument('--n_rep', type=int, default=20,
                        help='Number of MC replicates (default: 20)')
     parser.add_argument('--seed', type=int, default=42,

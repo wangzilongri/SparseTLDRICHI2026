@@ -739,3 +739,662 @@ def sweep_nontransfer(
         )
         datasets.append((source, target, gen))
     return datasets
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# L1-TCL DGP (from arXiv 2305.09126v3)
+# ═══════════════════════════════════════════════════════════════════════════════
+# 
+# Reference: "Transfer Causal Learning" by the L1-TCL authors
+# Key differences from our main DGP:
+#   1. Constant ATE τ (no heterogeneous CATE)
+#   2. 2 covariates only (X1, X2)
+#   3. Focus on propensity score transfer, not outcome model transfer
+#   4. Linear outcome: Y = τZ + αX₂ + ε
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class L1TCLConfig:
+    """
+    Configuration for L1-TCL toy DGP (arXiv 2305.09126v3).
+    
+    DGP Structure:
+        Treatment assignment: P(Z=1|X₁,X₂) = sigmoid(β₁X₁ + β₂X₂)
+        Outcome: Y = τZ + αX₂ + ε
+    
+    Key feature: Different propensity score parameters between domains,
+    but the outcome model structure is the same (only τ, α can differ).
+    """
+    
+    # Sample sizes
+    n_target: int = 100           # Limited target data (the challenge)
+    n_source: int = 1000          # Abundant source data
+    
+    # Covariate distributions
+    # Target domain
+    mu1_target: float = 0.0       # E[X₁] in target
+    mu2_target: float = 2.0       # E[X₂] in target
+    # Source domain
+    mu1_source: float = 0.0       # E[X₁] in source
+    mu2_source: float = 1.0       # E[X₂] in source
+    
+    # Propensity score: P(Z=1|X) = sigmoid(β₁X₁ + β₂X₂)
+    # Target domain
+    beta1_target: float = 0.1     # Coefficient for X₁ in target
+    beta2_target: float = -0.1    # Coefficient for X₂ in target
+    # Source domain (different PS!)
+    beta1_source: float = 0.1     # Coefficient for X₁ in source
+    beta2_source: float = -0.2    # Coefficient for X₂ in source (KEY DIFFERENCE)
+    
+    # Outcome model: Y = τZ + αX₂ + ε
+    # Target domain
+    tau_target: float = -2/30     # ≈ -0.067 (the ATE we want to estimate)
+    alpha_target: float = 0.1     # Effect of X₂ on outcome
+    # Source domain (can be same or different)
+    tau_source: Optional[float] = None   # If None, same as target
+    alpha_source: Optional[float] = None # If None, same as target
+    
+    # Noise
+    noise_std: float = 0.5        # std(ε) = 0.5 → Var(ε) = 0.25
+    
+    # Reproducibility
+    random_state: int = 42
+
+
+class L1TCLGenerator:
+    """
+    Generator for L1-TCL toy DGP (arXiv 2305.09126v3).
+    
+    This DGP is designed to study transfer learning for propensity score
+    estimation, NOT for CATE estimation. Key characteristics:
+    
+    1. Constant treatment effect τ (no heterogeneity)
+    2. Only 2 covariates (X₁, X₂)
+    3. Propensity scores DIFFER between domains (the transfer challenge)
+    4. Outcome model is linear: Y = τZ + αX₂ + ε
+    
+    The goal is to use source domain data to improve PS estimation in
+    the target domain, which improves IPW/AIPW estimators for ATE.
+    
+    DGP Equations:
+    
+        Covariates:
+            X₁ ~ N(μ₁, 1)
+            X₂ ~ N(μ₂, 1)
+        
+        Treatment (propensity score differs by domain):
+            P(Z=1|X₁,X₂) = sigmoid(β₁X₁ + β₂X₂)
+            where β₁, β₂ are domain-specific
+        
+        Outcome (same structure, parameters can differ):
+            Y = τZ + αX₂ + ε,  ε ~ N(0, σ²)
+    
+    Example usage:
+        >>> config = L1TCLConfig(n_target=100, n_source=1000)
+        >>> gen = L1TCLGenerator(config)
+        >>> source_data, target_data = gen.generate_full_dataset()
+        >>> print(f"True ATE: {config.tau_target:.4f}")
+    """
+    
+    def __init__(self, config: L1TCLConfig = None):
+        self.config = config or L1TCLConfig()
+        self.rng = np.random.default_rng(self.config.random_state)
+        
+        # Resolve source parameters (default to target values if not specified)
+        self.tau_source = (self.config.tau_source 
+                          if self.config.tau_source is not None 
+                          else self.config.tau_target)
+        self.alpha_source = (self.config.alpha_source 
+                            if self.config.alpha_source is not None 
+                            else self.config.alpha_target)
+    
+    @staticmethod
+    def sigmoid(x: np.ndarray) -> np.ndarray:
+        """Sigmoid function: g(x) = 1 / (1 + exp(x))."""
+        # Note: L1-TCL uses g(x) = 1/(1+exp(x)), NOT 1/(1+exp(-x))
+        # This means higher linear predictor → LOWER probability
+        return 1.0 / (1.0 + np.exp(x))
+    
+    def _propensity(self, X: np.ndarray, domain: str) -> np.ndarray:
+        """
+        Compute propensity score P(Z=1|X).
+        
+        Parameters
+        ----------
+        X : array, shape (n, 2)
+            Covariates [X₁, X₂]
+        domain : str
+            'target' or 'source'
+        """
+        if domain == 'target':
+            beta1 = self.config.beta1_target
+            beta2 = self.config.beta2_target
+        else:
+            beta1 = self.config.beta1_source
+            beta2 = self.config.beta2_source
+        
+        linear_pred = beta1 * X[:, 0] + beta2 * X[:, 1]
+        return self.sigmoid(linear_pred)
+    
+    def _outcome(self, X: np.ndarray, Z: np.ndarray, domain: str) -> np.ndarray:
+        """
+        Compute outcome Y = τZ + αX₂ + ε.
+        
+        Parameters
+        ----------
+        X : array, shape (n, 2)
+        Z : array, shape (n,) - treatment indicator
+        domain : str
+        """
+        if domain == 'target':
+            tau = self.config.tau_target
+            alpha = self.config.alpha_target
+        else:
+            tau = self.tau_source
+            alpha = self.alpha_source
+        
+        eps = self.rng.normal(0, self.config.noise_std, size=len(Z))
+        Y = tau * Z + alpha * X[:, 1] + eps
+        return Y
+    
+    def generate_domain_data(self, domain: str, n_samples: int = None) -> Dict:
+        """
+        Generate data for one domain.
+        
+        Parameters
+        ----------
+        domain : str
+            'target' or 'source'
+        n_samples : int, optional
+            Override sample size
+        
+        Returns
+        -------
+        data : dict with keys
+            X : array (n, 2) - covariates
+            A : array (n,) - treatment indicator (Z in paper notation)
+            Y : array (n,) - observed outcome
+            e_true : array (n,) - true propensity score
+            tau_true : array (n,) - true CATE (constant)
+            mu0_true : array (n,) - E[Y|Z=0, X]
+            mu1_true : array (n,) - E[Y|Z=1, X]
+        """
+        # Determine sample size
+        if n_samples is None:
+            n_samples = (self.config.n_target if domain == 'target' 
+                        else self.config.n_source)
+        
+        # Get domain-specific parameters
+        if domain == 'target':
+            mu1 = self.config.mu1_target
+            mu2 = self.config.mu2_target
+            tau = self.config.tau_target
+            alpha = self.config.alpha_target
+        else:
+            mu1 = self.config.mu1_source
+            mu2 = self.config.mu2_source
+            tau = self.tau_source
+            alpha = self.alpha_source
+        
+        # Generate covariates
+        X1 = self.rng.normal(mu1, 1.0, size=n_samples)
+        X2 = self.rng.normal(mu2, 1.0, size=n_samples)
+        X = np.column_stack([X1, X2])
+        
+        # Generate treatment (propensity score model)
+        e_true = self._propensity(X, domain)
+        Z = self.rng.binomial(1, e_true, size=n_samples)
+        
+        # Generate outcome
+        Y = self._outcome(X, Z, domain)
+        
+        # Compute true potential outcomes for evaluation
+        # Y(0) = αX₂ (no treatment)
+        # Y(1) = τ + αX₂ (with treatment)
+        mu0_true = alpha * X[:, 1]
+        mu1_true = tau + alpha * X[:, 1]
+        tau_true = np.full(n_samples, tau)  # Constant CATE
+        
+        return dict(
+            X=X,
+            A=Z,
+            Y=Y,
+            e_true=e_true,
+            tau_true=tau_true,
+            mu0_true=mu0_true,
+            mu1_true=mu1_true,
+            c=np.zeros(n_samples, dtype=int) if domain == 'target' else np.ones(n_samples, dtype=int)
+        )
+    
+    def generate_full_dataset(self) -> Tuple[Dict, Dict]:
+        """
+        Generate complete source and target datasets.
+        
+        Returns
+        -------
+        source_data : dict
+        target_data : dict
+        """
+        source_data = self.generate_domain_data('source')
+        target_data = self.generate_domain_data('target')
+        return source_data, target_data
+    
+    def get_diagnostics(self) -> Dict:
+        """
+        Return diagnostic information about the L1-TCL DGP.
+        """
+        # Compute some theoretical quantities
+        # Treatment probability at covariate means
+        X_target_mean = np.array([[self.config.mu1_target, self.config.mu2_target]])
+        X_source_mean = np.array([[self.config.mu1_source, self.config.mu2_source]])
+        
+        e_target_at_mean = self._propensity(X_target_mean, 'target')[0]
+        e_source_at_mean = self._propensity(X_source_mean, 'source')[0]
+        
+        # PS parameter difference (the "sparse difference" in L1-TCL)
+        delta_beta = np.array([
+            self.config.beta1_target - self.config.beta1_source,
+            self.config.beta2_target - self.config.beta2_source
+        ])
+        
+        return {
+            'dgp_type': 'L1-TCL',
+            'n_features': 2,
+            'n_target': self.config.n_target,
+            'n_source': self.config.n_source,
+            
+            # Covariate shifts
+            'mu_target': [self.config.mu1_target, self.config.mu2_target],
+            'mu_source': [self.config.mu1_source, self.config.mu2_source],
+            
+            # Propensity score parameters
+            'beta_target': [self.config.beta1_target, self.config.beta2_target],
+            'beta_source': [self.config.beta1_source, self.config.beta2_source],
+            'delta_beta': delta_beta.tolist(),
+            'delta_beta_sparsity': int(np.sum(np.abs(delta_beta) > 1e-10)),
+            
+            # Treatment probabilities at covariate means
+            'e_target_at_mean': float(e_target_at_mean),
+            'e_source_at_mean': float(e_source_at_mean),
+            
+            # Outcome parameters
+            'tau_target': self.config.tau_target,
+            'tau_source': self.tau_source,
+            'alpha_target': self.config.alpha_target,
+            'alpha_source': self.alpha_source,
+            'tau_same_across_domains': abs(self.config.tau_target - self.tau_source) < 1e-10,
+            
+            # Noise
+            'noise_std': self.config.noise_std,
+            'noise_var': self.config.noise_std ** 2,
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# L1-TCL Extended DGP (matching their full experimental setup)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# This extends the toy DGP to support:
+#   1. Variable dimensionality d ∈ {10, 20, 50, 75, 100}
+#   2. Variable sparsity s ∈ {1, 3, 5, 7, 10} in Δβ
+#   3. Multiple source sites (like our main DGP)
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class L1TCLExtendedConfig:
+    """
+    Extended L1-TCL configuration matching their full experimental setup.
+    
+    Key changes from toy DGP:
+    - Variable dimensionality d (not just 2)
+    - Variable sparsity s in PS parameter difference
+    - Multiple source sites (like our main DGP)
+    - Outcome model: Y = τZ + α^T X + ε (uses all covariates)
+    
+    DGP Structure:
+        Treatment: P(Z=1|X) = sigmoid(X^T β)  where β ∈ R^d
+        Outcome: Y = τZ + α^T X + ε
+        
+        Source-target difference: Δβ = β_target - β_source is s-sparse
+    """
+    
+    # Dimensionality (paper sweeps: d ∈ {10, 20, 50, 75, 100})
+    n_features: int = 20
+    
+    # Sparsity of PS difference (paper sweeps: s ∈ {1, 3, 5, 7, 10})
+    ps_sparsity: int = 3
+    
+    # Sample sizes (paper sweeps)
+    n_target: int = 100                    # Paper: n ∈ {100, 200, 500}
+    n_source_per_site: int = 500           # Paper: n_s ∈ {2000, 3000, 5000} (single source)
+    n_source_sites: int = 10               # OUR ADDITION: multiple sources like main DGP
+    
+    # Covariate distribution
+    covariate_shift_scale: float = 0.5     # Mean shift between domains
+    target_shift_multiplier: float = 1.5   # Target has more shift (like main DGP)
+    
+    # PS parameters
+    beta_scale: float = 0.2                # Scale of β coefficients
+    delta_beta_scale: float = 0.3          # Scale of sparse difference Δβ
+    
+    # Outcome model: Y = τZ + α^T X + ε
+    tau_target: float = -0.067             # ≈ -2/30 (from paper)
+    tau_source: Optional[float] = None     # If None, same as target
+    alpha_scale: float = 0.1               # Scale of outcome coefficients
+    
+    # Noise
+    noise_std: float = 0.5
+    
+    # Treatment probability (RCT-like)
+    treatment_prob: float = 0.5
+    
+    # Reproducibility
+    random_state: int = 42
+
+
+class L1TCLExtendedGenerator:
+    """
+    Extended L1-TCL generator matching their full experimental setup.
+    
+    Key features:
+    1. Variable dimensionality d (configurable)
+    2. Sparse PS difference: Δβ = β_target - β_source is s-sparse
+    3. Multiple source sites with site-specific PS parameters
+    4. Linear outcome: Y = τZ + α^T X + ε
+    
+    Source sites share a common β_source but have small site-specific perturbations.
+    Target has a sparse deviation Δβ from the source parameters.
+    
+    This allows testing how well methods leverage source data when:
+    - The PS model differs between source and target
+    - The difference is sparse (L1-TCL assumption)
+    - Multiple source sites provide more data
+    """
+    
+    def __init__(self, config: L1TCLExtendedConfig = None):
+        self.config = config or L1TCLExtendedConfig()
+        self.rng = np.random.default_rng(self.config.random_state)
+        
+        d = self.config.n_features
+        s = self.config.ps_sparsity
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Generate base PS parameters (shared across sources)
+        # ═══════════════════════════════════════════════════════════════════════
+        self.beta_source_base = self.rng.normal(0, self.config.beta_scale, size=d)
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Generate sparse difference Δβ (s nonzeros)
+        # ═══════════════════════════════════════════════════════════════════════
+        self.delta_beta_support = self.rng.choice(d, size=min(s, d), replace=False)
+        self.delta_beta = np.zeros(d)
+        self.delta_beta[self.delta_beta_support] = self.rng.normal(
+            0, self.config.delta_beta_scale, size=len(self.delta_beta_support)
+        )
+        
+        # Target PS parameters = source + sparse diff
+        self.beta_target = self.beta_source_base + self.delta_beta
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Site-specific PS perturbations (small noise for each source site)
+        # ═══════════════════════════════════════════════════════════════════════
+        self.beta_sources = {}
+        for c in range(1, self.config.n_source_sites + 1):
+            # Small site-specific perturbation (much smaller than Δβ)
+            site_noise = self.rng.normal(0, self.config.beta_scale * 0.1, size=d)
+            self.beta_sources[c] = self.beta_source_base + site_noise
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Outcome coefficients α (shared across all domains)
+        # ═══════════════════════════════════════════════════════════════════════
+        self.alpha = self.rng.normal(0, self.config.alpha_scale, size=d)
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Covariate shifts per site
+        # ═══════════════════════════════════════════════════════════════════════
+        self.site_shifts = {}
+        for c in range(0, self.config.n_source_sites + 1):
+            shift_scale = (self.config.covariate_shift_scale * 
+                          self.config.target_shift_multiplier if c == 0 
+                          else self.config.covariate_shift_scale)
+            self.site_shifts[c] = self.rng.normal(0, shift_scale, size=d)
+        
+        # Resolve tau_source
+        self.tau_source = (self.config.tau_source 
+                          if self.config.tau_source is not None 
+                          else self.config.tau_target)
+    
+    @staticmethod
+    def sigmoid(x: np.ndarray) -> np.ndarray:
+        """Standard sigmoid: g(x) = 1 / (1 + exp(-x))."""
+        # Use standard sigmoid (not L1-TCL's inverse)
+        return 1.0 / (1.0 + np.exp(-np.clip(x, -500, 500)))
+    
+    def _propensity(self, X: np.ndarray, site_id: int) -> np.ndarray:
+        """
+        Compute propensity score P(Z=1|X) for a site.
+        
+        Parameters
+        ----------
+        X : array, shape (n, d)
+        site_id : int (0=target, 1,2,...=sources)
+        """
+        if site_id == 0:
+            beta = self.beta_target
+        else:
+            beta = self.beta_sources[site_id]
+        
+        linear_pred = X @ beta
+        return self.sigmoid(linear_pred)
+    
+    def generate_site_data(self, site_id: int, n_samples: int) -> Dict:
+        """
+        Generate data for one site.
+        
+        Parameters
+        ----------
+        site_id : int
+            0 = target, 1,2,... = sources
+        n_samples : int
+        
+        Returns
+        -------
+        data : dict
+        """
+        d = self.config.n_features
+        
+        # Covariates with site-specific shift
+        shift = self.site_shifts[site_id]
+        X = self.rng.normal(0, 1.0, size=(n_samples, d)) + shift
+        
+        # Treatment (RCT-like, but PS varies by site)
+        # Use constant treatment prob for simplicity (RCT design)
+        A = self.rng.binomial(1, self.config.treatment_prob, size=n_samples)
+        
+        # True propensity (for diagnostics)
+        e_true = self._propensity(X, site_id)
+        
+        # Outcome: Y = τZ + α^T X + ε
+        tau = self.config.tau_target if site_id == 0 else self.tau_source
+        mu0 = X @ self.alpha
+        mu1 = tau + X @ self.alpha
+        
+        eps = self.rng.normal(0, self.config.noise_std, size=n_samples)
+        Y = mu0 + A * tau + eps
+        
+        tau_true = np.full(n_samples, tau)  # Constant CATE
+        
+        return dict(
+            X=X,
+            A=A,
+            Y=Y,
+            e_true=e_true,
+            tau_true=tau_true,
+            mu0_true=mu0,
+            mu1_true=mu1,
+            c=np.full(n_samples, site_id, dtype=int)
+        )
+    
+    def generate_full_dataset(self) -> Tuple[Dict, Dict]:
+        """
+        Generate complete multi-site dataset.
+        
+        Returns
+        -------
+        source_data : dict (pooled from all source sites)
+        target_data : dict
+        """
+        # Generate source sites
+        source_datasets = [
+            self.generate_site_data(c, self.config.n_source_per_site)
+            for c in range(1, self.config.n_source_sites + 1)
+        ]
+        
+        # Pool sources
+        source_data = {}
+        for key in source_datasets[0].keys():
+            if key == 'X':
+                source_data[key] = np.vstack([d[key] for d in source_datasets])
+            else:
+                source_data[key] = np.concatenate([d[key] for d in source_datasets])
+        
+        # Generate target
+        target_data = self.generate_site_data(0, self.config.n_target)
+        
+        return source_data, target_data
+    
+    def get_diagnostics(self) -> Dict:
+        """Return diagnostic information about the extended L1-TCL DGP."""
+        return {
+            'dgp_type': 'L1-TCL-Extended',
+            'n_features': self.config.n_features,
+            'ps_sparsity': self.config.ps_sparsity,
+            'n_source_sites': self.config.n_source_sites,
+            'n_target': self.config.n_target,
+            'n_source_per_site': self.config.n_source_per_site,
+            'n_source_total': self.config.n_source_sites * self.config.n_source_per_site,
+            
+            # PS parameters
+            'beta_target': self.beta_target.tolist(),
+            'beta_source_base': self.beta_source_base.tolist(),
+            'delta_beta': self.delta_beta.tolist(),
+            'delta_beta_support': self.delta_beta_support.tolist(),
+            'delta_beta_nnz': int(np.sum(np.abs(self.delta_beta) > 1e-10)),
+            'delta_beta_norm': float(np.linalg.norm(self.delta_beta)),
+            
+            # Outcome parameters
+            'tau_target': self.config.tau_target,
+            'tau_source': self.tau_source,
+            'alpha': self.alpha.tolist(),
+            
+            # Noise
+            'noise_std': self.config.noise_std,
+        }
+
+
+def generate_l1tcl_extended(
+    n_features: int = 20,
+    ps_sparsity: int = 3,
+    n_target: int = 100,
+    n_source_per_site: int = 500,
+    n_source_sites: int = 10,
+    random_state: int = 42,
+    **config_kwargs
+) -> Tuple[Dict, Dict, L1TCLExtendedGenerator]:
+    """
+    Generate data using extended L1-TCL DGP.
+    
+    Parameters
+    ----------
+    n_features : int
+        Dimensionality d (paper: {10, 20, 50, 75, 100})
+    ps_sparsity : int
+        Sparsity s of PS difference (paper: {1, 3, 5, 7, 10})
+    n_target : int
+        Target sample size (paper: {100, 200, 500})
+    n_source_per_site : int
+        Samples per source site
+    n_source_sites : int
+        Number of source sites (OUR ADDITION: 10 like main DGP)
+    random_state : int
+    
+    Returns
+    -------
+    source_data, target_data, generator
+    """
+    config = L1TCLExtendedConfig(
+        n_features=n_features,
+        ps_sparsity=ps_sparsity,
+        n_target=n_target,
+        n_source_per_site=n_source_per_site,
+        n_source_sites=n_source_sites,
+        random_state=random_state,
+        **config_kwargs
+    )
+    
+    generator = L1TCLExtendedGenerator(config)
+    source_data, target_data = generator.generate_full_dataset()
+    
+    return source_data, target_data, generator
+
+
+def generate_l1tcl_data(
+    n_target: int = 100,
+    n_source: int = 1000,
+    tau_target: float = -2/30,
+    same_tau: bool = True,
+    random_state: int = 42,
+    **config_kwargs
+) -> Tuple[Dict, Dict, L1TCLGenerator]:
+    """
+    Convenience wrapper for generating L1-TCL toy DGP data.
+    
+    This generates data following the L1-TCL paper (arXiv 2305.09126v3):
+    - 2 covariates (X₁, X₂) with domain-specific distributions
+    - Different propensity score parameters between domains
+    - Constant treatment effect τ (not heterogeneous CATE)
+    - Linear outcome: Y = τZ + αX₂ + ε
+    
+    Parameters
+    ----------
+    n_target : int
+        Target domain sample size (default 100 = limited data)
+    n_source : int
+        Source domain sample size (default 1000 = abundant)
+    tau_target : float
+        True ATE in target domain (default -2/30 ≈ -0.067)
+    same_tau : bool
+        If True, source and target have same τ. If False, source τ=0.
+    random_state : int
+        Random seed
+    **config_kwargs : additional config overrides
+    
+    Returns
+    -------
+    source_data : dict
+    target_data : dict
+    generator : L1TCLGenerator
+    
+    Example
+    -------
+    >>> source, target, gen = generate_l1tcl_data(n_target=100, n_source=1000)
+    >>> print(f"True ATE: {gen.config.tau_target:.4f}")
+    >>> print(f"Target n={len(target['Y'])}, Source n={len(source['Y'])}")
+    """
+    tau_source = tau_target if same_tau else 0.0
+    
+    config = L1TCLConfig(
+        n_target=n_target,
+        n_source=n_source,
+        tau_target=tau_target,
+        tau_source=tau_source,
+        random_state=random_state,
+        **config_kwargs
+    )
+    
+    generator = L1TCLGenerator(config)
+    source_data, target_data = generator.generate_full_dataset()
+    
+    return source_data, target_data, generator

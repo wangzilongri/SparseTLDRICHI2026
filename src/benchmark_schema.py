@@ -89,6 +89,9 @@ class Scenario:
     nu_support_overlap: Optional[float] = None  # Nontransfer support overlap with β₀
     nu_coefficient_corr: Optional[float] = None # Correlation between ν and β₀
     
+    # L1-TCL DGP (arXiv 2305.09126v3)
+    use_l1tcl_dgp: Optional[bool] = None        # If True, use L1TCLGenerator
+    
     # Network knobs
     K_treatments: Optional[int] = None          # Number of treatments
     graph_type: Optional[str] = None            # GraphType value
