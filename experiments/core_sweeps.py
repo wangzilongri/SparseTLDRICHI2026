@@ -233,21 +233,21 @@ DEFAULT_METHODS_OPTION_A = [
     'AnchorPlugin',        # Placebo anchor, plug-in (no DR) - for comparison
     
     # Proposed methods - Residual mode (default)
-    'ProposedA',           # Separate proxy, separate correction, residual
-    'ProposedA_Together',  # Separate proxy, joint correction δ(X, A)
-    'ProposedA_JointProxy', # Joint proxy μ(X, A), separate correction
-    'ProposedA_FullyJoint', # Joint proxy AND joint correction
+    #'ProposedA',           # Separate proxy, separate correction, residual
+    #'ProposedA_Together',  # Separate proxy, joint correction δ(X, A)
+    #'ProposedA_JointProxy', # Joint proxy μ(X, A), separate correction
+    #'ProposedA_FullyJoint', # Joint proxy AND joint correction
     
     # Proposed methods - Direct mode (fit on Y directly)
-    'ProposedA_Direct',           # Separate, direct fitting
-    'ProposedA_Together_Direct',  # Joint correction, direct fitting
+    #'ProposedA_Direct',           # Separate, direct fitting
+    #'ProposedA_Together_Direct',  # Joint correction, direct fitting
     'ProposedA_FullyDirect',      # Fully joint + direct
     
     # Proposed methods - No cross-fitting variants
-    'ProposedA_NoCrossfit',                # Residual, no cross-fitting
-    'ProposedA_Direct_NoCrossfit',         # Direct, no cross-fitting
-    'ProposedA_Together_NoCrossfit',       # Joint + no cross-fitting
-    'ProposedA_Together_Direct_NoCrossfit', # Joint + direct + no cross-fitting
+    #'ProposedA_NoCrossfit',                # Residual, no cross-fitting
+    #'ProposedA_Direct_NoCrossfit',         # Direct, no cross-fitting
+    #'ProposedA_Together_NoCrossfit',       # Joint + no cross-fitting
+    #'ProposedA_Together_Direct_NoCrossfit', # Joint + direct + no cross-fitting
     
     # Option B variants
     'ProposedB_LinearStepB',  # Step B + target-DR
