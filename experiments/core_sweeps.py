@@ -548,6 +548,73 @@ Uses standard synthetic DGP with fair settings optimized for method comparison:
 """
     },
     
+    'gold_fair_sources': {
+        'benchmark_id': 'gold_fair_sources_sweep',
+        'description': 'Fair DGP: Source sites × Target budget heatmap (C × 1000 samples each)',
+        'base_scenario': {
+            # Fixed dimensionality
+            'p_dim': 50,
+            # Fair DGP settings
+            'nontransfer_scale': 0.1,  # SNR ≈ 3-4 (fair, not adversarial)
+            'use_fair_dgp': True,
+            'overlap_lambda': 0.25,    # AUC ≈ 0.7-0.8 (moderate overlap)
+            'intercept_drift_scale': 0.5,  # Controlled drift
+        },
+        'sweep_type': '2d',
+        'sweep_param': 'C_sources',  # Primary: number of source sites
+        'sweep_values': [2, 5, 10, 20, 50],  # Number of source sites
+        'secondary_param': 'm1',  # Secondary: target treated sample size
+        'secondary_values': [0, 50, 100, 200, 500],  # m1 values (like gold_fair_dim)
+        # Coupled parameters:
+        # - n_proxy_total = C_sources * 1000 (each site has 1000 samples)
+        # - m0 = m1 + 50 (staggered, like gold_fair_dim)
+        'coupled_params': {
+            'n_proxy_total': ('C_sources', '*', 1000),
+            'm0': ('m1', 50),
+        },
+        'methods': DEFAULT_METHODS_OPTION_A,
+        # Axis labels for heatmaps
+        'x_axis_label': 'Number of source sites (C)',
+        'y_axis_label': 'Target budget (m0, m1)',
+        'show_budget_tuples': True,  # Show (m0, m1) on y-axis
+        
+        'motivation': """
+**Research Question:** How do the number of source sites and target sample size jointly affect transfer learning performance?
+
+**Why This Matters:**
+This 2D grid explores the interaction between:
+1. **Source site count (C):** More sites = more diverse source information
+   - Each site contributes 1000 samples (fixed per-site budget)
+   - Total source data scales linearly: n_total = C × 1000
+2. **Target budget (m₀, m₁):** More target data → less need for transfer
+   - m₀ = m₁ + 50 (staggered: always 50 more placebo than treated)
+   - Includes m₁=0 case (placebo-only target) to test Option B methods
+
+**Key Question:**
+How does the value of adding more source sites change as target data grows?
+- With small target: expect large benefit from more sources
+- With large target: expect diminishing returns from sources
+
+**Key Grid:**
+- C ∈ {2, 5, 10, 20, 50} source sites (each with 1000 samples)
+- Target budgets: (50,0), (100,50), (150,100), (250,200), (550,500)
+- Dimension: p = 50 (fixed)
+- Total: 5 × 5 = 25 scenarios
+""",
+        'dgp_description': """
+**Fair DGP with Variable Source Sites × Target Budget:**
+
+Uses standard synthetic DGP with fair settings:
+- **Covariates:** X ~ N(0, I_50) (p = 50 fixed)
+- **Treatment:** A ~ Bernoulli(e(X)) with logistic propensity
+- **Outcome:** Y = μ_A(X) + ε with heterogeneous effects
+- **Transfer:** Controlled nontransfer component (SNR ≈ 3-4)
+- **Sites:** Variable C with 1000 samples each
+- **Overlap:** AUC ≈ 0.75 (moderate, not extreme)
+- **Target:** Variable budget with m₀ = m₁ + 50 stagger
+"""
+    },
+    
     'snr_ladder': {
         'benchmark_id': 'snr_ladder_sweep',
         'description': 'Cross-arm validity sweep: varying nontransfer strength (SNR)',
@@ -1430,13 +1497,22 @@ def run_sweep(
                 scenario_params[secondary_param] = secondary_val
                 
                 # Handle coupled parameters
-                # Supports: {'m1': 'm0'} (simple) or {'m0': ('m1', 50)} (with offset)
+                # Supports:
+                #   {'m1': 'm0'} (simple: target = source)
+                #   {'m0': ('m1', 50)} (offset: target = source + 50)
+                #   {'n_proxy_total': ('C_sources', '*', 1000)} (multiply: target = source * 1000)
                 for target_param, coupling_spec in coupled_params.items():
                     if isinstance(coupling_spec, tuple):
-                        # Offset coupling: (source_param, offset) → target = source + offset
-                        source_param, offset = coupling_spec
-                        source_val = scenario_params.get(source_param, primary_val)
-                        scenario_params[target_param] = source_val + offset
+                        if len(coupling_spec) == 3 and coupling_spec[1] == '*':
+                            # Multiply coupling: (source_param, '*', multiplier)
+                            source_param, _, multiplier = coupling_spec
+                            source_val = scenario_params.get(source_param, primary_val)
+                            scenario_params[target_param] = source_val * multiplier
+                        else:
+                            # Offset coupling: (source_param, offset) → target = source + offset
+                            source_param, offset = coupling_spec
+                            source_val = scenario_params.get(source_param, primary_val)
+                            scenario_params[target_param] = source_val + offset
                     else:
                         # Simple coupling: target = source
                         scenario_params[target_param] = scenario_params.get(coupling_spec, primary_val)
@@ -1455,13 +1531,22 @@ def run_sweep(
                 scenario_params['m1'] = m1_values[i]
             
             # Handle coupled parameters
-            # Supports: {'m1': 'm0'} (simple) or {'m0': ('m1', 50)} (with offset)
+            # Supports:
+            #   {'m1': 'm0'} (simple: target = source)
+            #   {'m0': ('m1', 50)} (offset: target = source + 50)
+            #   {'n_proxy_total': ('C_sources', '*', 1000)} (multiply: target = source * 1000)
             for target_param, coupling_spec in coupled_params.items():
                 if isinstance(coupling_spec, tuple):
-                    # Offset coupling: (source_param, offset) → target = source + offset
-                    source_param, offset = coupling_spec
-                    source_val = scenario_params.get(source_param, val)
-                    scenario_params[target_param] = source_val + offset
+                    if len(coupling_spec) == 3 and coupling_spec[1] == '*':
+                        # Multiply coupling: (source_param, '*', multiplier)
+                        source_param, _, multiplier = coupling_spec
+                        source_val = scenario_params.get(source_param, val)
+                        scenario_params[target_param] = source_val * multiplier
+                    else:
+                        # Offset coupling: (source_param, offset) → target = source + offset
+                        source_param, offset = coupling_spec
+                        source_val = scenario_params.get(source_param, val)
+                        scenario_params[target_param] = source_val + offset
                 else:
                     # Simple coupling: target = source
                     scenario_params[target_param] = scenario_params.get(coupling_spec, val)
@@ -1771,54 +1856,55 @@ def _generate_heatmap_plots_2d(df_agg: pd.DataFrame, config: dict, output_dir: s
     primary_param = config['sweep_param']
     secondary_param = config['secondary_param']
     
-    # Check if we should show (m0, m1) tuples on x-axis
+    # Check if we should show (m0, m1) tuples
     show_budget_tuples = config.get('show_budget_tuples', False)
     coupled_params = config.get('coupled_params', {})
     x_axis_label = config.get('x_axis_label', primary_param)
+    y_axis_label = config.get('y_axis_label', secondary_param)
     
     # Get unique values
     primary_values = sorted(df_agg[primary_param].dropna().unique())
     secondary_values = sorted(df_agg[secondary_param].dropna().unique())
     methods = df_agg['method'].unique()
     
-    # Build x-axis labels
-    if show_budget_tuples and 'm0' in df_agg.columns and 'm1' in df_agg.columns:
-        # Get unique (m0, m1) tuples matching the primary values
-        # First, get the coupling relationship
-        m0_values = []
-        m1_values = []
-        for pv in primary_values:
-            # Find a row with this primary value to get the corresponding m0, m1
-            sample_row = df_agg[df_agg[primary_param] == pv].iloc[0] if len(df_agg[df_agg[primary_param] == pv]) > 0 else None
-            if sample_row is not None:
-                m0_values.append(int(sample_row['m0']))
-                m1_values.append(int(sample_row['m1']))
+    # Helper function to build (m0, m1) tuple labels from values
+    def build_budget_tuple_labels(values, param_name):
+        """Build (m0, m1) labels for budget tuples."""
+        m0_vals = []
+        m1_vals = []
+        for val in values:
+            # Find a row with this param value to get corresponding m0, m1
+            sample = df_agg[df_agg[param_name] == val]
+            if len(sample) > 0:
+                sample_row = sample.iloc[0]
+                m0_vals.append(int(sample_row['m0']))
+                m1_vals.append(int(sample_row['m1']))
             else:
                 # Compute from coupling if possible
-                if primary_param == 'm1' and 'm0' in coupled_params:
+                if param_name == 'm1' and 'm0' in coupled_params:
                     coupling = coupled_params['m0']
-                    if isinstance(coupling, tuple):
-                        m1_values.append(int(pv))
-                        m0_values.append(int(pv + coupling[1]))
+                    if isinstance(coupling, tuple) and len(coupling) == 2:
+                        m1_vals.append(int(val))
+                        m0_vals.append(int(val + coupling[1]))
                     else:
-                        m1_values.append(int(pv))
-                        m0_values.append(int(pv))
-                elif primary_param == 'm0' and 'm1' in coupled_params:
-                    coupling = coupled_params['m1']
-                    if isinstance(coupling, tuple):
-                        m0_values.append(int(pv))
-                        m1_values.append(int(pv + coupling[1]))
-                    else:
-                        m0_values.append(int(pv))
-                        m1_values.append(int(pv))
+                        m1_vals.append(int(val))
+                        m0_vals.append(int(val))
                 else:
-                    m0_values.append(int(pv))
-                    m1_values.append(int(pv))
-        
-        # Create tuple labels
-        x_tick_labels = [f'({m0},{m1})' for m0, m1 in zip(m0_values, m1_values)]
+                    m0_vals.append(int(val))
+                    m1_vals.append(int(val))
+        return [f'({m0},{m1})' for m0, m1 in zip(m0_vals, m1_vals)]
+    
+    # Build x-axis labels
+    if show_budget_tuples and primary_param in ('m0', 'm1') and 'm0' in df_agg.columns and 'm1' in df_agg.columns:
+        x_tick_labels = build_budget_tuple_labels(primary_values, primary_param)
     else:
         x_tick_labels = [str(int(v)) for v in primary_values]
+    
+    # Build y-axis labels (secondary param)
+    if show_budget_tuples and secondary_param in ('m0', 'm1') and 'm0' in df_agg.columns and 'm1' in df_agg.columns:
+        y_tick_labels = build_budget_tuple_labels(secondary_values, secondary_param)
+    else:
+        y_tick_labels = [str(int(v)) for v in secondary_values]
     
     # Metrics to plot: (column, display_name, colormap, lower_is_better)
     metrics = [
@@ -1877,12 +1963,15 @@ def _generate_heatmap_plots_2d(df_agg: pd.DataFrame, config: dict, output_dir: s
             
             # Set ticks with custom labels
             ax.set_xticks(range(len(primary_values)))
-            ax.set_xticklabels(x_tick_labels, rotation=45 if show_budget_tuples else 0, ha='right' if show_budget_tuples else 'center')
+            x_rotation = 45 if (show_budget_tuples and primary_param in ('m0', 'm1')) else 0
+            x_ha = 'right' if x_rotation else 'center'
+            ax.set_xticklabels(x_tick_labels, rotation=x_rotation, ha=x_ha)
+            
             ax.set_yticks(range(len(secondary_values)))
-            ax.set_yticklabels([str(int(v)) for v in secondary_values])
+            ax.set_yticklabels(y_tick_labels)
             
             ax.set_xlabel(x_axis_label)
-            ax.set_ylabel(secondary_param)
+            ax.set_ylabel(y_axis_label)
             ax.set_title(f'{method}')
             
             # Add value annotations
@@ -1908,8 +1997,8 @@ def _generate_heatmap_plots_2d(df_agg: pd.DataFrame, config: dict, output_dir: s
         cbar = fig.colorbar(im, cax=cbar_ax)
         cbar.set_label(metric_name)
         
-        # Title uses custom x_axis_label
-        fig.suptitle(f'{metric_name} vs {x_axis_label} × {secondary_param}', fontsize=14, y=1.02)
+        # Title uses custom axis labels
+        fig.suptitle(f'{metric_name} vs {x_axis_label} × {y_axis_label}', fontsize=14, y=1.02)
         
         # Save
         metric_short = metric_col.replace('_mean', '')
@@ -3274,11 +3363,12 @@ Examples:
     )
     parser.add_argument('--sweep', type=str, default='all',
                        choices=['gold', 'gold_option_a', 'proxy', 'imbalance', 
-                                'gold_fair', 'gold_fair_dim', 'snr_ladder', 'overlap_ladder', 'drift_ladder',
+                                'gold_fair', 'gold_fair_dim', 'gold_fair_sources',
+                                'snr_ladder', 'overlap_ladder', 'drift_ladder',
                                 'l1tcl', 'l1tcl_source_size', 'l1tcl_dim', 'l1tcl_sparsity', 
                                 'l1tcl_gold', 'l1tcl_gold_dim', 'l1tcl_full',
                                 'all', 'all_fair'],
-                       help='Sweep to run (default: all). Fair sweeps: gold_fair, gold_fair_dim, snr_ladder, overlap_ladder, drift_ladder. '
+                       help='Sweep to run (default: all). Fair sweeps: gold_fair, gold_fair_dim, gold_fair_sources, snr_ladder, overlap_ladder, drift_ladder. '
                             'L1-TCL sweeps: l1tcl, l1tcl_source_size, l1tcl_dim, l1tcl_sparsity, l1tcl_gold, l1tcl_gold_dim, l1tcl_full')
     parser.add_argument('--n_rep', type=int, default=20,
                        help='Number of MC replicates (default: 20)')
@@ -3328,7 +3418,7 @@ Examples:
         )
     elif args.sweep == 'all_fair':
         # Run all fair sweeps
-        fair_sweeps = ['gold_fair', 'gold_fair_dim', 'snr_ladder', 'overlap_ladder', 'drift_ladder']
+        fair_sweeps = ['gold_fair', 'gold_fair_dim', 'gold_fair_sources', 'snr_ladder', 'overlap_ladder', 'drift_ladder']
         for sweep_name in fair_sweeps:
             if not args.quiet:
                 print(f"\n{'='*70}")
