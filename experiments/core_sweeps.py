@@ -1013,7 +1013,10 @@ This 2D grid explores the interaction between:
 
 def _create_nan_result(benchmark_id, scenario, rep, method_name, feasibility, seed, config):
     """Create a result row with all NaN metrics (for failed/infeasible methods)."""
-    return {
+    # Include secondary param if present (e.g., p_dim for 2D sweeps)
+    secondary_param = config.get('secondary_param')
+    
+    result = {
         'benchmark_id': benchmark_id,
         'scenario_id': scenario.scenario_id,
         'rep': rep,
@@ -1026,6 +1029,8 @@ def _create_nan_result(benchmark_id, scenario, rep, method_name, feasibility, se
         'n_proxy_total': scenario.n_proxy_total,
         'C_sources': scenario.C_sources,
         'nontransfer_scale': scenario.nontransfer_scale,
+        # Secondary sweep param (e.g., p_dim)
+        'p_dim': getattr(scenario, 'p_dim', None),
         # Fair DGP params
         'overlap_lambda': getattr(scenario, 'overlap_lambda', None),
         'intercept_drift_scale': getattr(scenario, 'intercept_drift_scale', None),
@@ -1046,6 +1051,7 @@ def _create_nan_result(benchmark_id, scenario, rep, method_name, feasibility, se
         'stepb_M_fro_norm': None, 'stepb_M_effective_rank': None,
         'runtime_sec': 0.0,
     }
+    return result
 
 
 # =============================================================================
@@ -1213,6 +1219,8 @@ def _run_single_rep(
             'n_proxy_total': scenario.n_proxy_total,
             'C_sources': scenario.C_sources,
             'nontransfer_scale': scenario.nontransfer_scale,
+            # Secondary sweep param (e.g., p_dim for 2D sweeps)
+            'p_dim': getattr(scenario, 'p_dim', None),
             
             # ─────────────────────────────────────────────────────────────────
             # Point Estimation Metrics
@@ -1556,8 +1564,11 @@ def generate_sweep_plots(
     import matplotlib.pyplot as plt
     
     if sweep_type == 'grid_2d':
-        # 2D grid sweep: generate heatmaps for each method
+        # 2D grid sweep (m0 × m1): generate heatmaps for each method
         _generate_heatmap_plots(df_agg, config, output_dir, verbose)
+    elif sweep_type == '2d':
+        # 2D sweep with secondary_param: generate heatmaps
+        _generate_heatmap_plots_2d(df_agg, config, output_dir, verbose)
     else:
         # 1D sweep: generate line plots
         _generate_line_plots(df_agg, config, output_dir, verbose)
@@ -1716,6 +1727,124 @@ def _generate_heatmap_plots(df_agg: pd.DataFrame, config: dict, output_dir: str,
         cbar.set_label(metric_name)
         
         fig.suptitle(f'{metric_name} vs Target Budget (m0 x m1)', fontsize=14, y=1.02)
+        
+        # Save
+        metric_short = metric_col.replace('_mean', '')
+        fig.savefig(os.path.join(output_dir, f'{benchmark_id}_{metric_short}.png'), 
+                   dpi=150, bbox_inches='tight')
+        fig.savefig(os.path.join(output_dir, f'{benchmark_id}_{metric_short}.pdf'),
+                   bbox_inches='tight')
+        plt.close(fig)
+        
+        if verbose:
+            print(f"  ✓ {metric_name} heatmap saved")
+
+
+def _generate_heatmap_plots_2d(df_agg: pd.DataFrame, config: dict, output_dir: str, verbose: bool):
+    """Generate heatmap plots for 2D sweeps with secondary_param (e.g., m0 × p_dim)."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    benchmark_id = config['benchmark_id']
+    
+    # Get parameter names from config
+    primary_param = config['sweep_param']
+    secondary_param = config['secondary_param']
+    
+    # Get unique values
+    primary_values = sorted(df_agg[primary_param].dropna().unique())
+    secondary_values = sorted(df_agg[secondary_param].dropna().unique())
+    methods = df_agg['method'].unique()
+    
+    # Metrics to plot: (column, display_name, colormap, lower_is_better)
+    metrics = [
+        # Core point estimation
+        ('pehe_mean', 'PEHE (↓ lower is better)', 'viridis_r', True),
+        ('ate_abs_err_mean', 'ATE Error (↓ lower is better)', 'viridis_r', True),
+        # Ranking
+        ('tau_corr_mean', 'Spearman ρ (↑ higher is better)', 'viridis', False),
+        ('qini_auc_mean', 'Qini AUC (↑ higher is better)', 'viridis', False),
+        ('topk_20_ratio_mean', 'Top-20% Capture (↑ higher is better)', 'viridis', False),
+        # Decision-focused
+        ('policy_regret_mean', 'Policy Regret (↓ lower is better)', 'viridis_r', True),
+        # Calibration
+        ('tau_ece_mean', 'CATE ECE (↓ lower is better)', 'viridis_r', True),
+    ]
+    
+    for metric_col, metric_name, cmap, lower_better in metrics:
+        if metric_col not in df_agg.columns:
+            continue
+        
+        n_methods = len(methods)
+        n_cols = min(3, n_methods)
+        n_rows = (n_methods + n_cols - 1) // n_cols
+        
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
+        if n_methods == 1:
+            axes = np.array([[axes]])
+        elif n_rows == 1:
+            axes = axes.reshape(1, -1)
+        elif n_cols == 1:
+            axes = axes.reshape(-1, 1)
+        
+        # Find global min/max for consistent color scale
+        vmin = df_agg[metric_col].min()
+        vmax = df_agg[metric_col].max()
+        
+        for idx, method in enumerate(methods):
+            row, col = idx // n_cols, idx % n_cols
+            ax = axes[row, col]
+            
+            # Create pivot table for heatmap
+            method_data = df_agg[df_agg['method'] == method]
+            
+            # Build matrix (secondary_values on Y-axis, primary_values on X-axis)
+            matrix = np.full((len(secondary_values), len(primary_values)), np.nan)
+            for _, row_data in method_data.iterrows():
+                try:
+                    primary_idx = list(primary_values).index(row_data[primary_param])
+                    secondary_idx = list(secondary_values).index(row_data[secondary_param])
+                    matrix[secondary_idx, primary_idx] = row_data[metric_col]
+                except (ValueError, KeyError):
+                    continue
+            
+            # Plot heatmap (origin='lower' so smaller values at bottom)
+            im = ax.imshow(matrix, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax, origin='lower')
+            
+            # Set ticks
+            ax.set_xticks(range(len(primary_values)))
+            ax.set_xticklabels([str(v) for v in primary_values])
+            ax.set_yticks(range(len(secondary_values)))
+            ax.set_yticklabels([str(v) for v in secondary_values])
+            
+            ax.set_xlabel(primary_param)
+            ax.set_ylabel(secondary_param)
+            ax.set_title(f'{method}')
+            
+            # Add value annotations
+            for i in range(len(secondary_values)):
+                for j in range(len(primary_values)):
+                    val = matrix[i, j]
+                    if not np.isnan(val):
+                        text_color = 'white' if (val - vmin) / (vmax - vmin + 1e-10) > 0.5 else 'black'
+                        ax.text(j, i, f'{val:.2f}', ha='center', va='center', 
+                               color=text_color, fontsize=8)
+                    else:
+                        ax.text(j, i, 'N/A', ha='center', va='center', 
+                               color='gray', fontsize=8)
+        
+        # Hide empty subplots
+        for idx in range(n_methods, n_rows * n_cols):
+            row, col = idx // n_cols, idx % n_cols
+            axes[row, col].axis('off')
+        
+        # Add colorbar
+        fig.subplots_adjust(right=0.85)
+        cbar_ax = fig.add_axes([0.88, 0.15, 0.03, 0.7])
+        cbar = fig.colorbar(im, cax=cbar_ax)
+        cbar.set_label(metric_name)
+        
+        fig.suptitle(f'{metric_name} vs {primary_param} × {secondary_param}', fontsize=14, y=1.02)
         
         # Save
         metric_short = metric_col.replace('_mean', '')
