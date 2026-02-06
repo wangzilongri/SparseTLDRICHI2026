@@ -212,6 +212,10 @@ METRIC_DEFINITIONS = {
 # Following advisor guidance:
 # - Replace ProposedA/B with Glmtrans_Auto (Option A) and Glmtrans_OptionB (Option B)
 # - Glmtrans_OptionB uses source detection on control arm + source-DR CATE
+#
+# NOTE: Methods are automatically filtered to only those available.
+# If R/glmtrans is not installed, glmtrans methods are silently skipped.
+# Run `python -m glmtrans_wrapper --setup` to install glmtrans.
 
 DEFAULT_METHODS_OPTION_B = [
     # Baselines (no transfer)
@@ -227,6 +231,9 @@ DEFAULT_METHODS_OPTION_B = [
     
     # Other Option B methods
     'AnchorPlugin',        # Placebo anchor, plug-in CATE (no DR)
+    
+    # Fallback methods (work without R/glmtrans)
+    'ProposedB_SourceDR',  # Step B + source-DR (Python-only fallback)
     
     # Transport baselines (don't require target treated)
     'IPWTransport',           # Hong: weighted outcome models
@@ -252,9 +259,13 @@ DEFAULT_METHODS_OPTION_A = [
     'AnchorOnly',          # Placebo anchor + DR
     'AnchorPlugin',        # Placebo anchor, plug-in
     
+    # Fallback methods (work without R/glmtrans)
+    'ProposedA_FullyDirect',  # Python-only fallback
+    'ProposedB_SourceDR',     # Python-only fallback
+    
     # Transport baselines
     'IPWTransport',           # Weighted outcome models
-    'EntropyBalancing',       # Entropy balancing
+    'EntropyBalancing',       # Entropy balancing weights
     'OutcomeModelTransport',  # Unweighted outcome models
     'DRLearner_PooledWithSite', 'DRLearner_PooledNoSite',
 ]
@@ -1307,6 +1318,34 @@ def run_sweep(
     if methods is None:
         # Use sweep-specific methods if defined, otherwise default
         methods = config.get('methods', DEFAULT_METHODS)
+    
+    # Filter to available methods (handles missing R/glmtrans gracefully)
+    available_factories = create_method_factories(seed0)
+    available_methods = set(available_factories.keys())
+    original_methods = methods.copy() if isinstance(methods, list) else list(methods)
+    methods = [m for m in methods if m in available_methods]
+    
+    # Warn about unavailable methods
+    unavailable = set(original_methods) - set(methods)
+    if unavailable:
+        glmtrans_missing = [m for m in unavailable if m.startswith('Glmtrans')]
+        other_missing = [m for m in unavailable if not m.startswith('Glmtrans')]
+        
+        if verbose:
+            print("=" * 70)
+            print("WARNING: Some requested methods are not available")
+            print("=" * 70)
+            if glmtrans_missing:
+                print(f"  glmtrans methods unavailable: {glmtrans_missing}")
+                print("  To install glmtrans, run:")
+                print("    cd src && python -m glmtrans_wrapper --setup")
+            if other_missing:
+                print(f"  Other unavailable: {other_missing}")
+            print(f"\n  Continuing with available methods: {methods}")
+            print("=" * 70)
+    
+    if not methods:
+        raise ValueError("No available methods to run! Check that estimators are properly installed.")
     
     # Determine actual number of workers
     if n_jobs == -1:

@@ -1085,4 +1085,59 @@ def test_glmtrans_r():
 
 
 if __name__ == '__main__':
-    test_glmtrans_r()
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description='glmtrans R package Python wrapper',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Check glmtrans status
+  python -m glmtrans_wrapper --status
+  
+  # Install/setup glmtrans
+  python -m glmtrans_wrapper --setup
+  
+  # Run tests
+  python -m glmtrans_wrapper --test
+'''
+    )
+    parser.add_argument('--setup', action='store_true',
+                        help='Install glmtrans R package if not present')
+    parser.add_argument('--status', action='store_true',
+                        help='Check glmtrans availability status')
+    parser.add_argument('--test', action='store_true',
+                        help='Run glmtrans tests')
+    
+    args = parser.parse_args()
+    
+    if args.status:
+        status = get_glmtrans_status()
+        print("=" * 60)
+        print("glmtrans Status")
+        print("=" * 60)
+        print(f"R installed:        {'✓' if status['r_installed'] else '✗'}")
+        print(f"glmtrans installed: {'✓' if status['glmtrans_installed'] else '✗'}")
+        print(f"R libs path:        {status['r_libs_path']}")
+        print(f"Available:          {'✓' if status['available'] else '✗'}")
+        print(f"\nMessage: {status['message']}")
+        sys.exit(0 if status['available'] else 1)
+    
+    elif args.setup:
+        success = setup_glmtrans(verbose=True)
+        sys.exit(0 if success else 1)
+    
+    elif args.test:
+        if not _check_r_available():
+            print("ERROR: glmtrans not available. Run --setup first.")
+            sys.exit(1)
+        test_glmtrans_r()
+    
+    else:
+        # Default: show status
+        status = get_glmtrans_status()
+        print(f"glmtrans available: {'✓' if status['available'] else '✗'}")
+        print(f"Message: {status['message']}")
+        if not status['available']:
+            print("\nTo setup: python -m glmtrans_wrapper --setup")
+        parser.print_help()
