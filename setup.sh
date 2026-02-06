@@ -171,14 +171,26 @@ else
         cd "R-${R_VERSION}"
         
         # Configure and build
+        # --with-x=no: Don't require X11 (not available on most servers)
+        # --with-readline=no: Don't require readline (optional)
+        # --with-cairo=no: Don't require cairo graphics (optional)
+        # --enable-R-shlib: Build shared library (needed for some packages)
         echo "Configuring R (this may take a few minutes)..."
-        ./configure --prefix="$LOCAL_R_DIR" --enable-R-shlib --quiet
+        ./configure --prefix="$LOCAL_R_DIR" \
+            --enable-R-shlib \
+            --with-x=no \
+            --with-readline=no \
+            --with-cairo=no \
+            --disable-java \
+            2>&1 | tail -5
         
         echo "Compiling R (this may take 10-15 minutes)..."
-        make -j $(nproc) --quiet
+        # Use nproc if available, otherwise default to 4
+        NCPU=$(nproc 2>/dev/null || echo 4)
+        make -j $NCPU
         
         echo "Installing R..."
-        make install --quiet
+        make install
         
         # Cleanup
         cd "$HOME/local"
