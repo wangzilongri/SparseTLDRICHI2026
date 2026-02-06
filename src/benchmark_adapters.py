@@ -743,6 +743,15 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
         # Transport baselines not available
         pass
     
+    # Add glmtrans-based estimators (Tian & Feng 2023 transfer learning)
+    try:
+        from glmtrans_wrapper import create_glmtrans_factories
+        glmtrans_factories = create_glmtrans_factories(seed)
+        factories.update(glmtrans_factories)
+    except ImportError:
+        # Glmtrans not available
+        pass
+    
     return factories
 
 

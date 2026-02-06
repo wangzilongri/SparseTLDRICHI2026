@@ -1,0 +1,8 @@
+glmtrans	glmtrans
+glmtrans_inf	glmtrans_inf
+models	models
+plot.glmtrans	plot.glmtrans
+plot.glmtrans_source_detection	plot.glmtrans
+predict.glmtrans	predict.glmtrans
+print.glmtrans	print.glmtrans
+source_detection	source_detection

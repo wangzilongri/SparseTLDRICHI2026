@@ -206,55 +206,53 @@ METRIC_DEFINITIONS = {
 
 # Methods for disconnected target (m1=0, placebo-only)
 # CRITICAL: Only methods that DON'T require target treated for Stage 3!
+# =============================================================================
+# DEFAULT METHOD LISTS
+# =============================================================================
+# Following advisor guidance:
+# - Replace ProposedA/B with Glmtrans_Auto (Option A) and Glmtrans_OptionB (Option B)
+# - Glmtrans_OptionB uses source detection on control arm + source-DR CATE
+
 DEFAULT_METHODS_OPTION_B = [
-    # Our methods that work with placebo-only
-    'ProxyOnly',           # Source proxy only
+    # Baselines (no transfer)
+    'ProxyOnly',           # Source proxy only (no correction)
+    
+    # glmtrans transfer learning (Tian & Feng 2023)
+    # Glmtrans_OptionB: Theoretically correct for placebo-only target
+    # - Uses glmtrans for control-arm source detection only
+    # - Fits DR CATE on selected sources
+    # - Transports to target (no target treated needed)
+    'Glmtrans_OptionB',    # RECOMMENDED for Option B (placebo-only)
+    'Glmtrans_Auto',       # Requires target treated (for comparison when available)
+    
+    # Other Option B methods
     'AnchorPlugin',        # Placebo anchor, plug-in CATE (no DR)
-    'ProposedB_SourceDR',  # TRUE disconnected method: Step B + source-DR
     
     # Transport baselines (don't require target treated)
-    # NOTE: For CATE prediction, HongTwoStage≈IPWTransport (both weighted),
-    # and AIPWTransport≈OutcomeModelTransport≈IPD_RE (all unweighted).
-    # We keep representative methods from each category.
     'IPWTransport',           # Hong: weighted outcome models
-    'EntropyBalancing',       # Entropy balancing weights (different from IPW)
-    'OutcomeModelTransport',  # Rott: unweighted outcome models (reference)
+    'EntropyBalancing',       # Entropy balancing weights
+    'OutcomeModelTransport',  # Unweighted outcome models (reference)
 ]
 
 # Methods for connected target (m1>0, has target treated)
 # Can use methods that require target treated for Stage 3
 DEFAULT_METHODS_OPTION_A = [
     # Baselines
-    'TargetOnlyDR',        # Target-only DR (renamed from NoTransfer)
+    'TargetOnlyDR',        # Target-only DR (no transfer)
     'ProxyOnly',           # Source proxy only
     
+    # glmtrans transfer learning (Tian & Feng 2023)
+    # RECOMMENDED: Replaces ProposedA variants
+    'Glmtrans_Auto',       # Auto source detection (plug-in)
+    'Glmtrans_All',        # All sources (plug-in)
+    'Glmtrans_DR',         # DR with auto detection
+    'Glmtrans_OptionB',    # Source-DR (for comparison, doesn't use target treated)
+    
     # Anchor ablations
-    'AnchorOnly',          # Placebo anchor + DR (needs target treated!)
-    'AnchorPlugin',        # Placebo anchor, plug-in (no DR) - for comparison
+    'AnchorOnly',          # Placebo anchor + DR
+    'AnchorPlugin',        # Placebo anchor, plug-in
     
-    # Proposed methods - Residual mode (default)
-    #'ProposedA',           # Separate proxy, separate correction, residual
-    #'ProposedA_Together',  # Separate proxy, joint correction δ(X, A)
-    #'ProposedA_JointProxy', # Joint proxy μ(X, A), separate correction
-    #'ProposedA_FullyJoint', # Joint proxy AND joint correction
-    
-    # Proposed methods - Direct mode (fit on Y directly)
-    #'ProposedA_Direct',           # Separate, direct fitting
-    #'ProposedA_Together_Direct',  # Joint correction, direct fitting
-    'ProposedA_FullyDirect',      # Fully joint + direct
-    
-    # Proposed methods - No cross-fitting variants
-    #'ProposedA_NoCrossfit',                # Residual, no cross-fitting
-    #'ProposedA_Direct_NoCrossfit',         # Direct, no cross-fitting
-    #'ProposedA_Together_NoCrossfit',       # Joint + no cross-fitting
-    #'ProposedA_Together_Direct_NoCrossfit', # Joint + direct + no cross-fitting
-    
-    # Option B variants
-    'ProposedB_LinearStepB',  # Step B + target-DR
-    'ProposedB_SourceDR',  # Step B + source-DR (for comparison)
-    
-    # Transport baselines (non-redundant for CATE)
-    # NOTE: HongTwoStage≈IPWTransport, AIPWTransport≈OutcomeModelTransport≈IPD_RE
+    # Transport baselines
     'IPWTransport',           # Weighted outcome models
     'EntropyBalancing',       # Entropy balancing
     'OutcomeModelTransport',  # Unweighted outcome models
@@ -475,6 +473,62 @@ Uses `FairSyntheticRCTConfig` with advisor-recommended settings:
 $$\\mu_{a,c}(x) = \\alpha_{a,c} + x^\\top b_a + x^\\top \\beta_{a,c} + \\text{nonlin}(x)$$
 
 where $\\beta_{1,c} = M^* \\beta_{0,c} + \\nu_c$ with small $\\nu_c$.
+"""
+    },
+    
+    'gold_fair_dim': {
+        'benchmark_id': 'gold_fair_dim_sweep',
+        'description': 'Fair DGP: Target size × Dimensionality grid (m₀ × p_dim)',
+        'base_scenario': {
+            'n_proxy_total': 20000,
+            'C_sources': 10,
+            'nontransfer_scale': 0.1,  # SNR ≈ 3-4 (fair, not adversarial)
+            'use_fair_dgp': True,
+            'overlap_lambda': 0.25,    # AUC ≈ 0.7-0.8 (moderate overlap)
+            'intercept_drift_scale': 0.5,  # Controlled drift
+        },
+        'sweep_type': '2d',
+        'sweep_param': 'm0',
+        'sweep_values': [50, 100, 200, 500],  # Target sample size (m0 = m1)
+        'secondary_param': 'p_dim',
+        'secondary_values': [10, 20, 50, 100],  # Feature dimensionality
+        # m1 tracks m0 (equal placebo/treated in target)
+        'coupled_params': {'m1': 'm0'},
+        'methods': DEFAULT_METHODS_OPTION_A,
+        
+        'motivation': """
+**Research Question:** How do target sample size and feature dimensionality jointly affect estimator performance under fair DGP settings?
+
+**Why This Matters:**
+This 2D grid explores the interaction between:
+1. **Target size (m₀ = m₁):** More target data → less need for transfer
+2. **Dimensionality (d):** Higher d → harder estimation, potentially more benefit from source data
+
+**Key Grid:**
+- Target: m₀ = m₁ ∈ {50, 100, 200, 500}
+- Dimension: d ∈ {10, 20, 50, 100}
+- Total: 4 × 4 = 16 scenarios
+
+**Critical Trade-offs:**
+- Low d + large m₀: Target-only methods may suffice
+- High d + small m₀: Transfer learning becomes essential
+- The "break-even" point depends on SNR and overlap
+
+**DGP Settings (Fair):**
+- SNR ≈ 3-4 (nontransfer_scale = 0.1)
+- Overlap AUC ≈ 0.75 (overlap_lambda = 0.25)
+- Controlled intercept drift (scale = 0.5)
+- 20,000 source observations across 10 sites
+""",
+        'dgp_description': """
+**Fair DGP with Variable Dimensionality:**
+
+Uses standard synthetic DGP with fair settings optimized for method comparison:
+- **Covariates:** X ~ N(0, I_d) with variable d
+- **Treatment:** A ~ Bernoulli(e(X)) with logistic propensity
+- **Outcome:** Y = μ_A(X) + ε with heterogeneous effects
+- **Transfer:** Controlled nontransfer component (SNR ≈ 3-4)
+- **Sites:** 10 source sites with moderate covariate shift
 """
     },
     
@@ -1678,14 +1732,74 @@ def generate_sweep_report(
         if 'dgp_description' in config:
             f.write(config['dgp_description'].strip() + "\n\n")
         
-        # Add concrete parameter table
-        f.write("### Parameter Summary\n\n")
+        # =================================================================
+        # Programmatically generate swept vs fixed parameters
+        # =================================================================
+        sweep_type = config.get('sweep_type', '1d')
+        coupled_params = config.get('coupled_params', {})
+        
+        # Identify swept parameters
+        swept_params = {}
+        swept_params[sweep_param] = config['sweep_values']
+        
+        # Add secondary sweep param for 2D sweeps
+        if sweep_type == '2d' and 'secondary_param' in config:
+            swept_params[config['secondary_param']] = config['secondary_values']
+        elif sweep_type == 'grid_2d' and 'm1_values' in config:
+            swept_params['m1'] = config['m1_values']
+        
+        # Add coupled parameters (they vary but are derived from swept params)
+        coupled_info = {}
+        for target_p, source_p in coupled_params.items():
+            coupled_info[target_p] = f"= {source_p}"
+        
+        # Fixed parameters = base_scenario minus swept/coupled
+        fixed_params = {k: v for k, v in config['base_scenario'].items() 
+                        if k not in swept_params and k not in coupled_info}
+        
+        # --- Swept Parameters Section ---
+        f.write("### Swept Parameters (Varied Across Scenarios)\n\n")
+        f.write("| Parameter | Values | Description |\n")
+        f.write("|-----------|--------|-------------|\n")
+        for param, values in swept_params.items():
+            desc = _get_param_description(param)
+            f.write(f"| **{param}** | `{values}` | {desc} |\n")
+        f.write("\n")
+        
+        # --- Coupled Parameters Section (if any) ---
+        if coupled_info:
+            f.write("### Coupled Parameters (Derived from Swept)\n\n")
+            f.write("| Parameter | Coupling | Description |\n")
+            f.write("|-----------|----------|-------------|\n")
+            for param, coupling in coupled_info.items():
+                desc = _get_param_description(param)
+                f.write(f"| **{param}** | `{coupling}` | {desc} |\n")
+            f.write("\n")
+        
+        # --- Fixed Parameters Section ---
+        f.write("### Fixed Parameters (Held Constant)\n\n")
         f.write("| Parameter | Value | Description |\n")
         f.write("|-----------|-------|-------------|\n")
-        f.write(f"| **Sweep param** | `{sweep_param}` | {config['sweep_values']} |\n")
-        for param, val in config['base_scenario'].items():
+        for param, val in fixed_params.items():
             desc = _get_param_description(param)
-            f.write(f"| {param} | {val} | {desc} |\n")
+            f.write(f"| {param} | `{val}` | {desc} |\n")
+        f.write("\n")
+        
+        # --- Summary Box ---
+        f.write("### Experimental Design Summary\n\n")
+        n_swept = len(swept_params)
+        n_coupled = len(coupled_info)
+        n_fixed = len(fixed_params)
+        total_scenarios = 1
+        for values in swept_params.values():
+            total_scenarios *= len(values)
+        
+        f.write(f"- **Sweep type:** `{sweep_type}`\n")
+        f.write(f"- **Number of swept parameters:** {n_swept}\n")
+        if coupled_info:
+            f.write(f"- **Number of coupled parameters:** {n_coupled}\n")
+        f.write(f"- **Number of fixed parameters:** {n_fixed}\n")
+        f.write(f"- **Total unique scenarios:** {total_scenarios}\n")
         f.write("\n")
         
         # =====================================================================
@@ -1714,14 +1828,53 @@ def generate_sweep_report(
         f.write("---\n\n")
         f.write("## 4. Methods Compared\n\n")
         methods_in_sweep = df_rep['method'].unique().tolist()
-        f.write("| Method | Uses Target Placebo | Uses Source Data | Description |\n")
-        f.write("|--------|---------------------|------------------|-------------|\n")
+        
+        # Summary table
+        f.write("### 4.1 Method Summary Table\n\n")
+        f.write("| Method | Category | Target Placebo | Target Treated | Source | Description |\n")
+        f.write("|--------|----------|----------------|----------------|--------|-------------|\n")
         for method in methods_in_sweep:
-            desc = _get_method_description(method)
-            uses_target = "✓" if method in ['AnchorOnly', 'ProposedB_LinearStepB', 'ProposedA'] else "✗"
-            uses_source = "✓" if method in ['ProxyOnly', 'ProposedB_LinearStepB', 'ProposedA'] else "✗"
-            f.write(f"| **{method}** | {uses_target} | {uses_source} | {desc} |\n")
+            details = _get_method_details(method)
+            uses_tgt_pbo = "✓" if details.get('uses_target_placebo', False) else "✗"
+            uses_tgt_trt = "✓" if details.get('uses_target_treated', False) else "✗"
+            uses_src = "✓" if details.get('uses_source', False) else "✗"
+            category = details.get('category', 'Unknown')
+            desc = details.get('short_desc', 'See documentation')
+            f.write(f"| **{method}** | {category} | {uses_tgt_pbo} | {uses_tgt_trt} | {uses_src} | {desc} |\n")
         f.write("\n")
+        
+        # Detailed method descriptions with pseudo-code
+        f.write("### 4.2 Method Implementation Details\n\n")
+        for method in methods_in_sweep:
+            details = _get_method_details(method)
+            f.write(f"#### {method}\n\n")
+            f.write(f"**Category:** {details.get('category', 'Unknown')}\n\n")
+            f.write(f"**Description:** {details.get('short_desc', 'See documentation')}\n\n")
+            
+            # Data requirements
+            reqs = []
+            if details.get('uses_target_placebo', False):
+                reqs.append("Target placebo (A=0)")
+            if details.get('uses_target_treated', False):
+                reqs.append("Target treated (A=1)")
+            if details.get('uses_source', False):
+                reqs.append("Source data")
+            f.write(f"**Data Requirements:** {', '.join(reqs) if reqs else 'None'}\n\n")
+            
+            # Pseudo-code
+            pseudo = details.get('pseudo_code', 'Not documented')
+            if pseudo and pseudo != 'Not documented':
+                f.write("**Pseudo-code:**\n")
+                f.write("```\n")
+                f.write(pseudo.strip())
+                f.write("\n```\n\n")
+            
+            # Reference
+            ref = details.get('reference', 'N/A')
+            if ref and ref != 'N/A':
+                f.write(f"**Reference:** {ref}\n\n")
+            
+            f.write("---\n\n")
         
         # =====================================================================
         # 5. EXPERIMENT SUMMARY
@@ -1961,48 +2114,619 @@ def generate_sweep_report(
 def _get_param_description(param: str) -> str:
     """Get human-readable description for a DGP parameter."""
     descriptions = {
-        'm0': 'Target placebo sample size',
-        'm1': 'Target treated sample size (if any)',
-        'n_proxy_total': 'Total source/proxy observations',
-        'C_sources': 'Number of source sites',
-        'nontransfer_scale': 'Scale of non-transferable component (σ)',
-        'imbalance_ratio': 'Max/min site size ratio',
-        'shift_strength': 'Covariate shift magnitude',
-        'overlap_strength': 'Support overlap parameter',
-        'a5_nonlin_strength': 'Nonlinearity strength in correction',
-        'a6_rank_true': 'True rank of transfer operator',
-        'a6_rank_fit': 'Fitted rank of transfer operator',
+        # Target site parameters
+        'm0': 'Target placebo/control sample size (n₀)',
+        'm1': 'Target treated sample size (n₁). If 0, only Option B methods are feasible.',
+        
+        # Source site parameters
+        'n_proxy_total': 'Total source/proxy observations across all sites',
+        'C_sources': 'Number of source sites (K)',
+        'imbalance_ratio': 'Max/min site size ratio for unbalanced source sites',
+        
+        # DGP type
+        'use_l1tcl_dgp': 'If True, use L1-TCL DGP (constant τ, PS-based transfer)',
+        
+        # L1-TCL specific parameters
+        'p_dim': 'Covariate dimension (d). Higher d = harder estimation.',
+        'a5_effective_sparsity': 'Fraction of coefficients differing source→target (s/d)',
+        
+        # Transfer/shift parameters
+        'nontransfer_scale': 'Scale of non-transferable component (σᵥ). Higher = less transfer benefit.',
+        'shift_strength': 'Covariate shift magnitude between sites',
+        'overlap_strength': 'Support overlap parameter (λ)',
+        'overlap_lambda': 'Covariate distribution divergence (0=identical, 1=disjoint)',
+        'intercept_drift_scale': 'Scale of arm-specific intercept drift across sites',
+        
+        # Model complexity
+        'a5_nonlin_strength': 'Nonlinearity strength in correction term',
+        'a6_rank_true': 'True rank of transfer operator M',
+        'a6_rank_fit': 'Fitted rank of transfer operator M',
+        
+        # Miscellaneous
+        'seed': 'Random seed for reproducibility',
+        'n_test': 'Size of held-out test set for evaluation',
     }
-    return descriptions.get(param, 'See documentation')
+    return descriptions.get(param, f'Parameter: {param}')
+
+
+# =============================================================================
+# Method Documentation with Pseudo-code
+# =============================================================================
+
+METHOD_DETAILS = {
+    # -------------------------------------------------------------------------
+    # Baselines
+    # -------------------------------------------------------------------------
+    'TargetOnlyDR': {
+        'short_desc': 'Target-only DR learner (no transfer)',
+        'category': 'Baseline',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': False,
+        'pseudo_code': '''
+1. Fit μ̂₀(x) on target controls: (X_target[A=0], Y_target[A=0])
+2. Fit μ̂₁(x) on target treated: (X_target[A=1], Y_target[A=1])
+3. Compute DR pseudo-outcomes on target:
+   Γᵢ = (Aᵢ/ê)(Yᵢ - μ̂₁(Xᵢ)) + μ̂₁(Xᵢ) - ((1-Aᵢ)/(1-ê))(Yᵢ - μ̂₀(Xᵢ)) - μ̂₀(Xᵢ)
+4. Fit τ̂(x) on (X_target, Γ) using Lasso
+''',
+        'reference': 'Kennedy (2020) - Doubly Robust Learner'
+    },
+    
+    'NoTransfer': {
+        'short_desc': 'Target-only DR learner (alias for TargetOnlyDR)',
+        'category': 'Baseline',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': False,
+        'pseudo_code': '(Same as TargetOnlyDR)',
+        'reference': 'Kennedy (2020)'
+    },
+    
+    'ProxyOnly': {
+        'short_desc': 'Source-only proxy (no target correction)',
+        'category': 'Baseline',
+        'uses_target_placebo': False,
+        'uses_target_treated': False,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Pool all source data by treatment arm
+2. Fit μ̂₀^src(x) on source controls
+3. Fit μ̂₁^src(x) on source treated
+4. Predict: τ̂(x) = μ̂₁^src(x) - μ̂₀^src(x)
+''',
+        'reference': 'Naive source pooling baseline'
+    },
+    
+    # -------------------------------------------------------------------------
+    # Anchor Methods
+    # -------------------------------------------------------------------------
+    'AnchorOnly': {
+        'short_desc': 'Placebo-anchored with DR (needs target treated)',
+        'category': 'Anchor',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Fit source proxy: μ̂₀^src(x) on pooled source controls
+2. Compute residuals on target placebo: δ̂₀(x) = Y - μ̂₀^src(X)
+3. Fit correction: δ̂₀(x) using Lasso on target placebo residuals
+4. Corrected μ̂₀(x) = μ̂₀^src(x) + δ̂₀(x)
+5. Fit μ̂₁(x) directly on target treated
+6. DR pseudo-outcomes + CATE model
+''',
+        'reference': 'Placebo-anchored transfer'
+    },
+    
+    'AnchorPlugin': {
+        'short_desc': 'Placebo-anchored plug-in (no DR)',
+        'category': 'Anchor',
+        'uses_target_placebo': True,
+        'uses_target_treated': False,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Fit source proxy: μ̂₀^src(x), μ̂₁^src(x)
+2. Compute residuals on target placebo
+3. Fit correction δ̂₀(x) on residuals
+4. Plug-in: τ̂(x) = μ̂₁^src(x) - (μ̂₀^src(x) + δ̂₀(x))
+   (No DR pseudo-outcomes, no target treated needed)
+''',
+        'reference': 'Plug-in variant of anchor'
+    },
+    
+    # -------------------------------------------------------------------------
+    # Proposed Methods (Option A)
+    # -------------------------------------------------------------------------
+    'ProposedA': {
+        'short_desc': 'Proposed: separate proxy + separate correction',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1 (Proxy): Fit μ̂₀^src, μ̂₁^src on source data
+Stage 2 (Correction): 
+  - Fit δ̂₀(x) on target placebo residuals: Y₀ - μ̂₀^src(X)
+  - Fit δ̂₁(x) on target treated residuals: Y₁ - μ̂₁^src(X)
+Stage 3 (DR):
+  - μ̂ₐ(x) = μ̂ₐ^src(x) + δ̂ₐ(x) for a ∈ {0,1}
+  - Compute DR pseudo-outcomes, fit τ̂(x)
+''',
+        'reference': 'Our proposed method'
+    },
+    
+    'ProposedA_Together': {
+        'short_desc': 'Proposed: joint correction δ(X, A)',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1: Fit separate μ̂₀^src, μ̂₁^src
+Stage 2: Fit JOINT correction δ̂(X, A) on all target data
+  - Augmented features: [X, A]
+  - Residuals: Y - μ̂_A^src(X)
+Stage 3: DR with corrected outcomes
+''',
+        'reference': 'Joint correction variant'
+    },
+    
+    # -------------------------------------------------------------------------
+    # Proposed Methods (Option B - Disconnected Target)
+    # -------------------------------------------------------------------------
+    'ProposedB_SourceDR': {
+        'short_desc': 'Proposed B: source-DR for placebo-only target',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': False,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1 (Proxy): Fit μ̂₀^src, μ̂₁^src on source
+Stage 2 (Correction): Fit δ̂₀(x) on target placebo residuals
+Step B (Transfer): Learn M from source to transfer δ̂₁ = M·δ̂₀
+Stage 3 (Source-DR): 
+  - Compute DR pseudo-outcomes on SOURCE data
+  - Transfer CATE model to target via learned weights
+''',
+        'reference': 'For disconnected target (m₁=0)'
+    },
+    
+    'ProposedB_LinearStepB': {
+        'short_desc': 'Proposed B: linear Step B transfer',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1: Fit μ̂₀^src, μ̂₁^src on source
+Stage 2: Fit δ̂₀(x) on target placebo
+Step B: Learn linear M from source: δ₁ ≈ M·δ₀
+  - Transferred: δ̂₁(x) = M·δ̂₀(x)
+Stage 3: DR on target (still needs target treated)
+''',
+        'reference': 'Linear transfer operator'
+    },
+    
+    # -------------------------------------------------------------------------
+    # glmtrans Methods (Tian & Feng 2023)
+    # -------------------------------------------------------------------------
+    'Glmtrans_Auto': {
+        'short_desc': 'glmtrans with auto source detection',
+        'category': 'Transfer Learning',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+For each outcome model (μ₀ and μ₁):
+  1. SOURCE DETECTION: Identify transferable sources
+     - Fit target-only model, compute CV loss L_target
+     - For each source k: compute loss L_k
+     - Source k transferable if L_k ≤ C₀ · L_target
+  2. TRANSFER STEP: Pool transferable sources
+     - Fit elastic-net on pooled source data → ŵ_A
+  3. DEBIAS STEP: Correct on target
+     - Compute residuals: r = Y_target - X_target · ŵ_A
+     - Fit elastic-net on residuals → δ̂_A
+  4. FINAL: β̂ = ŵ_A + δ̂_A
+
+CATE: τ̂(x) = μ̂₁(x) - μ̂₀(x)
+''',
+        'reference': 'Tian & Feng (2023) JASA'
+    },
+    
+    'Glmtrans_All': {
+        'short_desc': 'glmtrans using all sources',
+        'category': 'Transfer Learning',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Same as Glmtrans_Auto but skip source detection:
+  - Use ALL sources in transfer step
+  - No filtering of non-transferable sources
+''',
+        'reference': 'Tian & Feng (2023) JASA'
+    },
+    
+    'Glmtrans_DR': {
+        'short_desc': 'glmtrans with DR pseudo-outcomes',
+        'category': 'Transfer Learning',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Fit μ̂₀, μ̂₁ using glmtrans (auto detection)
+2. Compute DR pseudo-outcomes on target:
+   Γᵢ = (Aᵢ/ê)(Yᵢ - μ̂₁) + μ̂₁ - ((1-Aᵢ)/(1-ê))(Yᵢ - μ̂₀) - μ̂₀
+3. Fit τ̂(x) on (X_target, Γ) using Lasso
+''',
+        'reference': 'glmtrans + DR combination'
+    },
+    
+    'Glmtrans_ElasticNet': {
+        'short_desc': 'glmtrans with elastic-net (α=0.5)',
+        'category': 'Transfer Learning',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Same as Glmtrans_Auto but with α=0.5:
+  - Penalty: (1-α)/2·||β||₂² + α·||β||₁
+  - α=0.5 balances L1 (sparsity) and L2 (grouping)
+''',
+        'reference': 'Tian & Feng (2023) JASA'
+    },
+    
+    'Glmtrans_OptionB': {
+        'short_desc': 'Option B: glmtrans source detection + Source-DR CATE',
+        'category': 'Transfer Learning',
+        'uses_target_placebo': True,
+        'uses_target_treated': False,  # KEY: Does NOT require target treated
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 0 (Source Detection - Control Arm Only):
+  - Run glmtrans on control arm: target placebo vs source controls
+  - Identify transferable sources: Ŝ₀ = {k : loss_k ≤ C₀ · loss_target}
+  - This uses only Y_target(0), NO target treated needed
+
+Step 1 (Restrict to Selected Sources):
+  - Form restricted source data: D_src^good = ∪_{k ∈ Ŝ₀} D_k
+  - No weighting, just selection (deterministic)
+
+Step 2 (Source-DR CATE):
+  - Fit μ̂₀^src, μ̂₁^src on selected sources
+  - Estimate ê^src on selected sources
+  - Compute DR pseudo-outcomes on SOURCES:
+    Γᵢ = μ̂₁(Xᵢ) - μ̂₀(Xᵢ) + (Aᵢ-ê)/(ê(1-ê)) · residual
+  - Fit τ̂^src(x) on source pseudo-outcomes
+
+Step 3 (Transport to Target):
+  - τ̂_target(x) := τ̂^src(x)  (direct transport)
+  - No further correction (no target treated data)
+
+KEY: Theoretically valid for placebo-only target (m₁=0)
+''',
+        'reference': 'Advisor construction: glmtrans screening + source-DR transport'
+    },
+    
+    # -------------------------------------------------------------------------
+    # Transport Baselines
+    # -------------------------------------------------------------------------
+    'IPWTransport': {
+        'short_desc': 'IPW-weighted outcome models',
+        'category': 'Transport',
+        'uses_target_placebo': True,
+        'uses_target_treated': False,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Estimate site membership: P(S=target|X)
+2. Compute IPW weights: w(x) = P(S=target|X) / P(S=source|X)
+3. Fit weighted outcome models on source:
+   μ̂ₐ = argmin Σᵢ wᵢ·(Yᵢ - μ(Xᵢ))²
+4. Predict: τ̂(x) = μ̂₁(x) - μ̂₀(x)
+''',
+        'reference': 'Hong et al. - IPW transport'
+    },
+    
+    'EntropyBalancing': {
+        'short_desc': 'Entropy balancing weights',
+        'category': 'Transport',
+        'uses_target_placebo': True,
+        'uses_target_treated': False,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Find weights w that balance source to target:
+   Σᵢ wᵢ·Xᵢ = X̄_target (moment matching)
+   max Σᵢ wᵢ·log(wᵢ) (max entropy)
+2. Fit weighted outcome models
+3. Predict: τ̂(x) = μ̂₁(x) - μ̂₀(x)
+''',
+        'reference': 'Hainmueller (2012)'
+    },
+    
+    'OutcomeModelTransport': {
+        'short_desc': 'Unweighted outcome models',
+        'category': 'Transport',
+        'uses_target_placebo': True,
+        'uses_target_treated': False,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Fit outcome models on source (unweighted):
+   μ̂ₐ^src on (X_source[A=a], Y_source[A=a])
+2. Predict on target: τ̂(x) = μ̂₁^src(x) - μ̂₀^src(x)
+   (Assumes outcome model generalizes across sites)
+''',
+        'reference': 'Baseline - no reweighting'
+    },
+    
+    # -------------------------------------------------------------------------
+    # DR Learner Variants (Pooled Data)
+    # -------------------------------------------------------------------------
+    'DRLearner_PooledWithSite': {
+        'short_desc': 'DR learner on pooled data with site indicator',
+        'category': 'DR Learner',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Pool source + target data
+2. Fit nuisance models including site as covariate:
+   - μ̂₀(X, S), μ̂₁(X, S), ê(X, S)
+3. Compute DR pseudo-outcomes on pooled data
+4. Fit τ̂(X, S) including site indicator
+5. Predict: τ̂_target(x) = τ̂(x, S=target)
+''',
+        'reference': 'DR Learner with site adjustment'
+    },
+    
+    'DRLearner_PooledNoSite': {
+        'short_desc': 'DR learner on pooled data (no site indicator)',
+        'category': 'DR Learner',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Pool source + target data (ignore site)
+2. Fit nuisance models on pooled X:
+   - μ̂₀(X), μ̂₁(X), ê(X)
+3. Compute DR pseudo-outcomes on pooled data
+4. Fit τ̂(X) on pooled pseudo-outcomes
+5. Predict: τ̂(x) for any x
+   (Assumes no site-specific effects)
+''',
+        'reference': 'Simple pooled DR Learner'
+    },
+    
+    # -------------------------------------------------------------------------
+    # Additional Proposed Variants
+    # -------------------------------------------------------------------------
+    'ProposedA_JointProxy': {
+        'short_desc': 'Proposed: joint proxy μ(X, A)',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1: Fit JOINT proxy μ̂^src(X, A) on source
+  - Augmented features: [X, A]
+Stage 2: Fit separate corrections δ̂₀, δ̂₁ on target
+Stage 3: DR on target
+''',
+        'reference': 'Joint proxy variant'
+    },
+    
+    'ProposedA_FullyJoint': {
+        'short_desc': 'Proposed: joint proxy + joint correction',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1: Fit JOINT proxy μ̂^src(X, A) on source
+Stage 2: Fit JOINT correction δ̂(X, A) on target
+  - Both stages share treatment arm via augmentation
+Stage 3: DR on target
+''',
+        'reference': 'Fully joint variant'
+    },
+    
+    'ProposedA_Direct': {
+        'short_desc': 'Proposed: separate + direct fitting',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1: Fit μ̂₀^src, μ̂₁^src on source
+Stage 2 (Direct): Fit μ̂₀, μ̂₁ directly on target Y
+  - NOT on residuals, but warm-started from proxy
+Stage 3: DR on target
+''',
+        'reference': 'Direct fitting variant'
+    },
+    
+    'ProposedA_Together_Direct': {
+        'short_desc': 'Proposed: joint correction + direct',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1: Fit separate proxy models
+Stage 2 (Direct): Fit joint μ̂(X, A) directly on target Y
+  - Warm-started from proxy
+Stage 3: DR on target
+''',
+        'reference': 'Direct + joint variant'
+    },
+    
+    'ProposedA_JointProxy_Direct': {
+        'short_desc': 'Proposed: joint proxy + direct',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1: Fit JOINT proxy μ̂^src(X, A)
+Stage 2 (Direct): Fit corrections directly on Y
+Stage 3: DR on target
+''',
+        'reference': 'Joint proxy + direct variant'
+    },
+    
+    'ProposedA_FullyDirect': {
+        'short_desc': 'Proposed: fully joint + direct',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1: Fit JOINT proxy μ̂^src(X, A) on source
+Stage 2 (Direct): Fit JOINT correction directly on target Y
+  - Augmented features: [X, A]
+  - Warm-started from joint proxy
+Stage 3: DR on target
+
+Key: Both proxy and correction use shared (X, A) representation
+''',
+        'reference': 'Fully joint + direct variant'
+    },
+    
+    # No cross-fitting variants
+    'ProposedA_NoCrossfit': {
+        'short_desc': 'Proposed: residual, no cross-fitting',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Same as ProposedA but without sample splitting:
+- Nuisance models fit on full target data
+- Pseudo-outcomes computed on same data
+- Faster but may introduce bias
+''',
+        'reference': 'Non-sample-split variant'
+    },
+    
+    'ProposedA_Direct_NoCrossfit': {
+        'short_desc': 'Proposed: direct, no cross-fitting',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Same as ProposedA_Direct without sample splitting:
+- Direct fitting on full target data
+- No cross-validation for nuisance
+''',
+        'reference': 'Direct + non-sample-split'
+    },
+    
+    'ProposedA_Together_NoCrossfit': {
+        'short_desc': 'Proposed: joint + no cross-fitting',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Same as ProposedA_Together without sample splitting
+''',
+        'reference': 'Joint + non-sample-split'
+    },
+    
+    'ProposedA_Together_Direct_NoCrossfit': {
+        'short_desc': 'Proposed: joint + direct + no cross-fitting',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Same as ProposedA_Together_Direct without sample splitting
+''',
+        'reference': 'Joint + direct + non-sample-split'
+    },
+    
+    # -------------------------------------------------------------------------
+    # Other Transport Baselines
+    # -------------------------------------------------------------------------
+    'HongTwoStage': {
+        'short_desc': 'Hong two-stage transport',
+        'category': 'Transport',
+        'uses_target_placebo': True,
+        'uses_target_treated': False,
+        'uses_source': True,
+        'pseudo_code': '''
+Stage 1: Estimate sampling weights
+  - P(S=target|X) via logistic regression
+  - w(x) = P(target|x) / P(source|x)
+Stage 2: Fit weighted outcome models
+  - μ̂ₐ = weighted least squares on source
+''',
+        'reference': 'Hong et al. - two-stage transport'
+    },
+    
+    'AIPWTransport': {
+        'short_desc': 'AIPW transport estimator',
+        'category': 'Transport',
+        'uses_target_placebo': True,
+        'uses_target_treated': False,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Estimate site probability P(S=target|X)
+2. Compute AIPW estimate for target population:
+   Uses both outcome modeling and IPW
+''',
+        'reference': 'AIPW for transportability'
+    },
+    
+    'IPD_RE': {
+        'short_desc': 'IPD random effects meta-analysis',
+        'category': 'Transport',
+        'uses_target_placebo': True,
+        'uses_target_treated': False,
+        'uses_source': True,
+        'pseudo_code': '''
+1. Fit outcome model with random site intercepts:
+   Y = μ(X) + αₛ + ε, αₛ ~ N(0, σ²)
+2. Predict on target using population-average
+''',
+        'reference': 'Random effects IPD meta-analysis'
+    },
+    
+    'ProposedB_KernelStepB': {
+        'short_desc': 'Proposed B: kernel Step B transfer',
+        'category': 'Proposed',
+        'uses_target_placebo': True,
+        'uses_target_treated': True,
+        'uses_source': True,
+        'pseudo_code': '''
+Same as ProposedB_LinearStepB but with kernel M:
+- Learn non-linear mapping from δ₀ to δ₁ on source
+- Transfer via kernel ridge regression
+''',
+        'reference': 'Kernel transfer operator'
+    },
+}
 
 
 def _get_method_description(method: str) -> str:
-    """Get human-readable description for a method."""
-    descriptions = {
-        'NoTransfer': 'Uses only target placebo, no transfer',
-        'ProxyOnly': 'Uses only source data, ignores target',
-        'AnchorOnly': 'Uses only target placebo data',
-        # Residual mode variants
-        'ProposedA': 'Proposed: separate proxy + separate correction (residual)',
-        'ProposedA_Together': 'Proposed: separate proxy + joint correction (residual)',
-        'ProposedA_JointProxy': 'Proposed: joint proxy + separate correction (residual)',
-        'ProposedA_FullyJoint': 'Proposed: joint proxy + joint correction (residual)',
-        # Direct mode variants
-        'ProposedA_Direct': 'Proposed: separate + direct fitting',
-        'ProposedA_Together_Direct': 'Proposed: joint correction + direct fitting',
-        'ProposedA_JointProxy_Direct': 'Proposed: joint proxy + direct fitting',
-        'ProposedA_FullyDirect': 'Proposed: fully joint + direct fitting',
-        # No cross-fitting variants
-        'ProposedA_NoCrossfit': 'Proposed: residual, no cross-fitting',
-        'ProposedA_Direct_NoCrossfit': 'Proposed: direct, no cross-fitting',
-        'ProposedA_Together_NoCrossfit': 'Proposed: joint + no cross-fitting',
-        'ProposedA_Together_Direct_NoCrossfit': 'Proposed: joint + direct + no cross-fitting',
-        # Option B
-        'ProposedB_LinearStepB': 'Proposed (Option B): placebo-anchored with linear Step B',
-        'ProposedB_SourceDR': 'Proposed (Option B): source-DR for placebo-only target',
-        'ProposedB_KernelStepB': 'Proposed (Option B): placebo-anchored with kernel Step B',
-    }
-    return descriptions.get(method, 'See documentation')
+    """Get short description for a method."""
+    if method in METHOD_DETAILS:
+        return METHOD_DETAILS[method]['short_desc']
+    return 'See documentation'
+
+
+def _get_method_details(method: str) -> dict:
+    """Get full details for a method including pseudo-code."""
+    return METHOD_DETAILS.get(method, {
+        'short_desc': 'Unknown method',
+        'category': 'Unknown',
+        'uses_target_placebo': False,
+        'uses_target_treated': False,
+        'uses_source': False,
+        'pseudo_code': 'Not documented',
+        'reference': 'N/A'
+    })
 
 
 def _generate_findings(sweep_name: str, df_agg: pd.DataFrame, config: dict) -> List[str]:
@@ -2232,11 +2956,11 @@ Examples:
     )
     parser.add_argument('--sweep', type=str, default='all',
                        choices=['gold', 'gold_option_a', 'proxy', 'imbalance', 
-                                'gold_fair', 'snr_ladder', 'overlap_ladder', 'drift_ladder',
+                                'gold_fair', 'gold_fair_dim', 'snr_ladder', 'overlap_ladder', 'drift_ladder',
                                 'l1tcl', 'l1tcl_source_size', 'l1tcl_dim', 'l1tcl_sparsity', 
                                 'l1tcl_gold', 'l1tcl_gold_dim', 'l1tcl_full',
                                 'all', 'all_fair'],
-                       help='Sweep to run (default: all). Fair sweeps: gold_fair, snr_ladder, overlap_ladder, drift_ladder. '
+                       help='Sweep to run (default: all). Fair sweeps: gold_fair, gold_fair_dim, snr_ladder, overlap_ladder, drift_ladder. '
                             'L1-TCL sweeps: l1tcl, l1tcl_source_size, l1tcl_dim, l1tcl_sparsity, l1tcl_gold, l1tcl_gold_dim, l1tcl_full')
     parser.add_argument('--n_rep', type=int, default=20,
                        help='Number of MC replicates (default: 20)')
@@ -2286,7 +3010,7 @@ Examples:
         )
     elif args.sweep == 'all_fair':
         # Run all fair sweeps
-        fair_sweeps = ['gold_fair', 'snr_ladder', 'overlap_ladder', 'drift_ladder']
+        fair_sweeps = ['gold_fair', 'gold_fair_dim', 'snr_ladder', 'overlap_ladder', 'drift_ladder']
         for sweep_name in fair_sweeps:
             if not args.quiet:
                 print(f"\n{'='*70}")

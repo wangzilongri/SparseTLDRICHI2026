@@ -620,6 +620,62 @@ METHOD_REGISTRY: Dict[str, MethodSpec] = {
         uses_source_data=True,
         description="TARNet representation learning"
     ),
+    
+    # =========================================================================
+    # glmtrans Transfer Learning Methods (Tian & Feng 2023)
+    # Uses R glmtrans package for two-step transfer learning in GLMs
+    # =========================================================================
+    
+    "Glmtrans_Auto": MethodSpec(
+        method="Glmtrans_Auto",
+        feasibility_restricted=Feasibility.ORACLE_TARGET_TREATED,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="glmtrans with automatic source detection (plug-in)"
+    ),
+    
+    "Glmtrans_All": MethodSpec(
+        method="Glmtrans_All",
+        feasibility_restricted=Feasibility.ORACLE_TARGET_TREATED,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="glmtrans using all sources (plug-in)"
+    ),
+    
+    "Glmtrans_DR": MethodSpec(
+        method="Glmtrans_DR",
+        feasibility_restricted=Feasibility.ORACLE_TARGET_TREATED,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="glmtrans with DR pseudo-outcomes"
+    ),
+    
+    "Glmtrans_ElasticNet": MethodSpec(
+        method="Glmtrans_ElasticNet",
+        feasibility_restricted=Feasibility.ORACLE_TARGET_TREATED,
+        feasibility_oracle=Feasibility.ORACLE_TARGET_TREATED,
+        uses_target_placebo=True,
+        uses_target_treated=True,
+        uses_source_data=True,
+        description="glmtrans with elastic-net (alpha=0.5)"
+    ),
+    
+    # Glmtrans Option B: Source detection + Source-DR for placebo-only target
+    "Glmtrans_OptionB": MethodSpec(
+        method="Glmtrans_OptionB",
+        feasibility_restricted=Feasibility.FEASIBLE_RESTRICTED,  # Works with placebo-only!
+        feasibility_oracle=Feasibility.FEASIBLE_RESTRICTED,
+        uses_target_placebo=True,
+        uses_target_treated=False,  # Does NOT require target treated
+        uses_source_data=True,
+        description="Option B: glmtrans source detection + Source-DR CATE (placebo-only target)"
+    ),
 }
 
 
