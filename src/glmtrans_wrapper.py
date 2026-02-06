@@ -7,6 +7,14 @@ via subprocess or rpy2 for transfer learning in high-dimensional GLMs.
 Reference:
     Tian, Y., & Feng, Y. (2023). Transfer learning under high-dimensional 
     generalized linear models. JASA, 118(544), 2684-2697.
+
+Setup:
+    To install R dependencies:
+        python -m glmtrans_wrapper --setup
+    
+    Or from Python:
+        from glmtrans_wrapper import setup_glmtrans
+        setup_glmtrans()
 """
 
 import numpy as np
@@ -17,6 +25,15 @@ import json
 from typing import Dict, List, Optional, Tuple, Any, Union
 from pathlib import Path
 import warnings
+import sys
+
+# Try to import pandas, but make it optional
+try:
+    import pandas as pd
+    HAS_PANDAS = True
+except ImportError:
+    HAS_PANDAS = False
+    pd = None
 
 
 # Path to the R script
@@ -24,8 +41,24 @@ R_SCRIPT_PATH = Path(__file__).parent / "glmtrans_estimators.R"
 R_LIBS_PATH = Path(__file__).parent.parent / "R_libs"
 
 
-def _check_r_available() -> bool:
-    """Check if R and glmtrans are available."""
+# =============================================================================
+# Setup and Installation Functions
+# =============================================================================
+
+def _check_r_installed() -> bool:
+    """Check if R/Rscript is installed on the system."""
+    try:
+        result = subprocess.run(
+            ["Rscript", "--version"],
+            capture_output=True, text=True, timeout=10
+        )
+        return result.returncode == 0
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
+
+def _check_glmtrans_installed() -> bool:
+    """Check if glmtrans R package is installed."""
     try:
         result = subprocess.run(
             ["Rscript", "-e", "library(glmtrans); cat('OK')"],
@@ -35,6 +68,177 @@ def _check_r_available() -> bool:
         return "OK" in result.stdout
     except (subprocess.SubprocessError, FileNotFoundError):
         return False
+
+
+def _check_r_available() -> bool:
+    """Check if R and glmtrans are available."""
+    return _check_r_installed() and _check_glmtrans_installed()
+
+
+def setup_glmtrans(verbose: bool = True) -> bool:
+    """
+    Setup and install glmtrans R package if needed.
+    
+    This function:
+    1. Checks if R is installed
+    2. Creates a local R library directory
+    3. Installs glmtrans and dependencies if not present
+    
+    Parameters
+    ----------
+    verbose : bool
+        Print progress messages
+        
+    Returns
+    -------
+    success : bool
+        True if glmtrans is available after setup
+        
+    Example
+    -------
+    >>> from glmtrans_wrapper import setup_glmtrans
+    >>> if setup_glmtrans():
+    ...     print("glmtrans ready!")
+    """
+    if verbose:
+        print("=" * 60)
+        print("Setting up glmtrans R package")
+        print("=" * 60)
+    
+    # Step 1: Check if R is installed
+    if verbose:
+        print("\n1. Checking R installation...")
+    
+    if not _check_r_installed():
+        print("   ERROR: R/Rscript not found in PATH")
+        print("   Please install R from https://cran.r-project.org/")
+        return False
+    
+    if verbose:
+        print("   ✓ R is installed")
+    
+    # Step 2: Create local library directory
+    if verbose:
+        print(f"\n2. Setting up R library at {R_LIBS_PATH}...")
+    
+    R_LIBS_PATH.mkdir(parents=True, exist_ok=True)
+    
+    if verbose:
+        print(f"   ✓ Library directory ready")
+    
+    # Step 3: Check if glmtrans is already installed
+    if verbose:
+        print("\n3. Checking glmtrans package...")
+    
+    if _check_glmtrans_installed():
+        if verbose:
+            print("   ✓ glmtrans is already installed and working")
+        return True
+    
+    # Step 4: Install glmtrans
+    if verbose:
+        print("   Installing glmtrans (this may take a few minutes)...")
+    
+    install_script = f'''
+# Set library path
+.libPaths(c("{R_LIBS_PATH}", .libPaths()))
+
+# Install glmtrans if not available
+if (!requireNamespace("glmtrans", quietly = TRUE)) {{
+    cat("Installing glmtrans from CRAN...\\n")
+    install.packages("glmtrans", lib = "{R_LIBS_PATH}", 
+                     repos = "https://cloud.r-project.org",
+                     dependencies = TRUE)
+}}
+
+# Install glmnet if not available (dependency)
+if (!requireNamespace("glmnet", quietly = TRUE)) {{
+    cat("Installing glmnet from CRAN...\\n")
+    install.packages("glmnet", lib = "{R_LIBS_PATH}",
+                     repos = "https://cloud.r-project.org",
+                     dependencies = TRUE)
+}}
+
+# Verify installation
+library(glmtrans)
+library(glmnet)
+cat("\\nInstallation successful!\\n")
+cat("glmtrans version:", as.character(packageVersion("glmtrans")), "\\n")
+'''
+    
+    try:
+        result = subprocess.run(
+            ["Rscript", "-e", install_script],
+            capture_output=True, text=True, timeout=600,  # 10 min timeout
+            env={**os.environ, "R_LIBS_USER": str(R_LIBS_PATH)}
+        )
+        
+        if verbose:
+            if result.stdout:
+                for line in result.stdout.strip().split('\n'):
+                    print(f"   {line}")
+            if result.stderr and result.returncode != 0:
+                for line in result.stderr.strip().split('\n')[:10]:
+                    print(f"   [stderr] {line}")
+        
+        if result.returncode != 0:
+            print(f"   ERROR: Installation failed with code {result.returncode}")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print("   ERROR: Installation timed out")
+        return False
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        return False
+    
+    # Step 5: Verify installation
+    if verbose:
+        print("\n4. Verifying installation...")
+    
+    if _check_glmtrans_installed():
+        if verbose:
+            print("   ✓ glmtrans is now available!")
+            print("\n" + "=" * 60)
+            print("Setup complete! You can now use glmtrans methods.")
+            print("=" * 60)
+        return True
+    else:
+        print("   ERROR: Installation verification failed")
+        return False
+
+
+def get_glmtrans_status() -> Dict[str, Any]:
+    """
+    Get detailed status of glmtrans availability.
+    
+    Returns
+    -------
+    status : dict
+        Dictionary with:
+        - r_installed: bool
+        - glmtrans_installed: bool
+        - r_libs_path: str
+        - available: bool
+        - message: str
+    """
+    r_installed = _check_r_installed()
+    glmtrans_installed = _check_glmtrans_installed() if r_installed else False
+    
+    if not r_installed:
+        message = "R is not installed. Install from https://cran.r-project.org/"
+    elif not glmtrans_installed:
+        message = f"glmtrans not installed. Run: python -m glmtrans_wrapper --setup"
+    else:
+        message = "glmtrans is available and ready"
+    
+    return {
+        'r_installed': r_installed,
+        'glmtrans_installed': glmtrans_installed,
+        'r_libs_path': str(R_LIBS_PATH),
+        'available': r_installed and glmtrans_installed,
+        'message': message
+    }
 
 
 def _array_to_r_matrix(arr: np.ndarray, name: str) -> str:
