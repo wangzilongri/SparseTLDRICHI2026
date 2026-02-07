@@ -25,6 +25,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
+import traceback as tb_module
 
 # Add paths
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -333,18 +334,9 @@ class IHDPRepResult:
     runtime_seconds: float
 
 
-def run_single_ihdp_replication(args: Tuple) -> List[IHDPRepResult]:
+def _run_single_ihdp_replication_inner(args: Tuple) -> List[IHDPRepResult]:
     """
-    Run one replication of IHDP benchmark.
-    
-    Parameters
-    ----------
-    args : tuple
-        (scenario, methods, rep_id, base_seed, verbose)
-        
-    Returns
-    -------
-    results : list of IHDPRepResult
+    Inner implementation: Run one replication of IHDP benchmark.
     """
     scenario, methods, rep_id, base_seed, verbose = args
     
@@ -361,7 +353,7 @@ def run_single_ihdp_replication(args: Tuple) -> List[IHDPRepResult]:
         data = data_gen(scenario, seed)
     except Exception as e:
         if verbose:
-            print(f"  [Rep {rep_id}] Data generation failed: {e}")
+            print(f"  [Rep {rep_id}] Data generation failed: {e}", flush=True)
         return []
     
     results = []
@@ -371,7 +363,7 @@ def run_single_ihdp_replication(args: Tuple) -> List[IHDPRepResult]:
         # Check method availability
         if method_name not in method_factories:
             if verbose:
-                print(f"  [Rep {rep_id}] Method {method_name} not available, skipping")
+                print(f"  [Rep {rep_id}] Method {method_name} not available, skipping", flush=True)
             continue
         
         # Check feasibility
@@ -449,7 +441,7 @@ def run_single_ihdp_replication(args: Tuple) -> List[IHDPRepResult]:
             
         except Exception as e:
             if verbose:
-                print(f"  [Rep {rep_id}] {method_name} failed: {e}")
+                print(f"  [Rep {rep_id}] {method_name} failed: {e}", flush=True)
             runtime = time.time() - start_time
             result = IHDPRepResult(
                 scenario=scenario,
@@ -465,6 +457,26 @@ def run_single_ihdp_replication(args: Tuple) -> List[IHDPRepResult]:
         results.append(result)
     
     return results
+
+
+def run_single_ihdp_replication(args: Tuple) -> List[IHDPRepResult]:
+    """
+    Top-level wrapper with full error catching for subprocess safety.
+    
+    Catches ALL exceptions (including unexpected ones that would kill workers
+    silently in ProcessPoolExecutor).
+    """
+    try:
+        return _run_single_ihdp_replication_inner(args)
+    except BaseException as e:
+        # Catch absolutely everything including SystemExit, KeyboardInterrupt
+        rep_id = args[2] if len(args) > 2 else '?'
+        msg = f"[Rep {rep_id}] WORKER CRASHED: {type(e).__name__}: {e}"
+        print(msg, flush=True)
+        tb_module.print_exc()
+        # Return empty list instead of letting the exception propagate
+        # (propagation can cause the entire pool to hang)
+        return []
 
 
 # =============================================================================
@@ -528,7 +540,7 @@ def run_ihdp_sweep(
     
     # Sanity check: run ONE task sequentially first to catch import/data errors early
     if verbose:
-        print("Sanity check: running 1 task sequentially...")
+        print("Sanity check: running 1 task sequentially...", flush=True)
     try:
         test_results = run_single_ihdp_replication(tasks[0])
         if not test_results:
@@ -537,11 +549,10 @@ def run_ihdp_sweep(
             print("Aborting sweep.")
             return pd.DataFrame()
         else:
-            print(f"Sanity check passed: {len(test_results)} results from 1 task.")
+            print(f"Sanity check passed: {len(test_results)} results from 1 task.", flush=True)
     except Exception as e:
         print(f"ERROR: Sanity check failed with exception: {e}")
-        import traceback
-        traceback.print_exc()
+        tb_module.print_exc()
         return pd.DataFrame()
     
     # Run tasks
@@ -562,22 +573,63 @@ def run_ihdp_sweep(
             n_jobs = multiprocessing.cpu_count()
         
         if verbose:
-            print(f"Using {n_jobs} parallel workers")
+            print(f"Using {n_jobs} parallel workers", flush=True)
         
-        with ProcessPoolExecutor(max_workers=n_jobs) as executor:
-            futures = [executor.submit(run_single_ihdp_replication, task) for task in tasks]
-            
-            for future in tqdm(as_completed(futures), total=len(futures), 
-                             desc=f"Running {sweep_name}", disable=not verbose):
-                try:
-                    results = future.result()
-                    if not results:
-                        n_empty_tasks += 1
-                    all_results.extend(results)
-                except Exception as e:
-                    n_failed_tasks += 1
-                    # Always print task failures (not gated by verbose)
-                    print(f"\nTask FAILED: {e}")
+        # Use 'spawn' context to avoid fork + OpenBLAS/MKL crashes on Linux.
+        # 'fork' can cause silent segfaults when numpy/sklearn use threaded BLAS.
+        mp_context = multiprocessing.get_context('spawn')
+        
+        if verbose:
+            print(f"Multiprocessing start method: spawn (explicit)", flush=True)
+            print(f"Submitting {len(tasks)} tasks...", flush=True)
+        
+        # First: quick parallel smoke test with 2 workers
+        if verbose:
+            print("Parallel smoke test: 2 workers, 2 tasks...", flush=True)
+        try:
+            with ProcessPoolExecutor(max_workers=2, mp_context=mp_context) as test_executor:
+                test_futures = [test_executor.submit(run_single_ihdp_replication, tasks[i]) 
+                               for i in range(min(2, len(tasks)))]
+                for f in as_completed(test_futures, timeout=120):
+                    r = f.result()
+                    print(f"  Smoke test worker returned {len(r)} results", flush=True)
+            print("Parallel smoke test passed!", flush=True)
+        except Exception as e:
+            print(f"PARALLEL SMOKE TEST FAILED: {type(e).__name__}: {e}", flush=True)
+            tb_module.print_exc()
+            print("\nFalling back to sequential execution...", flush=True)
+            for task in tqdm(tasks, desc=f"Running {sweep_name} (sequential fallback)", disable=not verbose):
+                results = run_single_ihdp_replication(task)
+                if not results:
+                    n_empty_tasks += 1
+                all_results.extend(results)
+            n_jobs = 0  # Signal that we already ran sequentially
+        
+        if n_jobs > 0:
+            # Full parallel run
+            with ProcessPoolExecutor(max_workers=n_jobs, mp_context=mp_context) as executor:
+                futures = [executor.submit(run_single_ihdp_replication, task) for task in tasks]
+                
+                if verbose:
+                    print(f"All {len(futures)} futures submitted. Waiting for results...", flush=True)
+                
+                for i, future in enumerate(tqdm(as_completed(futures), total=len(futures), 
+                                 desc=f"Running {sweep_name}", disable=not verbose)):
+                    try:
+                        results = future.result(timeout=300)  # 5 min timeout per task
+                        if not results:
+                            n_empty_tasks += 1
+                        all_results.extend(results)
+                    except Exception as e:
+                        n_failed_tasks += 1
+                        # Always print task failures
+                        print(f"\nTask {i} FAILED: {type(e).__name__}: {e}", flush=True)
+                    
+                    # Periodic progress logging
+                    if verbose and (i + 1) % 50 == 0:
+                        print(f"\n  Progress: {i+1}/{len(futures)} futures done, "
+                              f"{len(all_results)} results so far, "
+                              f"{n_empty_tasks} empty, {n_failed_tasks} failed", flush=True)
     
     # Summary of task outcomes
     n_total_tasks = len(tasks)
