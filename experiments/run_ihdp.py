@@ -16,6 +16,11 @@ Usage:
     
     # Generate tables only (from existing results)
     python experiments/run_ihdp.py --tables_only --output results/ihdp
+
+    # If results are in separate folders (e.g. from remote runs), use parent path:
+    #   results/IHDP connected/results_agg_ihdp_connected_sweep.csv
+    #   results/IHDP disconnected/results_agg_ihdp_disconnected_sweep.csv
+    python experiments/run_ihdp.py --tables_only --output results
 """
 
 import os
@@ -38,14 +43,35 @@ from ihdp_sweeps import (
 # TABLE GENERATION
 # =============================================================================
 
+def _find_ihdp_agg_file(results_dir: str, filename: str) -> str:
+    """
+    Locate an IHDP aggregated CSV, checking results_dir and common subfolders.
+    Remote runs may place connected/disconnected results in separate folders.
+    """
+    candidates = [
+        os.path.join(results_dir, filename),
+        os.path.join(results_dir, 'IHDP connected', filename),
+        os.path.join(results_dir, 'ihdp_connected', filename),
+        os.path.join(results_dir, 'IHDP disconnected', filename),
+        os.path.join(results_dir, 'ihdp_disconnected', filename),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return os.path.join(results_dir, filename)  # return default for error message
+
+
 def generate_ihdp_latex_tables(results_dir: str, output_dir: str) -> None:
     """
     Generate LaTeX tables from IHDP results.
     
+    Looks for aggregated CSVs in results_dir or subfolders
+    "IHDP connected" / "ihdp_connected" and "IHDP disconnected" / "ihdp_disconnected".
+    
     Creates:
     - P3_IHDP_Connected_PEHE.tex: Main text table for connected regime
     - P3_IHDP_Disconnected_PEHE.tex: Main text table for disconnected regime
-    - Full appendix tables for all metrics
+    - Appendix: A*_IHDP_Connected_FullMetrics.tex, A*_IHDP_Disconnected_FullMetrics.tex
     """
     os.makedirs(output_dir, exist_ok=True)
     
@@ -67,34 +93,43 @@ def generate_ihdp_latex_tables(results_dir: str, output_dir: str) -> None:
     PRIMARY_METRICS = ['pehe', 'ate_abs_err', 'tau_corr', 'policy_regret', 'tau_ece']
     
     # =========================================================================
-    # Connected regime table
+    # Connected regime: main PEHE table
     # =========================================================================
-    connected_file = os.path.join(results_dir, 'results_agg_ihdp_connected_sweep.csv')
+    connected_file = _find_ihdp_agg_file(results_dir, 'results_agg_ihdp_connected_sweep.csv')
     if os.path.exists(connected_file):
         df = pd.read_csv(connected_file)
         
-        # Generate PEHE table
         _generate_pehe_table(
             df=df,
             output_path=os.path.join(output_dir, 'P3_IHDP_Connected_PEHE.tex'),
             caption='IHDP connected regime: PEHE across target budgets (mean $\\pm$ SD, 50 realizations).',
             label='tab:ihdp_connected_pehe',
             method_display=METHOD_DISPLAY,
-            budget_col='m0',  # Primary budget column
-            use_tuples=True,  # Show (m0, m1) tuples
+            budget_col='m0',
+            use_tuples=True,
         )
         print(f"Generated: P3_IHDP_Connected_PEHE.tex")
+        
+        # Appendix: full metrics for connected
+        _generate_appendix_full_metrics(
+            df=df,
+            output_path=os.path.join(output_dir, 'A_IHDP_Connected_FullMetrics.tex'),
+            caption='IHDP connected regime: full metrics (PEHE, ATE error, Spearman, Policy regret, ECE).',
+            label='tab:ihdp_connected_appendix',
+            method_display=METHOD_DISPLAY,
+            use_tuples=True,
+        )
+        print(f"Generated: A_IHDP_Connected_FullMetrics.tex")
     else:
         print(f"Warning: {connected_file} not found")
     
     # =========================================================================
-    # Disconnected regime table
+    # Disconnected regime: main PEHE table
     # =========================================================================
-    disconnected_file = os.path.join(results_dir, 'results_agg_ihdp_disconnected_sweep.csv')
+    disconnected_file = _find_ihdp_agg_file(results_dir, 'results_agg_ihdp_disconnected_sweep.csv')
     if os.path.exists(disconnected_file):
         df = pd.read_csv(disconnected_file)
         
-        # Generate PEHE table
         _generate_pehe_table(
             df=df,
             output_path=os.path.join(output_dir, 'P3_IHDP_Disconnected_PEHE.tex'),
@@ -105,8 +140,22 @@ def generate_ihdp_latex_tables(results_dir: str, output_dir: str) -> None:
             use_tuples=False,
         )
         print(f"Generated: P3_IHDP_Disconnected_PEHE.tex")
+        
+        # Appendix: full metrics for disconnected
+        _generate_appendix_full_metrics(
+            df=df,
+            output_path=os.path.join(output_dir, 'A_IHDP_Disconnected_FullMetrics.tex'),
+            caption='IHDP disconnected regime ($m_1=0$): full metrics.',
+            label='tab:ihdp_disconnected_appendix',
+            method_display=METHOD_DISPLAY,
+            use_tuples=False,
+        )
+        print(f"Generated: A_IHDP_Disconnected_FullMetrics.tex")
     else:
         print(f"Warning: {disconnected_file} not found")
+    
+    # Screening validity (if raw rep-level results with diagnostics exist)
+    _generate_screening_validity_if_available(results_dir, output_dir)
 
 
 def _generate_pehe_table(
@@ -166,7 +215,8 @@ def _generate_pehe_table(
                 if pd.isna(mean_val):
                     row_data.append('--')
                 else:
-                    row_data.append(f'{mean_val:.2f}{{\\tiny$\\pm${sd_val:.2f}}}')
+                    sd_str = f'{sd_val:.2f}' if not (pd.isna(sd_val) or np.isnan(sd_val)) else '--'
+                    row_data.append(f'{mean_val:.2f}{{\\tiny$\\pm${sd_str}}}')
             else:
                 row_data.append('--')
         
@@ -235,6 +285,131 @@ def _generate_pehe_table(
         f.write('\n'.join(lines))
 
 
+def _generate_appendix_full_metrics(
+    df: pd.DataFrame,
+    output_path: str,
+    caption: str,
+    label: str,
+    method_display: dict,
+    use_tuples: bool = False,
+    metrics: list = None,
+) -> None:
+    """Generate appendix table: one row per (Method, Budget), columns PEHE, ATE, Corr, Regret, ECE."""
+    if metrics is None:
+        metrics = ['pehe', 'ate_abs_err', 'tau_corr', 'policy_regret', 'tau_ece']
+    metric_headers = {'pehe': 'PEHE', 'ate_abs_err': 'ATE err', 'tau_corr': 'Spearman', 'policy_regret': 'Regret', 'tau_ece': 'ECE'}
+    
+    df = df.copy()
+    if use_tuples and 'm1' in df.columns:
+        df['budget_tuple'] = df.apply(lambda r: f"({int(r['m0'])},{int(r['m1'])})", axis=1)
+        budget_col = 'budget_tuple'
+    else:
+        budget_col = 'm0'
+    
+    methods_ordered = [m for m in method_display.keys() if m in df['method'].unique()]
+    def _budget_key(x):
+        if isinstance(x, str) and x.startswith('('):
+            return eval(x)
+        return x
+    budget_values = sorted(df[budget_col].unique(), key=_budget_key)
+    
+    lines = [
+        '\\begin{table}[t]',
+        '\\centering',
+        f'\\caption{{{caption}}}',
+        f'\\label{{{label}}}',
+        '\\scriptsize',
+        '\\setlength{\\tabcolsep}{3pt}',
+        f'\\begin{{tabular}}{{{"l" + "r" * (1 + len(metrics))}}}',
+        '\\toprule',
+        'Method & Budget & ' + ' & '.join(metric_headers.get(m, m) for m in metrics) + ' \\\\',
+        '\\midrule',
+    ]
+    
+    for method in methods_ordered:
+        for budget in budget_values:
+            mask = (df[budget_col] == budget) & (df['method'] == method)
+            sub = df.loc[mask]
+            if len(sub) == 0:
+                continue
+            row = [method_display.get(method, method), str(budget) if not isinstance(budget, str) else budget]
+            for met in metrics:
+                mean_col = f'{met}_mean' if f'{met}_mean' in sub.columns else met
+                sd_col = f'{met}_sd' if f'{met}_sd' in sub.columns else f'{met}_std'
+                if mean_col in sub.columns:
+                    mv = sub[mean_col].values[0]
+                    sv = sub[sd_col].values[0] if sd_col in sub.columns else np.nan
+                    if pd.isna(mv):
+                        row.append('--')
+                    else:
+                        ss = f'{sv:.2f}' if not (pd.isna(sv) or np.isnan(sv)) else '--'
+                        row.append(f'{mv:.2f} $\\pm$ {ss}')
+                else:
+                    row.append('--')
+            lines.append(' & '.join(row) + ' \\\\')
+    
+    lines.extend(['\\bottomrule', '\\end{tabular}', '\\end{table}'])
+    with open(output_path, 'w') as f:
+        f.write('\n'.join(lines))
+
+
+def _generate_screening_validity_if_available(results_dir: str, output_dir: str) -> None:
+    """
+    If raw rep-level results exist with diagnostics (e.g. diag_sources_selected),
+    write an appendix snippet for screening validity. Otherwise skip.
+    """
+    for name, filename in [
+        ('connected', 'results_rep_ihdp_connected_sweep.csv'),
+        ('disconnected', 'results_rep_ihdp_disconnected_sweep.csv'),
+    ]:
+        path = _find_ihdp_agg_file(results_dir, filename.replace('results_agg_', 'results_rep_'))
+        if not os.path.exists(path):
+            path = os.path.join(results_dir, filename)
+        if not os.path.exists(path):
+            continue
+        try:
+            rep_df = pd.read_csv(path)
+            if 'diag_sources_selected' not in rep_df.columns or 'pehe' not in rep_df.columns:
+                continue
+            # Simple summary: mean number of sources selected per method, and correlation with PEHE
+            out_path = os.path.join(output_dir, f'A_IHDP_Screening_Validity_{name}.tex')
+            # If diag_sources_selected is string like "1,2,3", count number of sources
+            if rep_df['diag_sources_selected'].dtype == object:
+                rep_df = rep_df.copy()
+                rep_df['n_sources_selected'] = rep_df['diag_sources_selected'].fillna('').str.split(',').str.len()
+                sel_col = 'n_sources_selected'
+            else:
+                sel_col = 'diag_sources_selected'
+            by_method = rep_df.groupby('method').agg({
+                sel_col: 'mean',
+                'pehe': ['mean', 'std', 'count'],
+            }).round(2)
+            lines = [
+                '\\begin{table}[t]',
+                '\\centering',
+                f'\\caption{{IHDP {name}: mean sources selected (screening) and PEHE by method.}}',
+                f'\\label{{tab:ihdp_screening_{name}}}',
+                '\\scriptsize',
+                '\\begin{tabular}{lrrr}',
+                '\\toprule',
+                'Method & Mean sources selected & PEHE (mean) & N reps \\\\',
+                '\\midrule',
+            ]
+            for method in by_method.index:
+                row = by_method.loc[method]
+                # Handle MultiIndex columns
+                n_sel = row[(sel_col, 'mean')] if (sel_col, 'mean') in row else row.iloc[0]
+                pehe = row[('pehe', 'mean')]
+                n_reps = int(row[('pehe', 'count')])
+                lines.append(f'{method} & {float(n_sel):.1f} & {float(pehe):.2f} & {n_reps} \\\\')
+            lines.extend(['\\bottomrule', '\\end{tabular}', '\\end{table}'])
+            with open(out_path, 'w') as f:
+                f.write('\n'.join(lines))
+            print(f"Generated: A_IHDP_Screening_Validity_{name}.tex")
+        except Exception as e:
+            pass  # Skip if columns or format differ
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -252,7 +427,7 @@ def main():
     parser.add_argument('--n_jobs', type=int, default=1,
                        help='Number of parallel jobs (-1 for all)')
     parser.add_argument('--output', type=str, default='results/ihdp',
-                       help='Output directory')
+                       help='Output directory (or parent of IHDP connected / IHDP disconnected folders)')
     parser.add_argument('--tables_only', action='store_true',
                        help='Generate tables from existing results')
     parser.add_argument('--tables_output', type=str, default=None,
