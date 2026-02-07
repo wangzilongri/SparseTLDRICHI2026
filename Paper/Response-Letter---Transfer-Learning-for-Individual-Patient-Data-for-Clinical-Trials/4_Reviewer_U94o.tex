@@ -1,0 +1,100 @@
+\section{Response to Reviewer \texttt{U94o}}
+
+
+\subsection*{Summary}
+This paper addresses the problem of transportability of treatment effects from Randomized Controlled Trials (RCTs) to external, heterogeneous patient populations. In particular, it focuses on scenarios where the target treatment is different than those tested in the trial environment.
+
+The authors attempt to solve this problem using a custom framework for training and then refining a doubly robust metalearner. First, a learner is trained on the available clinical trial data at all the sites that are available for a given therapy. Second, the placebo trials at a target site are used as a ``gold'' standard for training a LASSO regressor that is used to modify the prediction of the original regressor when the treatment is not provided.
+
+These methods were validated using a simulated multi-center RCT dataset, constructed to simulate a covariate shift across sites.
+
+
+\subsection*{Summary of Strengths}
+
+\begin{itemize}
+    \item The main strength of this paper lies in the customized doubly robust algorithm for integrating placebo patients from the site of interest into the predictor.
+    \item The manuscript provides an in-depth analysis of bias and corresponding corrections that arise when dealing with heterogeneous treatment effects.
+\end{itemize}
+
+\subsection*{Summary of Weaknesses}
+
+\subsubsection{Assumption of placebo trials as a ``gold standard.''}  
+The major weakness of the paper lies in the assumption that placebo trials constitute a ``gold standard.'' The factors causing baseline risk to shift between source and target populations may not be the same factors, or act with the same magnitude, as those causing the treatment effect to shift.
+
+{\color{blue}
+We thank the reviewer for raising this important conceptual concern.  
+We clarify that our use of the term \emph{proxy--gold} follows established terminology in the high-dimensional transfer learning literature and was \emph{not} intended imply that placebo outcomes identify treatment effects. We apologize for this potential confusion. 
+We definitely agree that placebo outcomes should \emph{not} be interpreted as a causal or identification ``gold standard'' for treated outcomes or treatment effects in the target population.
+
+In particular, the proxy--gold terminology originates in sparse and high-dimensional transfer learning settings, where abundant but biased data sources (``proxies'') are corrected using scarce but high-fidelity labels (``gold'') that are reliable for a \emph{specific component} of the prediction problem \citep{bastani2021predicting, li2022transfer, tian2023transfer}. In this literature, ``gold'' refers to labels that are unbiased for the target distribution of interest—not to a causal ground truth for all downstream quantities. Our usage follows this convention.
+
+In our setting, placebo outcomes are ``gold'' only in the sense that they provide an unbiased and site-specific calibration signal for the target population’s \emph{baseline outcome regression} $\mu_{0,0}(x)$ under randomization. They are not assumed to identify treated outcomes, treatment effects, or treatment-effect heterogeneity in the target population.
+
+Crucially, we do \emph{not} assume that the mechanisms driving baseline risk shift and treatment-effect shift coincide. This distinction is central to our framework and is now formalized in the revised manuscript. Placebo anchoring corrects baseline miscalibration induced by covariate shift, while extrapolation to the treated arm is governed by an explicit structural regularity condition (Assumption~A5), which defines a \emph{working-model target} rather than a nonparametrically identified estimand.
+
+
+To avoid further confusion, we have revised the manuscript to consistently emphasize that ``proxy--gold'' is a transfer-learning construct and to replace informal references to ``gold standard'' with ``gold calibration signal'' or ``anchor,'' making clear that placebo data improve baseline alignment but do not, by themselves, guarantee correct transport of treatment effects.
+}
+
+
+\subsubsection{Exclusive reliance on synthetic data.}  
+The paper only utilizes synthetic data, not de-identified or real-world data. The number of covariates used (three causal features and two confounders) is not representative of real scenarios, which typically involve dozens of different features.
+
+{\color{blue}
+We thank the reviewer for this concern. We have addressed it in two ways in the revised manuscript.
+
+\textbf{(1) Real-life data: IHDP semi-synthetic benchmark.}
+We have added a new \textbf{Real-Life Data Experiments} section (Section~5) that evaluates all methods on a semi-synthetic benchmark built from the Infant Health and Development Program (IHDP) dataset. IHDP provides \emph{real} baseline covariates (25 features: 19 binary, 6 continuous) from an early-childhood intervention study, with semi-synthetically generated outcomes so that ground-truth treatment effects are known for exact evaluation. We partition subjects into multiple ``sites'' via k-means on covariates (inducing natural covariate shift) and evaluate both the connected regime (target has both arms) and the disconnected regime ($m_1=0$, placebo-only target) over 50 IHDP realizations. Results show that the proposed method achieves best or near-best PEHE in the connected regime, and in the disconnected regime \texttt{Proposed-B} attains the best Spearman ranking while \texttt{AnchorPlugin} leads on PEHE---aligning with the synthetic findings under real covariate distributions. This directly addresses the concern about dependence only on synthetic data by including validation on real-world covariate structure.
+
+\textbf{(2) Dimensionality sweep.}
+While the original experiments used only 5 covariates, the revised manuscript also includes a comprehensive \textbf{dimensionality sweep} with $p \in \{10, 20, 50, 100\}$, representative of real clinical trial scenarios. We evaluate all comparison methods across these dimensions with 100 Monte Carlo replications each; results demonstrate that our proposed method maintains strong performance even at $p=100$, with PEHE degrading gracefully as dimension increases.
+
+We acknowledge that validation on fully observational (non-semi-synthetic) de-identified RCT IPD would further strengthen the empirical contribution; access to multi-site IPD with the specific structure required by our setting is limited by data sharing and privacy constraints. We have noted this limitation in the revised manuscript and view such validation as important future work.
+}
+
+\subsubsection{Insufficient description of data generation.}  
+The manuscript does not describe the data generation process in sufficient detail. It is unclear what distributions were used for the covariates themselves, what weights were used for calculating the outcomes, and what sample sizes were used.
+
+{\color{blue}
+We agree with the reviewer and have substantially expanded the data-generating process (DGP) description in the revised manuscript. The DGP section now explicitly specifies:
+
+\textbf{Covariate generation:}
+\begin{itemize}
+\item Covariates $X \in \mathbb{R}^p$ are drawn from site-specific multivariate Gaussian distributions $X \mid S=c \sim \mathcal{N}(\mu_c, \Sigma_c)$, where $\mu_c$ and $\Sigma_c$ vary across sites to induce covariate shift.
+\item Dimension $p$ is varied in $\{10, 20, 50, 100\}$.
+\end{itemize}
+
+\textbf{Outcome model:}
+\begin{itemize}
+\item Baseline risk: $\mu_0(x) = x^\top \beta_0 + \text{site-specific bias}$
+\item Treatment effect: $\tau(x) = x^\top \gamma$ with heterogeneity driven by a sparse subset of covariates.
+\item Site-specific deviations follow Assumption~A5 with sparse linear corrections.
+\end{itemize}
+
+\textbf{Sample sizes:}
+\begin{itemize}
+\item Target placebo $m_0 \in \{50, 100, 150, 250, 550\}$
+\item Target treated $m_1 \in \{0, 50, 100, 200, 500\}$
+\item Source sites: $C \in \{2, 5, 10, 20, 50\}$ sites with $n_c \sim 500$--$2000$ per site
+\item Total proxy sample: 5,000--50,000 depending on configuration
+\end{itemize}
+
+All parameters, distributions, and the complete DGP specification are now provided in the revised experiments section and supplementary appendix of the main manuscript.
+}
+
+\subsubsection{Writing quality and presentation issues.}  
+The paper is not well written and contains a number of grammatical and syntactic issues. For example, Table~I is entirely unnecessary since it merely repeats information already in the text.
+
+Similarly, the section titled \emph{Implementation} (``The simulation is implemented in Python with fixed random seeds to ensure reproducibility.'') does not provide any meaningful contribution to the manuscript. Figures~2,~3,~4, and~5 are simply bar charts showing the same data already presented in Table~II.
+
+{\color{blue}
+We thank the reviewer for the feedback on presentation quality. In the revised manuscript:
+\begin{itemize}
+\item We have carefully proofread and corrected grammatical and syntactic issues throughout.
+\item The Implementation section has been expanded to include meaningful details: regularization path specification, cross-validation procedure for small-gold regimes, covariate standardization, and computational considerations.
+\item Figures have been replaced with detailed tables as suggested.
+\end{itemize}
+}
+
+
+\clearpage

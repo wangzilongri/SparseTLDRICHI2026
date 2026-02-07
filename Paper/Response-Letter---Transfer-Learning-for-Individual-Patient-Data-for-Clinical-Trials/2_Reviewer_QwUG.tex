@@ -1,0 +1,89 @@
+\section{Response to Reviewer \texttt{QwUG}}
+
+\subsection*{Summary}
+
+The manuscript is well written, clearly structured, and technically rigorous, with detailed experiments and robustness checks. The manuscript would benefit from more discussion of key assumptions in real-world clinical trial settings and clearer description of the experimental data sources.
+
+
+\subsection*{Summary of Strengths}
+
+\begin{itemize}
+    \item The manuscript introduces a placebo-anchored proxy--gold transfer learning framework, which is an innovative way to combine abundant multi-site RCT data (proxy labels) with high-fidelity placebo outcomes from the gold labels.
+    \item The manuscript is methodologically rigorous. Stage-wise anchoring using target placebo outcomes, and doubly robust orthogonalization using known randomization propensities, demonstrate careful research design.
+    \item The manuscript includes strong experimental design. Well-designed evaluation metrics—Precision in Estimation of Heterogeneous Effects (PEHE), mean absolute error of the average treatment effect (ATE), and calibration RMSE for treated and placebo outcome regressions ($\mu_1$ and $\mu_0$)—capture both individual-level and population-level performance.
+    \item Writing is clear and structure is logical.
+\end{itemize}
+
+\subsection*{Summary of Weaknesses}
+
+\subsubsection{Justification of Assumptions A4 and A5 in real-world settings.}  
+Assumptions A4 and A5, specialized to the multi-site RCT setting, are crucial for performance. However, the manuscript does not sufficiently justify why real-world clinical trials or clinical data would satisfy these assumptions. Additional discussion is suggested.\\
+
+{\color{blue}
+We thank the reviewer for this suggestion and agree that additional clinical context would strengthen the manuscript. 
+We emphasize that Assumptions~A4 and~A5 are intended as \emph{regularity conditions for stable estimation} in multi-site randomized trials, rather than strong biological invariance or causal identification assumptions.
+
+Assumption~A4 has now been refined into a Lipschitz smoothness condition on outcome regressions: it requires that conditional mean outcomes vary continuously with baseline covariates within each site. 
+This assumption rules out arbitrarily unstable responses to small covariate perturbations and ensures that moderate covariate shift across trial populations does not induce unbounded changes in predicted outcomes. 
+Such smoothness assumptions are standard in nonparametric regression and causal learning, and are implicitly relied upon whenever outcome models are evaluated outside their exact training distribution.
+Importantly, A4 does not assert exchangeability, treatment-effect homogeneity, or transportability across sites.
+
+Assumption~A5 concerns how outcome regressions differ across trial populations. 
+Rather than assuming that treatment effects or baseline risks are identical across sites, A5 posits that systematic cross-site differences can be reasonably approximated by a low-complexity correction to a well-learned proxy model. 
+Clinically, this reflects the common observation that between-trial heterogeneity is often driven by a limited number of interpretable factors—such as baseline risk calibration, disease severity, key biomarkers, or measurement and enrollment practices—rather than by wholesale changes in the outcome-generating mechanism.
+
+This perspective is consistent with individual participant data meta-analysis and clinical prediction model updating, where cross-study heterogeneity is typically addressed through parsimonious recalibration or limited effect-modification, rather than unrestricted refitting of complex models.
+Importantly, Assumption~A5 is \emph{no longer} an identification assumption: it defines a working approximation class that enables stable estimation and calibrated extrapolation when treated outcomes are unavailable in the target population. 
+When A5 holds approximately, estimation error decomposes into stochastic error and approximation error; when it is violated, performance degrades smoothly toward proxy-only baselines rather than exhibiting a sharp failure.
+}
+
+
+\subsubsection{Description of experimental data sources.}  
+The sources of the experimental data are not clearly described. It is recommended to more explicitly describe the data sources and data processing methods.
+
+{\color{blue}
+We thank the reviewer for this suggestion and have substantially expanded the description of our experimental data in the revised manuscript.
+
+\medskip
+\noindent\textbf{Data sources.}
+The revised manuscript now reports experiments on \emph{two} data sources: (i)~synthetic multi-center RCT data from a controlled DGP (Sections~4 and appendix), and (ii)~real-life covariate data from the Infant Health and Development Program (IHDP) benchmark in a new \textbf{Real-Life Data Experiments} section (Section~5). IHDP provides 25 real baseline covariates with semi-synthetic outcomes and known ground-truth CATEs; we evaluate connected and disconnected regimes over 50 realizations. Below we summarize the synthetic setup; the IHDP setup and results are described in Section~5 of the main manuscript.
+
+\medskip
+\noindent\textbf{Synthetic multi-center RCT data.}
+Synthetic experiments use data generated from a controlled Data-Generating Process (DGP) designed to mimic realistic multi-site randomized controlled trial settings. We use synthetic data for the following reasons:
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Ground-truth access}: Synthetic data allows us to compute ground-truth individual treatment effects $\tau(X_i)$, which are unobservable in real data. This enables direct evaluation of CATE estimation accuracy via PEHE and calibration metrics.
+\item \textbf{Controlled experimental conditions}: We can systematically vary key parameters (sample size, dimensionality, number of source sites, assumption violations) to understand method behavior across a range of scenarios.
+\item \textbf{Reproducibility}: Fixed random seeds ensure fully reproducible experiments.
+\end{enumerate}
+
+\medskip
+\noindent\textbf{DGP specification (revised Section~IV-C of the manuscript).}
+The DGP generates multi-center RCT data with explicit covariate shift, controlled signal-to-noise ratios, and known ground-truth treatment effects:
+\begin{itemize}
+\item \textbf{Sites}: $C=10$ source sites plus one target site ($c=0$).
+\item \textbf{Covariates}: $p$-dimensional baseline covariates $X \in \mathbb{R}^p$ with $p \in \{10, 20, 50, 100\}$. Site-level covariate shift is induced via $X \mid c \sim \mathcal{N}(\mu_c, I)$, calibrated to produce moderate overlap (AUC $\approx 0.75$ for source vs.\ target classification).
+\item \textbf{Treatment assignment}: Randomized with logistic propensity $e(X)$, known by design.
+\item \textbf{Outcomes}: Follow the proxy--deviation decomposition from Assumption~A5:
+$\mu_{a,c}(x) = \mu^{\mathrm{proxy}}_a(x) + \delta_{a,c}(x)$,
+where $\mu^{\mathrm{proxy}}_a(x) = x^\top \beta_a$ are shared outcome regressions and $\delta_{a,c}(x) = x^\top \gamma_{a,c}$ are sparse site-specific deviations.
+\item \textbf{Sample sizes}: Target budget $(m_0, m_1)$ varies across experiments. Source sites contribute 20,000 total observations (2,000 per site).
+\end{itemize}
+
+\medskip
+\noindent\textbf{Experimental sweeps.}
+We conduct three primary sweeps to evaluate robustness:
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Target budget vs.\ dimensionality}: $(m_0, m_1) \times p \in \{10, 20, 50, 100\}$
+\item \textbf{Source site scaling}: Number of sources $C \in \{2, 5, 10, 20, 50\}$
+\item \textbf{Assumption A5 violation}: Sparsity ratio and nonlinearity parameter $\Gamma$ varied to test graceful degradation
+\end{enumerate}
+All experiments use 100 Monte Carlo replications with fixed seeds, reporting mean $\pm$ standard deviation across replications.
+
+\medskip
+\noindent\textbf{Implementation.}
+All simulations are implemented in Python. Regularization parameters are selected via cross-validation. The \texttt{glmtrans} transfer learning algorithm is interfaced through an R package wrapper. Code and DGP specifications are available in the supplementary materials.
+}
+
+
+\clearpage

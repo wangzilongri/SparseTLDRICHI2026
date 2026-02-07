@@ -1,0 +1,94 @@
+\section{Response to Reviewer \texttt{dTHHH}}
+
+\subsection*{Summary}
+
+This manuscript presents a novel placebo-anchored transfer learning framework for individual-patient-data meta-analysis in settings where covariate shift exists between randomized controlled trials (RCTs) and the target population, and where conventional network meta-analysis assumptions (e.g., shared comparator, network connectivity) break down.
+
+
+\subsection*{Summary of Strengths}
+
+\begin{itemize}
+    \item The topic is timely and aligns well with growing interest in trial generalizability and causal machine learning.
+    \item The core methodological idea, treating source IPD as proxy labels and target placebo outcomes as gold labels for anchored calibration, is well-structured.
+    \item Embedding the correction into a doubly robust learner with known trial propensities is theoretically coherent and practical.
+    \item Results demonstrate improved CATE estimation, baseline calibration, and transportability robustness relative to baseline models.
+\end{itemize}
+
+\noindent\textcolor{blue}{We thank the reviewer for their kind comments. We will now address the concerns raised.}
+
+\subsection*{Summary of Weaknesses}
+
+
+\subsubsection{Evaluation limited to synthetic data.}  
+The framework is evaluated only on synthetic data and not on real RCT data.\\
+\textcolor{blue}{We understand the reviewer's concern regarding this. To address this issue we have included ...}
+\wzl{Not answered yet}
+
+
+\subsubsection{Assumption A5: low-dimensional structured covariate-driven shift.}  
+Assumption A5 posits low-dimensional structured covariate-driven shift. In practice, site heterogeneity may arise from interactions, nonlinearities, or unobserved effect modifiers.
+
+
+{\color{blue}
+We apologize for the lack of clarity in the original presentation and thank the reviewer for raising this important concern. 
+We regret that Assumption~A5 may have been interpreted as an identification assumption. We would like to clarify that Assumption~A5 is \emph{not} intended to guarantee full causal identification or transportability. 
+Rather, it is a \emph{regularity condition for estimation} that restricts the class of admissible cross-site deviations and enables calibrated extrapolation when treated outcomes are unavailable in the target population. 
+
+Assumption~A5 is motivated by both the transfer learning and clinical prediction literatures, which consistently find that cross-study heterogeneity is often driven by a limited number of clinically meaningful factors (e.g., baseline risk calibration, key biomarkers, disease severity, or measurement practices), rather than wholesale changes in the outcome-generating mechanism. 
+In this sense, A5 reflects a parsimonious modeling assumption analogous to recalibration or limited coefficient revision in individual participant data meta-analysis and clinical model updating.
+We emphasize that A5 restricts the complexity of outcome-regression contrasts,
+not the covariate distributions themselves.
+
+Importantly, A5 does not require transport bias to be exactly sparse or perfectly linear. Existing theory shows that LASSO-based corrections remain valid under approximate sparsity and degrade gracefully when the assumption is only partially satisfied (e.g., Bastani, 2021). We further emphasize that A5 concerns sparsity of \emph{outcome-model contrasts} across sites, not sparsity of covariate shifts themselves.
+
+Accordingly, A5 should be interpreted as a structural regularity assumption that improves estimation efficiency when approximately satisfied, rather than as a sharp identification condition. To address the reviewer’s concern directly, we will include additional sensitivity analyses in the revision that examine nonlinear and non-sparse transport bias, to empirically characterize the scope and limitations of placebo anchoring.
+}
+
+
+
+\subsubsection{Limited evaluation metrics.}  
+The evaluation focuses mainly on CATE and ATE RMSE. Other metrics may also need to be considered.
+
+{\color{blue}
+
+We thank the reviewer for this suggestion and agree that focusing solely on CATE RMSE (PEHE) and ATE error provides an incomplete assessment of estimator performance. In the revision, we substantially expand the evaluation to include metrics that capture complementary aspects of individual treatment effect estimation and downstream decision quality.
+
+Specifically, in addition to PEHE and ATE absolute error, we now report:
+\begin{itemize}
+\item \textbf{Rank-based metrics} (Spearman correlation), which assess the quality of CATE ordering and are particularly relevant for prioritization and targeting tasks.
+\item \textbf{Qini AUC}, which evaluates uplift-based ranking performance and is standard in individualized treatment and marketing applications.
+\item \textbf{Policy regret}, which measures the welfare loss of the treatment policy induced by the estimated CATE relative to the optimal policy, directly linking estimation error to decision-making consequences.
+\item \textbf{Top-$k$ uplift capture}, which quantifies how much of the true treatment benefit is captured by treating only the top-ranked individuals.
+\item \textbf{CATE calibration error (ECE)}, which evaluates the reliability of estimated CATE magnitudes and complements ranking-based metrics by detecting systematic over- or under-estimation.
+\end{itemize}
+
+Together, these metrics distinguish between global effect accuracy, individual-level heterogeneity estimation, ranking quality, calibration, and policy performance. This expanded evaluation demonstrates that the proposed method’s advantages are not limited to a single error criterion but persist across multiple dimensions of practical relevance.
+}
+
+
+\subsubsection{Missing comparisons with existing methods.}  
+Comparison with existing transportability or meta-analytic methods or benchmarks is missing.
+
+{\color{blue}
+
+We thank the reviewer for this comment and agree that comparisons with established transportability methods are essential. In response, we now benchmark against 10 methods spanning ablation baselines, transport estimators, and oracle references, evaluated over 100 Monte Carlo replications.
+
+The comparison methods include:
+\begin{itemize}
+\item \textbf{Ablation baselines}: ProxyOnly (no target data), AnchorOnly (target data only, no proxy), AnchorPlugin (outcome-model transport with anchoring);
+\item \textbf{Reweighting-based transport}: IPWTransport (inverse probability weighting for site membership);
+\item \textbf{Outcome-regression transport}: OM-Transport, which pools source trials and predicts on target covariates;
+\item \textbf{Moment-based transport}: EntropyBalancing, which reweights sources to match target covariate moments;
+\item \textbf{Proposed methods}: Proposed (Option A), Proposed-CF (cross-fitted), Proposed-B (Option B for $m_1=0$).
+\end{itemize}
+
+We explicitly distinguish two regimes: the \emph{disconnected regime} ($m_1=0$) where only target placebo is available, and the \emph{oracle regime} ($m_1>0$) where target treated outcomes exist.
+
+\textbf{Key results:} In the oracle regime at $m_1=50$, Proposed achieves PEHE of $0.67 \pm 0.17$ compared to $2.11 \pm 0.95$ for OM-Transport (68\% reduction), $2.82 \pm 0.67$ for AnchorOnly (76\% reduction), and $2.85 \pm 0.63$ for TargetOnlyDR (76\% reduction). Spearman correlation reaches $0.98 \pm 0.01$ vs.\ $0.83$ for transport baselines, and policy regret is reduced to $0.02 \pm 0.01$ vs.\ $0.28$ for transport baselines.
+
+In the disconnected regime ($m_1=0$), Proposed-B matches or outperforms transport baselines across all conditions, achieving the best PEHE in most configurations while remaining well-defined when standard methods require stronger assumptions.
+}
+
+
+
+\clearpage

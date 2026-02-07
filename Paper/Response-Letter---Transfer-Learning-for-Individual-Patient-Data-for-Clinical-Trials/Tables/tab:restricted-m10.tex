@@ -1,0 +1,24 @@
+\begin{table}[t]
+\centering
+\tiny
+\setlength{\tabcolsep}{1.5pt}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}l|ccccc|ccccc|ccccc@{}}
+\hline
+& \multicolumn{5}{c|}{\textbf{PEHE$\downarrow$}} & \multicolumn{5}{c|}{\textbf{ATE$\downarrow$}} & \multicolumn{5}{c}{\textbf{ECE$\downarrow$}} \\
+\textbf{Method} & 2 & 5 & 10 & 20 & 50 & 2 & 5 & 10 & 20 & 50 & 2 & 5 & 10 & 20 & 50 \\
+\hline
+ProxyOnly & 5.7{\tiny$\pm$1.0} & 5.6{\tiny$\pm$0.9} & 5.6{\tiny$\pm$0.9} & 5.7{\tiny$\pm$1.0} & 5.5{\tiny$\pm$0.8} & 1.3{\tiny$\pm$1.0} & 1.3{\tiny$\pm$0.9} & 1.3{\tiny$\pm$1.1} & 1.3{\tiny$\pm$1.0} & 1.2{\tiny$\pm$0.9} & 1.5{\tiny$\pm$0.9} & 1.5{\tiny$\pm$0.8} & 1.5{\tiny$\pm$1.0} & 1.6{\tiny$\pm$0.9} & 1.4{\tiny$\pm$0.8} \\
+AnchorPlugin & 4.5{\tiny$\pm$1.0} & 4.4{\tiny$\pm$1.0} & 4.3{\tiny$\pm$1.0} & 4.3{\tiny$\pm$1.0} & 4.2{\tiny$\pm$0.9} & 0.8{\tiny$\pm$0.7} & \textbf{0.9{\tiny$\pm$0.7}} & 0.9{\tiny$\pm$0.7} & 0.9{\tiny$\pm$0.7} & 0.9{\tiny$\pm$0.7} & \textbf{1.1{\tiny$\pm$0.6}} & 1.1{\tiny$\pm$0.6} & 1.1{\tiny$\pm$0.6} & 1.1{\tiny$\pm$0.6} & 1.0{\tiny$\pm$0.6} \\
+IPWTransport & 3.6{\tiny$\pm$1.4} & 3.3{\tiny$\pm$1.5} & 3.1{\tiny$\pm$1.3} & 2.9{\tiny$\pm$1.2} & 2.7{\tiny$\pm$1.2} & 0.8{\tiny$\pm$0.6} & 0.9{\tiny$\pm$0.7} & \textbf{0.9{\tiny$\pm$0.6}} & 0.8{\tiny$\pm$0.6} & 0.8{\tiny$\pm$0.6} & 1.3{\tiny$\pm$0.7} & 1.2{\tiny$\pm$0.7} & 1.0{\tiny$\pm$0.6} & 0.9{\tiny$\pm$0.6} & 0.8{\tiny$\pm$0.5} \\
+OM-Transport & 3.5{\tiny$\pm$1.4} & 3.2{\tiny$\pm$1.5} & 3.1{\tiny$\pm$1.3} & \textbf{2.8{\tiny$\pm$1.2}} & 2.7{\tiny$\pm$1.2} & 0.8{\tiny$\pm$0.6} & 0.9{\tiny$\pm$0.7} & 0.9{\tiny$\pm$0.6} & \textbf{0.8{\tiny$\pm$0.6}} & 0.8{\tiny$\pm$0.6} & 1.2{\tiny$\pm$0.7} & 1.1{\tiny$\pm$0.7} & 1.0{\tiny$\pm$0.6} & 0.9{\tiny$\pm$0.6} & 0.8{\tiny$\pm$0.5} \\
+EntropyBal & 3.8{\tiny$\pm$1.5} & 3.5{\tiny$\pm$1.5} & 3.3{\tiny$\pm$1.2} & 3.0{\tiny$\pm$1.2} & 2.8{\tiny$\pm$1.2} & 0.8{\tiny$\pm$0.6} & 0.9{\tiny$\pm$0.7} & 0.9{\tiny$\pm$0.6} & 0.8{\tiny$\pm$0.6} & 0.8{\tiny$\pm$0.6} & 1.3{\tiny$\pm$0.7} & 1.3{\tiny$\pm$0.7} & 1.1{\tiny$\pm$0.6} & 0.9{\tiny$\pm$0.6} & 0.8{\tiny$\pm$0.5} \\
+Proposed-B & \textbf{3.5{\tiny$\pm$1.5}} & \textbf{3.2{\tiny$\pm$1.5}} & \textbf{3.1{\tiny$\pm$1.3}} & 2.8{\tiny$\pm$1.2} & \textbf{2.7{\tiny$\pm$1.2}} & \textbf{0.8{\tiny$\pm$0.6}} & 0.9{\tiny$\pm$0.7} & 0.9{\tiny$\pm$0.6} & 0.8{\tiny$\pm$0.6} & \textbf{0.8{\tiny$\pm$0.6}} & 1.2{\tiny$\pm$0.7} & \textbf{1.1{\tiny$\pm$0.7}} & \textbf{1.0{\tiny$\pm$0.6}} & \textbf{0.9{\tiny$\pm$0.6}} & \textbf{0.8{\tiny$\pm$0.6}} \\
+\hline
+\end{tabular}
+\caption{
+\textbf{Restricted regime ($m_1=0$):} Performance vs.\ source sites $C$.
+$m_0=50$ target placebo. Mean{\tiny$\pm$SD} over 100 reps. Best in \textbf{bold}.
+}
+\label{tab:restricted-m10}
+\end{table}

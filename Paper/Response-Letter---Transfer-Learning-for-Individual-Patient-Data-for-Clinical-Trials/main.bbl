@@ -1,0 +1,87 @@
+\begin{thebibliography}{}
+
+\bibitem[Bastani, 2021]{bastani2021predicting}
+Bastani, H. (2021).
+\newblock Predicting with proxies: Transfer learning in high dimension.
+\newblock {\em Management Science}, 67(5):2964--2984.
+
+\bibitem[Belloni et~al., 2012]{belloni2012sparse}
+Belloni, A., Chen, D., Chernozhukov, V., and Hansen, C. (2012).
+\newblock Sparse models and methods for optimal instruments with an application to eminent domain.
+\newblock {\em Econometrica}, 80(6):2369--2429.
+
+\bibitem[B{\"u}hlmann and Van De~Geer, 2011]{buhlmann2011statistics}
+B{\"u}hlmann, P. and Van De~Geer, S. (2011).
+\newblock {\em Statistics for high-dimensional data: methods, theory and applications}.
+\newblock Springer Science \& Business Media.
+
+\bibitem[Dahabreh et~al., 2019]{dahabreh2019towards}
+Dahabreh, I.~J., Petito, L.~C., Robertson, S.~E., Hern{\'a}n, M.~A., and Steingrimsson, J.~A. (2019).
+\newblock Towards causally interpretable meta-analysis: transporting inferences from multiple studies to a target population.
+\newblock {\em arXiv preprint arXiv:1903.11455}.
+
+\bibitem[Dahabreh et~al., 2023]{dahabreh2023efficient}
+Dahabreh, I.~J., Robertson, S.~E., Petito, L.~C., Hern{\'a}n, M.~A., and Steingrimsson, J.~A. (2023).
+\newblock Efficient and robust methods for causally interpretable meta-analysis: Transporting inferences from multiple randomized trials to a target population.
+\newblock {\em Biometrics}, 79(2):1057--1072.
+
+\bibitem[Hern{\'a}n and Robins, 2010]{hernan2010causal}
+Hern{\'a}n, M.~A. and Robins, J.~M. (2010).
+\newblock Causal inference.
+
+\bibitem[Hong et~al., 2025]{hong2025estimating}
+Hong, H., Liu, L., and Stuart, E.~A. (2025).
+\newblock Estimating target population treatment effects in meta-analysis with individual participant-level data.
+\newblock {\em Statistical Methods in Medical Research}, 34(2):355--368.
+
+\bibitem[Imbens and Rubin, 2015]{imbens2015causal}
+Imbens, G.~W. and Rubin, D.~B. (2015).
+\newblock {\em Causal inference in statistics, social, and biomedical sciences}.
+\newblock Cambridge University Press.
+
+\bibitem[Li et~al., 2022]{li2022transfer}
+Li, S., Cai, T.~T., and Li, H. (2022).
+\newblock Transfer learning for high-dimensional linear regression: Prediction, estimation and minimax optimality.
+\newblock {\em Journal of the Royal Statistical Society Series B: Statistical Methodology}, 84(1):149--173.
+
+\bibitem[Riley and Fisher, 2021]{riley2021using}
+Riley, R.~D. and Fisher, D.~J. (2021).
+\newblock Using ipd meta-analysis to examine interactions between treatment effect and participant-level covariates.
+\newblock {\em Individual Participant Data Meta-Analysis: A Handbook for Healthcare Research}, pages 163--198.
+
+\bibitem[Rott et~al., 2025]{rott2025causally}
+Rott, K.~W., Clark, J.~M., Murad, M.~H., Hodges, J.~S., and Huling, J.~D. (2025).
+\newblock Causally interpretable meta-analysis combining aggregate and individual participant data.
+\newblock {\em American journal of epidemiology}, 194(7):2060--2068.
+
+\bibitem[Steyerberg, 2019]{steyerberg2019validation}
+Steyerberg, E.~W. (2019).
+\newblock Validation of prediction models.
+\newblock In {\em Clinical prediction models: a practical approach to development, validation, and updating}, pages 329--344. Springer.
+
+\bibitem[Tian and Feng, 2023]{tian2023transfer}
+Tian, Y. and Feng, Y. (2023).
+\newblock Transfer learning under high-dimensional generalized linear models.
+\newblock {\em Journal of the American Statistical Association}, 118(544):2684--2697.
+
+\bibitem[Van~Calster et~al., 2019]{van2019calibration}
+Van~Calster, B., McLernon, D.~J., Van~Smeden, M., Wynants, L., and Steyerberg, E.~W. (2019).
+\newblock Calibration: the achilles heel of predictive analytics.
+\newblock {\em BMC medicine}, 17(1):230.
+
+\bibitem[Villani et~al., 2008]{villani2008optimal}
+Villani, C. et~al. (2008).
+\newblock {\em Optimal transport: old and new}, volume 338.
+\newblock Springer.
+
+\bibitem[Westreich et~al., 2017]{westreich2017transportability}
+Westreich, D., Edwards, J.~K., Lesko, C.~R., Stuart, E., and Cole, S.~R. (2017).
+\newblock Transportability of trial results using inverse odds of sampling weights.
+\newblock {\em American journal of epidemiology}, 186(8):1010--1014.
+
+\bibitem[Wynants et~al., 2017]{wynants2017key}
+Wynants, L., Collins, G.~S., and Van~Calster, B. (2017).
+\newblock Key steps and common pitfalls in developing and validating risk models.
+\newblock {\em BJOG: An International Journal of Obstetrics \& Gynaecology}, 124(3):423--432.
+
+\end{thebibliography}
