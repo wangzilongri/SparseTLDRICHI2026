@@ -223,10 +223,16 @@ def _aggregate_ihdp_results(df: pd.DataFrame) -> pd.DataFrame:
     Groups by (benchmark_id, method, m0, m1, n_sites) and computes
     mean/std for each metric.
     """
-    # Group columns (scenario identifiers)
-    group_cols = ['benchmark_id', 'method', 'm0', 'm1']
-    if 'n_sites' in df.columns:
-        group_cols.append('n_sites')
+    # Debug: show what columns are in the DataFrame
+    print(f"DEBUG: DataFrame columns = {list(df.columns)}")
+    print(f"DEBUG: DataFrame shape = {df.shape}")
+    
+    # Group columns (scenario identifiers) - only use columns that exist
+    all_group_cols = ['benchmark_id', 'method', 'm0', 'm1', 'n_sites']
+    group_cols = [c for c in all_group_cols if c in df.columns]
+    
+    if not group_cols:
+        raise ValueError(f"No group columns found in DataFrame. Columns: {list(df.columns)}")
     
     # Metric columns (numeric columns to aggregate)
     metric_cols = [c for c in df.columns if c not in group_cols + 
@@ -571,6 +577,12 @@ def run_ihdp_sweep(
         records.append(record)
     
     df = pd.DataFrame(records)
+    
+    # Debug: check if DataFrame is empty or missing columns
+    print(f"DEBUG: Created DataFrame with {len(df)} rows and columns: {list(df.columns)}")
+    
+    if df.empty:
+        print("WARNING: DataFrame is empty! Check if methods ran successfully.")
     
     # Save results
     os.makedirs(output_dir, exist_ok=True)
