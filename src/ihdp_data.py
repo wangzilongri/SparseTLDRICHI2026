@@ -66,7 +66,10 @@ class IHDPDataLoader:
     """
     
     # Default path relative to project root
-    DEFAULT_DATA_DIR = "L1-TCL/dat/ihdp/csv"
+    # Primary: data/ihdp/csv (tracked in repo)
+    # Fallback: L1-TCL/dat/ihdp/csv (submodule, may not be present)
+    DEFAULT_DATA_DIR = "data/ihdp/csv"
+    FALLBACK_DATA_DIR = "L1-TCL/dat/ihdp/csv"
     
     # Covariate indices
     BINARY_FEATURES = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
@@ -85,13 +88,17 @@ class IHDPDataLoader:
             src_dir = Path(__file__).parent
             project_root = src_dir.parent
             self.data_dir = project_root / self.DEFAULT_DATA_DIR
+            # Fallback to submodule path if primary not found
+            if not self.data_dir.exists():
+                self.data_dir = project_root / self.FALLBACK_DATA_DIR
         else:
             self.data_dir = Path(data_dir)
         
         if not self.data_dir.exists():
             raise FileNotFoundError(
-                f"IHDP data directory not found: {self.data_dir}\n"
-                f"Expected CSV files at: {self.data_dir}/ihdp_npci_*.csv"
+                f"IHDP data directory not found.\n"
+                f"Searched: {self.DEFAULT_DATA_DIR} and {self.FALLBACK_DATA_DIR}\n"
+                f"Expected CSV files at: <project_root>/data/ihdp/csv/ihdp_npci_*.csv"
             )
     
     def _get_file_path(self, realization_id: int) -> Path:
