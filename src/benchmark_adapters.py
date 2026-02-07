@@ -879,6 +879,14 @@ def create_method_factories(seed: int = 42) -> Dict[str, Callable]:
         # Glmtrans not available
         pass
     
+    # Fallback for Glmtrans_OptionB (Proposed-B) when R/glmtrans is unavailable.
+    # Ensures disconnected-regime sweeps (e.g. IHDP) always run Proposed-B.
+    if 'Glmtrans_OptionB' not in factories:
+        factories['Glmtrans_OptionB'] = lambda: PlaceboAnchoredDRLearner(
+            variant='proposed_B_source_dr',
+            random_state=seed
+        )
+    
     return factories
 
 
