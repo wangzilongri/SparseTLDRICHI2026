@@ -1,0 +1,194 @@
+
+============================================================
+IHDP Semi-Synthetic Experiments
+============================================================
+Sweeps: ['ihdp_disconnected']
+Replications: 50
+Parallel jobs: 10
+Output: results/ihdp_disconnected
+============================================================
+
+
+>>> Running ihdp_disconnected...
+
+============================================================
+IHDP Sweep: ihdp_disconnected
+============================================================
+Scenarios: 4
+Methods: 6
+Replications: 50
+Total runs: 1200
+Output: results/ihdp_disconnected
+============================================================
+
+Sanity check: running 1 task sequentially...
+Sanity check passed: 6 results from 1 task.
+Using 10 parallel workers
+Multiprocessing start method: spawn (explicit)
+Submitting 200 tasks...
+Parallel smoke test: 2 workers, 2 tasks...
+  Smoke test worker returned 6 results
+  Smoke test worker returned 6 results
+Parallel smoke test passed!
+All 200 futures submitted. Waiting for results...
+Running ihdp_disconnected:   0%|          | 0/200 [00:00<?, ?it/s]Running ihdp_disconnected:   0%|          | 1/200 [00:23<1:17:37, 23.40s/it]Running ihdp_disconnected:   1%|          | 2/200 [00:23<32:12,  9.76s/it]  Running ihdp_disconnected:   3%|▎         | 6/200 [00:23<07:23,  2.29s/it]Running ihdp_disconnected:   4%|▍         | 8/200 [00:23<04:46,  1.49s/it]Running ihdp_disconnected:   5%|▌         | 10/200 [00:24<03:13,  1.02s/it]Running ihdp_disconnected:   5%|▌         | 10/200 [00:39<03:13,  1.02s/it]Running ihdp_disconnected:   6%|▌         | 11/200 [00:45<15:53,  5.05s/it]Running ihdp_disconnected:   8%|▊         | 15/200 [00:46<07:29,  2.43s/it]Running ihdp_disconnected:   9%|▉         | 18/200 [00:46<04:45,  1.57s/it]Running ihdp_disconnected:  10%|█         | 20/200 [00:46<03:33,  1.19s/it]Running ihdp_disconnected:  10%|█         | 20/200 [01:00<03:33,  1.19s/it]Running ihdp_disconnected:  10%|█         | 21/200 [01:07<12:48,  4.30s/it]Running ihdp_disconnected:  11%|█         | 22/200 [01:08<10:35,  3.57s/it]Running ihdp_disconnected:  12%|█▏        | 24/200 [01:08<07:00,  2.39s/it]Running ihdp_disconnected:  13%|█▎        | 26/200 [01:08<04:45,  1.64s/it]Running ihdp_disconnected:  14%|█▍        | 28/200 [01:08<03:16,  1.14s/it]Running ihdp_disconnected:  15%|█▌        | 30/200 [01:08<02:17,  1.24it/s]Running ihdp_disconnected:  15%|█▌        | 30/200 [01:20<02:17,  1.24it/s]Running ihdp_disconnected:  16%|█▌        | 31/200 [01:30<12:51,  4.57s/it]Running ihdp_disconnected:  16%|█▌        | 32/200 [01:30<10:23,  3.71s/it]Running ihdp_disconnected:  17%|█▋        | 34/200 [01:30<06:34,  2.37s/it]Running ihdp_disconnected:  19%|█▉        | 38/200 [01:31<03:10,  1.18s/it]Running ihdp_disconnected:  20%|██        | 40/200 [01:31<02:22,  1.13it/s]Running ihdp_disconnected:  20%|██        | 40/200 [01:50<02:22,  1.13it/s]Running ihdp_disconnected:  20%|██        | 41/200 [01:52<11:14,  4.24s/it]Running ihdp_disconnected:  22%|██▏       | 43/200 [01:53<07:42,  2.95s/it]Running ihdp_disconnected:  24%|██▎       | 47/200 [01:53<04:00,  1.57s/it]
+  Progress: 50/200 futures done, 300 results so far, 0 empty, 0 failed
+Running ihdp_disconnected:  25%|██▌       | 50/200 [01:53<02:42,  1.08s/it]Running ihdp_disconnected:  25%|██▌       | 50/200 [02:10<02:42,  1.08s/it]Running ihdp_disconnected:  26%|██▌       | 51/200 [02:15<09:42,  3.91s/it]Running ihdp_disconnected:  26%|██▌       | 52/200 [02:15<08:12,  3.33s/it]Running ihdp_disconnected:  26%|██▋       | 53/200 [02:15<06:42,  2.74s/it]Running ihdp_disconnected:  28%|██▊       | 55/200 [02:16<04:21,  1.80s/it]Running ihdp_disconnected:  29%|██▉       | 58/200 [02:16<02:28,  1.04s/it]Running ihdp_disconnected:  30%|███       | 60/200 [02:16<01:48,  1.29it/s]Running ihdp_disconnected:  30%|███       | 60/200 [02:30<01:48,  1.29it/s]Running ihdp_disconnected:  30%|███       | 61/200 [02:37<09:48,  4.23s/it]Running ihdp_disconnected:  31%|███       | 62/200 [02:38<08:18,  3.61s/it]Running ihdp_disconnected:  33%|███▎      | 66/200 [02:38<03:51,  1.73s/it]Running ihdp_disconnected:  34%|███▍      | 69/200 [02:38<02:26,  1.12s/it]Running ihdp_disconnected:  34%|███▍      | 69/200 [02:50<02:26,  1.12s/it]Running ihdp_disconnected:  36%|███▌      | 71/200 [03:00<07:45,  3.61s/it]Running ihdp_disconnected:  36%|███▌      | 72/200 [03:00<06:37,  3.10s/it]Running ihdp_disconnected:  37%|███▋      | 74/200 [03:00<04:34,  2.18s/it]Running ihdp_disconnected:  38%|███▊      | 76/200 [03:01<03:10,  1.54s/it]Running ihdp_disconnected:  40%|████      | 80/200 [03:01<01:49,  1.09it/s]Running ihdp_disconnected:  40%|████      | 81/200 [03:22<07:26,  3.75s/it]Running ihdp_disconnected:  41%|████      | 82/200 [03:22<06:13,  3.17s/it]Running ihdp_disconnected:  42%|████▏     | 84/200 [03:23<04:14,  2.19s/it]Running ihdp_disconnected:  43%|████▎     | 86/200 [03:23<02:54,  1.53s/it]Running ihdp_disconnected:  44%|████▍     | 89/200 [03:23<01:46,  1.04it/s]Running ihdp_disconnected:  46%|████▌     | 91/200 [03:45<06:41,  3.68s/it]Running ihdp_disconnected:  46%|████▌     | 92/200 [03:45<05:36,  3.11s/it]Running ihdp_disconnected:  46%|████▋     | 93/200 [03:45<04:36,  2.58s/it]Running ihdp_disconnected:  47%|████▋     | 94/200 [03:46<03:38,  2.06s/it]Running ihdp_disconnected:  48%|████▊     | 96/200 [03:46<02:15,  1.30s/it]
+  Progress: 100/200 futures done, 600 results so far, 0 empty, 0 failed
+Running ihdp_disconnected:  50%|█████     | 100/200 [03:46<01:03,  1.56it/s]Running ihdp_disconnected:  50%|█████     | 100/200 [04:00<01:03,  1.56it/s]Running ihdp_disconnected:  50%|█████     | 101/200 [04:08<06:32,  3.96s/it]Running ihdp_disconnected:  51%|█████     | 102/200 [04:08<05:21,  3.28s/it]Running ihdp_disconnected:  52%|█████▏    | 104/200 [04:08<03:33,  2.22s/it]Running ihdp_disconnected:  53%|█████▎    | 106/200 [04:09<02:22,  1.52s/it]Running ihdp_disconnected:  54%|█████▍    | 108/200 [04:09<01:38,  1.07s/it]Running ihdp_disconnected:  54%|█████▍    | 108/200 [04:20<01:38,  1.07s/it]Running ihdp_disconnected:  56%|█████▌    | 111/200 [04:31<05:19,  3.58s/it]Running ihdp_disconnected:  56%|█████▌    | 112/200 [04:31<04:26,  3.02s/it]Running ihdp_disconnected:  56%|█████▋    | 113/200 [04:31<03:35,  2.48s/it]Running ihdp_disconnected:  57%|█████▋    | 114/200 [04:31<02:53,  2.02s/it]Running ihdp_disconnected:  58%|█████▊    | 117/200 [04:31<01:29,  1.08s/it]Running ihdp_disconnected:  60%|█████▉    | 119/200 [04:31<01:01,  1.31it/s]Running ihdp_disconnected:  60%|█████▉    | 119/200 [04:50<01:01,  1.31it/s]Running ihdp_disconnected:  60%|██████    | 121/200 [04:52<04:57,  3.77s/it]Running ihdp_disconnected:  61%|██████    | 122/200 [04:53<04:05,  3.14s/it]Running ihdp_disconnected:  62%|██████▏   | 124/200 [04:53<02:45,  2.17s/it]Running ihdp_disconnected:  63%|██████▎   | 126/200 [04:53<01:49,  1.48s/it]Running ihdp_disconnected:  64%|██████▍   | 128/200 [04:54<01:15,  1.04s/it]Running ihdp_disconnected:  65%|██████▌   | 130/200 [04:54<00:52,  1.34it/s]Running ihdp_disconnected:  65%|██████▌   | 130/200 [05:10<00:52,  1.34it/s]Running ihdp_disconnected:  66%|██████▌   | 131/200 [05:15<05:07,  4.46s/it]Running ihdp_disconnected:  66%|██████▋   | 133/200 [05:15<03:19,  2.97s/it]Running ihdp_disconnected:  68%|██████▊   | 135/200 [05:15<02:13,  2.06s/it]Running ihdp_disconnected:  69%|██████▉   | 138/200 [05:16<01:15,  1.22s/it]Running ihdp_disconnected:  70%|███████   | 140/200 [05:16<00:53,  1.11it/s]Running ihdp_disconnected:  70%|███████   | 140/200 [05:30<00:53,  1.11it/s]Running ihdp_disconnected:  70%|███████   | 141/200 [05:37<04:16,  4.35s/it]Running ihdp_disconnected:  72%|███████▏  | 143/200 [05:37<02:49,  2.98s/it]Running ihdp_disconnected:  72%|███████▎  | 145/200 [05:38<01:54,  2.09s/it]Running ihdp_disconnected:  74%|███████▎  | 147/200 [05:38<01:18,  1.49s/it]Running ihdp_disconnected:  74%|███████▍  | 149/200 [05:38<00:53,  1.06s/it]
+  Progress: 150/200 futures done, 900 results so far, 0 empty, 0 failed
+Running ihdp_disconnected:  76%|███████▌  | 151/200 [06:00<03:17,  4.04s/it]Running ihdp_disconnected:  77%|███████▋  | 154/200 [06:00<01:53,  2.46s/it]Running ihdp_disconnected:  78%|███████▊  | 156/200 [06:00<01:19,  1.81s/it]Running ihdp_disconnected:  80%|███████▉  | 159/200 [06:00<00:47,  1.16s/it]Running ihdp_disconnected:  80%|███████▉  | 159/200 [06:20<00:47,  1.16s/it]Running ihdp_disconnected:  80%|████████  | 161/200 [06:22<02:24,  3.71s/it]Running ihdp_disconnected:  82%|████████▏ | 163/200 [06:22<01:40,  2.72s/it]Running ihdp_disconnected:  83%|████████▎ | 166/200 [06:23<00:59,  1.75s/it]Running ihdp_disconnected:  84%|████████▍ | 169/200 [06:23<00:36,  1.16s/it]Running ihdp_disconnected:  84%|████████▍ | 169/200 [06:40<00:36,  1.16s/it]Running ihdp_disconnected:  86%|████████▌ | 171/200 [06:45<01:44,  3.61s/it]Running ihdp_disconnected:  86%|████████▌ | 172/200 [06:45<01:27,  3.11s/it]Running ihdp_disconnected:  88%|████████▊ | 176/200 [06:45<00:40,  1.69s/it]Running ihdp_disconnected:  90%|████████▉ | 179/200 [06:46<00:24,  1.16s/it]Running ihdp_disconnected:  90%|████████▉ | 179/200 [07:00<00:24,  1.16s/it]Running ihdp_disconnected:  90%|█████████ | 181/200 [07:08<01:06,  3.53s/it]Running ihdp_disconnected:  92%|█████████▏| 184/200 [07:08<00:37,  2.34s/it]Running ihdp_disconnected:  93%|█████████▎| 186/200 [07:08<00:25,  1.80s/it]Running ihdp_disconnected:  94%|█████████▍| 188/200 [07:08<00:16,  1.36s/it]Running ihdp_disconnected:  95%|█████████▌| 190/200 [07:09<00:10,  1.04s/it]Running ihdp_disconnected:  95%|█████████▌| 190/200 [07:20<00:10,  1.04s/it]Running ihdp_disconnected:  96%|█████████▌| 191/200 [07:30<00:39,  4.37s/it]Running ihdp_disconnected:  97%|█████████▋| 194/200 [07:30<00:15,  2.61s/it]Running ihdp_disconnected: 100%|█████████▉| 199/200 [07:31<00:01,  1.33s/it]
+  Progress: 200/200 futures done, 1200 results so far, 0 empty, 0 failed
+Running ihdp_disconnected: 100%|██████████| 200/200 [07:31<00:00,  2.26s/it]/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 158 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 158 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 173 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 155 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 129 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 144 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 159 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 163 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 175 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 174 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 164 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 157 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 147 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 152 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 150 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 164 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 159 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 151 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 162 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 170 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 151 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 157 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 152 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 172 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 141 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.162e-01, tolerance: 6.964e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.600e-01, tolerance: 6.964e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.737e-01, tolerance: 6.964e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 7.772e-01, tolerance: 6.964e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.341e-01, tolerance: 6.964e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.048e+00, tolerance: 6.964e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 151 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 170 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 193 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 163 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 158 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.951e-02, tolerance: 1.887e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.437e-02, tolerance: 1.887e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 6.393e-02, tolerance: 1.887e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 2.952e-02, tolerance: 1.887e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 2.887e-02, tolerance: 1.887e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.118e-02, tolerance: 1.887e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 6.386e-02, tolerance: 1.887e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 7.061e-02, tolerance: 1.887e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 152 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 169 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 175 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 171 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 166 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 155 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 149 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 189 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 150 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 139 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.916e-02, tolerance: 3.453e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 138 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 170 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 165 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 151 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 166 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 166 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 174 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:305: UserWarning: Requested m0=200 but only 152 controls available
+  warnings.warn(f"Requested m0={m0} but only {n_control} controls available")
+
+
+Task summary: 200 total, 200 succeeded, 0 returned empty, 0 raised exceptions
+Total results collected: 1200
+Created DataFrame: 1200 rows x 34 cols
+
+Saved raw results to: results/ihdp_disconnected/results_rep_ihdp_disconnected_sweep.csv
+Aggregating 1200 rows, columns: ['benchmark_id', 'method', 'rep_id', 'seed', 'feasible', 'runtime_seconds', 'm0', 'm1', 'n_sites', 'pehe', 'ate_hat', 'ate_abs_err', 'ate_bias', 'tau_corr', 'tau_kendall', 'topk_10_ratio', 'topk_20_ratio', 'topk_30_ratio', 'topk_10_captured', 'topk_20_captured', 'qini_auc', 'calib_slope', 'calib_intercept', 'calib_r2', 'tau_ece', 'tau_mce', 'policy_value', 'policy_regret', 'policy_value_top20', 'policy_regret_top20', 'mu0_rmse', 'mu1_rmse', 'diag_realization_id', 'diag_n_sites']
+Saved aggregated results to: results/ihdp_disconnected/results_agg_ihdp_disconnected_sweep.csv
+
+============================================================
+Sweep Status Summary:
+  ihdp_disconnected: OK
+============================================================
+
+>>> Generating LaTeX tables...
+Warning: results/ihdp_disconnected/results_agg_ihdp_connected_sweep.csv not found
+Generated: P3_IHDP_Disconnected_PEHE.tex
+Generated: A_IHDP_Disconnected_FullMetrics.tex
+
+============================================================
+IHDP experiments complete!
+============================================================

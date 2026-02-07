@@ -1,0 +1,755 @@
+
+============================================================
+IHDP Semi-Synthetic Experiments
+============================================================
+Sweeps: ['ihdp_connected']
+Replications: 50
+Parallel jobs: 10
+Output: results/ihdp_connected
+============================================================
+
+
+>>> Running ihdp_connected...
+
+============================================================
+IHDP Sweep: ihdp_connected
+============================================================
+Scenarios: 9
+Methods: 9
+Replications: 50
+Total runs: 4050
+Output: results/ihdp_connected
+============================================================
+
+Sanity check: running 1 task sequentially...
+Sanity check passed: 9 results from 1 task.
+Using 10 parallel workers
+Multiprocessing start method: spawn (explicit)
+Submitting 450 tasks...
+Parallel smoke test: 2 workers, 2 tasks...
+  Smoke test worker returned 9 results
+  Smoke test worker returned 9 results
+Parallel smoke test passed!
+All 450 futures submitted. Waiting for results...
+Running ihdp_connected:   0%|          | 0/450 [00:00<?, ?it/s]Running ihdp_connected:   0%|          | 1/450 [00:39<4:59:11, 39.98s/it]Running ihdp_connected:   0%|          | 2/450 [00:40<2:03:23, 16.52s/it]Running ihdp_connected:   1%|          | 3/450 [00:40<1:08:38,  9.21s/it]Running ihdp_connected:   1%|          | 5/450 [00:40<29:52,  4.03s/it]  Running ihdp_connected:   2%|▏         | 8/450 [00:40<13:36,  1.85s/it]Running ihdp_connected:   2%|▏         | 10/450 [00:41<09:06,  1.24s/it]Running ihdp_connected:   2%|▏         | 10/450 [01:00<09:06,  1.24s/it]Running ihdp_connected:   2%|▏         | 11/450 [01:19<1:02:25,  8.53s/it]Running ihdp_connected:   3%|▎         | 12/450 [01:19<49:09,  6.73s/it]  Running ihdp_connected:   3%|▎         | 14/450 [01:19<30:24,  4.18s/it]Running ihdp_connected:   3%|▎         | 15/450 [01:20<24:02,  3.32s/it]/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.831e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 6.952e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 7.690e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.200e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.538e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.737e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.821e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.811e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.727e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.581e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.388e-02, tolerance: 3.761e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.435e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 4.184e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 4.710e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.087e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.346e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.509e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.592e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.611e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.577e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+Running ihdp_connected:   5%|▍         | 21/450 [01:58<37:52,  5.30s/it]Running ihdp_connected:   5%|▍         | 22/450 [01:58<33:23,  4.68s/it]Running ihdp_connected:   5%|▌         | 24/450 [01:59<24:09,  3.40s/it]Running ihdp_connected:   6%|▌         | 26/450 [01:59<17:22,  2.46s/it]Running ihdp_connected:   6%|▌         | 28/450 [01:59<12:30,  1.78s/it]Running ihdp_connected:   7%|▋         | 30/450 [01:59<09:11,  1.31s/it]/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.500e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.390e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.253e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.096e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 4.924e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 4.741e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.435e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 4.184e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 4.710e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.087e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.346e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.509e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.592e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.611e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.577e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.500e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.390e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.253e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.096e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 4.924e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 4.741e-02, tolerance: 2.233e-02
+  model = cd_fast.enet_coordinate_descent(
+Running ihdp_connected:   7%|▋         | 31/450 [02:37<53:02,  7.60s/it]Running ihdp_connected:   7%|▋         | 32/450 [02:38<43:15,  6.21s/it]Running ihdp_connected:   8%|▊         | 35/450 [02:38<23:25,  3.39s/it]Running ihdp_connected:   8%|▊         | 37/450 [02:38<16:20,  2.38s/it]Running ihdp_connected:   9%|▊         | 39/450 [02:38<11:28,  1.68s/it]Running ihdp_connected:   9%|▊         | 39/450 [02:50<11:28,  1.68s/it]Running ihdp_connected:   9%|▉         | 41/450 [03:17<47:41,  7.00s/it]Running ihdp_connected:   9%|▉         | 42/450 [03:17<39:51,  5.86s/it]Running ihdp_connected:  10%|▉         | 44/450 [03:17<26:28,  3.91s/it]Running ihdp_connected:  10%|█         | 46/450 [03:17<17:57,  2.67s/it]Running ihdp_connected:  11%|█         | 48/450 [03:18<12:26,  1.86s/it]
+  Progress: 50/450 futures done, 450 results so far, 0 empty, 0 failed
+Running ihdp_connected:  11%|█         | 50/450 [03:18<08:39,  1.30s/it]Running ihdp_connected:  11%|█         | 50/450 [03:30<08:39,  1.30s/it]Running ihdp_connected:  11%|█▏        | 51/450 [03:57<54:03,  8.13s/it]Running ihdp_connected:  12%|█▏        | 53/450 [03:57<35:37,  5.38s/it]Running ihdp_connected:  12%|█▏        | 55/450 [03:57<23:58,  3.64s/it]Running ihdp_connected:  13%|█▎        | 58/450 [03:57<14:16,  2.18s/it]Running ihdp_connected:  13%|█▎        | 58/450 [04:10<14:16,  2.18s/it]Running ihdp_connected:  14%|█▎        | 61/450 [04:36<40:06,  6.19s/it]Running ihdp_connected:  14%|█▍        | 63/450 [04:36<29:35,  4.59s/it]Running ihdp_connected:  15%|█▍        | 67/450 [04:37<16:57,  2.66s/it]Running ihdp_connected:  15%|█▌        | 69/450 [04:37<13:06,  2.06s/it]Running ihdp_connected:  15%|█▌        | 69/450 [04:50<13:06,  2.06s/it]Running ihdp_connected:  16%|█▌        | 71/450 [05:15<40:03,  6.34s/it]Running ihdp_connected:  16%|█▌        | 72/450 [05:15<34:05,  5.41s/it]Running ihdp_connected:  16%|█▋        | 74/450 [05:16<23:46,  3.79s/it]Running ihdp_connected:  17%|█▋        | 76/450 [05:16<16:39,  2.67s/it]Running ihdp_connected:  17%|█▋        | 78/450 [05:16<11:43,  1.89s/it]Running ihdp_connected:  18%|█▊        | 80/450 [05:16<08:31,  1.38s/it]Running ihdp_connected:  18%|█▊        | 80/450 [05:30<08:31,  1.38s/it]Running ihdp_connected:  18%|█▊        | 81/450 [05:55<49:21,  8.03s/it]Running ihdp_connected:  19%|█▊        | 84/450 [05:55<28:03,  4.60s/it]Running ihdp_connected:  19%|█▉        | 86/450 [05:56<19:55,  3.28s/it]Running ihdp_connected:  20%|█▉        | 88/450 [05:56<14:05,  2.33s/it]Running ihdp_connected:  20%|██        | 90/450 [05:56<10:00,  1.67s/it]Running ihdp_connected:  20%|██        | 90/450 [06:10<10:00,  1.67s/it]Running ihdp_connected:  20%|██        | 91/450 [06:35<48:34,  8.12s/it]Running ihdp_connected:  21%|██        | 93/450 [06:35<32:21,  5.44s/it]Running ihdp_connected:  21%|██▏       | 96/450 [06:35<18:56,  3.21s/it]Running ihdp_connected:  22%|██▏       | 98/450 [06:35<13:37,  2.32s/it]
+  Progress: 100/450 futures done, 900 results so far, 0 empty, 0 failed
+Running ihdp_connected:  22%|██▏       | 100/450 [06:35<09:49,  1.69s/it]Running ihdp_connected:  22%|██▏       | 100/450 [06:50<09:49,  1.69s/it]Running ihdp_connected:  22%|██▏       | 101/450 [07:14<46:39,  8.02s/it]Running ihdp_connected:  23%|██▎       | 103/450 [07:14<31:25,  5.43s/it]Running ihdp_connected:  24%|██▎       | 106/450 [07:14<18:22,  3.20s/it]Running ihdp_connected:  24%|██▍       | 109/450 [07:15<11:35,  2.04s/it]/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.219e-02, tolerance: 1.101e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 6.385e-02, tolerance: 1.101e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.010e-01, tolerance: 1.101e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.060e-02, tolerance: 1.101e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.188e-01, tolerance: 1.101e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.341e-01, tolerance: 1.101e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.420e-01, tolerance: 1.101e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.882e-02, tolerance: 8.133e-03
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.927e-02, tolerance: 8.133e-03
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.396e-02, tolerance: 1.523e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.184e-02, tolerance: 1.523e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.301e-01, tolerance: 1.523e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.529e-01, tolerance: 1.523e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.658e-01, tolerance: 1.523e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.396e-02, tolerance: 1.523e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.184e-02, tolerance: 1.523e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.301e-01, tolerance: 1.523e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.529e-01, tolerance: 1.523e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.658e-01, tolerance: 1.523e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 58 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+Running ihdp_connected:  24%|██▍       | 109/450 [07:30<11:35,  2.04s/it]Running ihdp_connected:  25%|██▍       | 111/450 [07:54<37:12,  6.59s/it]Running ihdp_connected:  25%|██▌       | 113/450 [07:54<27:06,  4.83s/it]Running ihdp_connected:  26%|██▌       | 116/450 [07:54<17:07,  3.08s/it]Running ihdp_connected:  26%|██▌       | 118/450 [07:54<12:46,  2.31s/it]Running ihdp_connected:  27%|██▋       | 120/450 [07:54<09:29,  1.73s/it]Running ihdp_connected:  27%|██▋       | 120/450 [08:10<09:29,  1.73s/it]Running ihdp_connected:  27%|██▋       | 121/450 [08:33<42:18,  7.72s/it]Running ihdp_connected:  27%|██▋       | 123/450 [08:33<28:52,  5.30s/it]Running ihdp_connected:  28%|██▊       | 125/450 [08:33<19:52,  3.67s/it]Running ihdp_connected:  28%|██▊       | 127/450 [08:34<13:59,  2.60s/it]Running ihdp_connected:  29%|██▊       | 129/450 [08:34<09:50,  1.84s/it]Running ihdp_connected:  29%|██▊       | 129/450 [08:50<09:50,  1.84s/it]Running ihdp_connected:  29%|██▉       | 131/450 [09:13<37:51,  7.12s/it]Running ihdp_connected:  29%|██▉       | 132/450 [09:13<31:14,  5.89s/it]Running ihdp_connected:  30%|██▉       | 133/450 [09:13<24:58,  4.73s/it]Running ihdp_connected:  31%|███       | 138/450 [09:13<10:07,  1.95s/it]Running ihdp_connected:  31%|███       | 140/450 [09:14<08:00,  1.55s/it]/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.776e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.982e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 7.400e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.397e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.924e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.192e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.300e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.297e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.213e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.776e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.982e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 7.400e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.397e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.924e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.192e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.300e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.297e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 9.213e-02, tolerance: 4.163e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 69 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 55 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+Running ihdp_connected:  31%|███       | 140/450 [09:30<08:00,  1.55s/it]Running ihdp_connected:  31%|███▏      | 141/450 [09:52<37:00,  7.19s/it]Running ihdp_connected:  32%|███▏      | 142/450 [09:53<30:34,  5.96s/it]Running ihdp_connected:  32%|███▏      | 144/450 [09:53<20:16,  3.98s/it]Running ihdp_connected:  33%|███▎      | 148/450 [09:53<10:15,  2.04s/it]
+  Progress: 150/450 futures done, 1350 results so far, 0 empty, 0 failed
+Running ihdp_connected:  33%|███▎      | 150/450 [09:53<07:40,  1.53s/it]Running ihdp_connected:  33%|███▎      | 150/450 [10:10<07:40,  1.53s/it]Running ihdp_connected:  34%|███▎      | 151/450 [10:33<37:30,  7.53s/it]Running ihdp_connected:  34%|███▍      | 153/450 [10:33<25:50,  5.22s/it]Running ihdp_connected:  34%|███▍      | 155/450 [10:33<18:00,  3.66s/it]Running ihdp_connected:  35%|███▍      | 157/450 [10:33<12:31,  2.56s/it]Running ihdp_connected:  36%|███▌      | 160/450 [10:34<07:35,  1.57s/it]Running ihdp_connected:  36%|███▌      | 160/450 [10:50<07:35,  1.57s/it]Running ihdp_connected:  36%|███▌      | 161/450 [11:13<36:27,  7.57s/it]Running ihdp_connected:  36%|███▌      | 162/450 [11:13<29:50,  6.22s/it]Running ihdp_connected:  37%|███▋      | 165/450 [11:13<16:35,  3.49s/it]Running ihdp_connected:  38%|███▊      | 170/450 [11:14<08:01,  1.72s/it]Running ihdp_connected:  38%|███▊      | 170/450 [11:30<08:01,  1.72s/it]Running ihdp_connected:  38%|███▊      | 171/450 [11:53<30:19,  6.52s/it]Running ihdp_connected:  39%|███▊      | 174/450 [11:53<19:26,  4.23s/it]Running ihdp_connected:  39%|███▉      | 177/450 [11:53<12:56,  2.84s/it]Running ihdp_connected:  40%|████      | 180/450 [11:54<08:51,  1.97s/it]Running ihdp_connected:  40%|████      | 180/450 [12:10<08:51,  1.97s/it]Running ihdp_connected:  40%|████      | 181/450 [12:33<31:12,  6.96s/it]Running ihdp_connected:  41%|████      | 183/450 [12:33<22:36,  5.08s/it]Running ihdp_connected:  42%|████▏     | 188/450 [12:34<11:18,  2.59s/it]Running ihdp_connected:  42%|████▏     | 188/450 [12:50<11:18,  2.59s/it]Running ihdp_connected:  42%|████▏     | 191/450 [13:13<24:50,  5.76s/it]Running ihdp_connected:  43%|████▎     | 192/450 [13:14<21:47,  5.07s/it]Running ihdp_connected:  43%|████▎     | 194/450 [13:14<16:02,  3.76s/it]Running ihdp_connected:  44%|████▎     | 196/450 [13:14<11:40,  2.76s/it]
+  Progress: 200/450 futures done, 1800 results so far, 0 empty, 0 failed
+Running ihdp_connected:  44%|████▍     | 200/450 [13:14<06:31,  1.56s/it]Running ihdp_connected:  44%|████▍     | 200/450 [13:30<06:31,  1.56s/it]Running ihdp_connected:  45%|████▍     | 201/450 [13:54<27:51,  6.71s/it]Running ihdp_connected:  45%|████▍     | 202/450 [13:54<23:23,  5.66s/it]Running ihdp_connected:  45%|████▌     | 204/450 [13:54<15:56,  3.89s/it]Running ihdp_connected:  46%|████▌     | 206/450 [13:54<10:57,  2.70s/it]Running ihdp_connected:  46%|████▋     | 209/450 [13:54<06:35,  1.64s/it]Running ihdp_connected:  46%|████▋     | 209/450 [14:10<06:35,  1.64s/it]Running ihdp_connected:  47%|████▋     | 211/450 [14:34<26:28,  6.65s/it]Running ihdp_connected:  47%|████▋     | 212/450 [14:34<22:11,  5.59s/it]Running ihdp_connected:  48%|████▊     | 214/450 [14:34<15:03,  3.83s/it]Running ihdp_connected:  48%|████▊     | 216/450 [14:34<10:20,  2.65s/it]Running ihdp_connected:  48%|████▊     | 218/450 [14:35<07:14,  1.87s/it]Running ihdp_connected:  48%|████▊     | 218/450 [14:50<07:14,  1.87s/it]Running ihdp_connected:  49%|████▉     | 221/450 [15:14<24:15,  6.36s/it]Running ihdp_connected:  50%|████▉     | 223/450 [15:14<17:32,  4.64s/it]Running ihdp_connected:  50%|█████     | 225/450 [15:14<12:33,  3.35s/it]Running ihdp_connected:  51%|█████     | 228/450 [15:15<07:49,  2.11s/it]Running ihdp_connected:  51%|█████     | 230/450 [15:15<05:47,  1.58s/it]Running ihdp_connected:  51%|█████     | 230/450 [15:30<05:47,  1.58s/it]Running ihdp_connected:  51%|█████▏    | 231/450 [15:54<27:43,  7.60s/it]Running ihdp_connected:  52%|█████▏    | 232/450 [15:54<22:39,  6.24s/it]Running ihdp_connected:  52%|█████▏    | 234/450 [15:55<14:49,  4.12s/it]Running ihdp_connected:  53%|█████▎    | 237/450 [15:55<08:27,  2.38s/it]Running ihdp_connected:  53%|█████▎    | 237/450 [16:10<08:27,  2.38s/it]Running ihdp_connected:  54%|█████▎    | 241/450 [16:35<20:07,  5.78s/it]Running ihdp_connected:  54%|█████▍    | 243/450 [16:35<15:12,  4.41s/it]Running ihdp_connected:  54%|█████▍    | 245/450 [16:35<11:14,  3.29s/it]Running ihdp_connected:  55%|█████▍    | 247/450 [16:35<08:18,  2.46s/it]
+  Progress: 250/450 futures done, 2250 results so far, 0 empty, 0 failed
+Running ihdp_connected:  55%|█████▍    | 247/450 [16:50<08:18,  2.46s/it]Running ihdp_connected:  56%|█████▌    | 251/450 [17:15<18:51,  5.68s/it]Running ihdp_connected:  56%|█████▌    | 252/450 [17:15<16:20,  4.95s/it]Running ihdp_connected:  57%|█████▋    | 256/450 [17:15<09:06,  2.82s/it]Running ihdp_connected:  58%|█████▊    | 259/450 [17:16<06:10,  1.94s/it]Running ihdp_connected:  58%|█████▊    | 259/450 [17:30<06:10,  1.94s/it]Running ihdp_connected:  58%|█████▊    | 261/450 [17:55<19:09,  6.08s/it]Running ihdp_connected:  58%|█████▊    | 262/450 [17:55<16:26,  5.25s/it]Running ihdp_connected:  59%|█████▊    | 264/450 [17:56<11:43,  3.78s/it]Running ihdp_connected:  59%|█████▉    | 267/450 [17:56<07:09,  2.35s/it]Running ihdp_connected:  60%|█████▉    | 269/450 [17:56<05:14,  1.74s/it]Running ihdp_connected:  60%|█████▉    | 269/450 [18:10<05:14,  1.74s/it]Running ihdp_connected:  60%|██████    | 271/450 [18:36<20:08,  6.75s/it]Running ihdp_connected:  60%|██████    | 272/450 [18:36<16:47,  5.66s/it]Running ihdp_connected:  61%|██████    | 274/450 [18:36<11:23,  3.88s/it]Running ihdp_connected:  61%|██████▏   | 276/450 [18:36<07:48,  2.69s/it]Running ihdp_connected:  62%|██████▏   | 279/450 [18:36<04:38,  1.63s/it]Running ihdp_connected:  62%|██████▏   | 279/450 [18:50<04:38,  1.63s/it]Running ihdp_connected:  62%|██████▏   | 281/450 [19:16<18:36,  6.61s/it]Running ihdp_connected:  63%|██████▎   | 282/450 [19:16<15:31,  5.55s/it]Running ihdp_connected:  63%|██████▎   | 285/450 [19:16<08:59,  3.27s/it]Running ihdp_connected:  64%|██████▍   | 288/450 [19:16<05:40,  2.10s/it]Running ihdp_connected:  64%|██████▍   | 290/450 [19:16<04:10,  1.57s/it]Running ihdp_connected:  64%|██████▍   | 290/450 [19:30<04:10,  1.57s/it]Running ihdp_connected:  65%|██████▍   | 291/450 [19:56<19:52,  7.50s/it]Running ihdp_connected:  65%|██████▌   | 293/450 [19:56<13:38,  5.21s/it]Running ihdp_connected:  66%|██████▌   | 296/450 [19:56<08:04,  3.15s/it]Running ihdp_connected:  66%|██████▌   | 298/450 [19:56<05:50,  2.30s/it]
+  Progress: 300/450 futures done, 2700 results so far, 0 empty, 0 failed
+Running ihdp_connected:  67%|██████▋   | 300/450 [19:56<04:12,  1.68s/it]Running ihdp_connected:  67%|██████▋   | 300/450 [20:10<04:12,  1.68s/it]Running ihdp_connected:  67%|██████▋   | 301/450 [20:36<19:58,  8.04s/it]Running ihdp_connected:  67%|██████▋   | 302/450 [20:36<16:07,  6.54s/it]Running ihdp_connected:  68%|██████▊   | 306/450 [20:36<07:29,  3.12s/it]Running ihdp_connected:  69%|██████▉   | 310/450 [20:37<04:13,  1.81s/it]Running ihdp_connected:  69%|██████▉   | 310/450 [20:50<04:13,  1.81s/it]Running ihdp_connected:  69%|██████▉   | 311/450 [21:17<15:58,  6.90s/it]Running ihdp_connected:  70%|██████▉   | 314/450 [21:17<10:01,  4.43s/it]Running ihdp_connected:  70%|███████   | 316/450 [21:17<07:23,  3.31s/it]Running ihdp_connected:  71%|███████   | 318/450 [21:17<05:22,  2.45s/it]Running ihdp_connected:  71%|███████   | 320/450 [21:18<03:56,  1.82s/it]Running ihdp_connected:  71%|███████   | 320/450 [21:30<03:56,  1.82s/it]Running ihdp_connected:  71%|███████▏  | 321/450 [21:57<17:19,  8.06s/it]Running ihdp_connected:  72%|███████▏  | 322/450 [21:58<14:02,  6.58s/it]Running ihdp_connected:  72%|███████▏  | 325/450 [21:58<07:34,  3.64s/it]Running ihdp_connected:  73%|███████▎  | 327/450 [21:58<05:15,  2.57s/it]Running ihdp_connected:  73%|███████▎  | 329/450 [21:58<03:45,  1.86s/it]Running ihdp_connected:  73%|███████▎  | 329/450 [22:10<03:45,  1.86s/it]Running ihdp_connected:  74%|███████▎  | 331/450 [22:38<14:21,  7.24s/it]Running ihdp_connected:  74%|███████▍  | 333/450 [22:38<09:55,  5.09s/it]Running ihdp_connected:  74%|███████▍  | 335/450 [22:38<06:51,  3.58s/it]Running ihdp_connected:  75%|███████▍  | 337/450 [22:38<04:46,  2.53s/it]Running ihdp_connected:  75%|███████▌  | 339/450 [22:38<03:19,  1.80s/it]Running ihdp_connected:  75%|███████▌  | 339/450 [22:50<03:19,  1.80s/it]Running ihdp_connected:  76%|███████▌  | 341/450 [23:18<13:07,  7.22s/it]Running ihdp_connected:  76%|███████▌  | 342/450 [23:18<10:44,  5.97s/it]Running ihdp_connected:  77%|███████▋  | 345/450 [23:19<06:00,  3.44s/it]Running ihdp_connected:  77%|███████▋  | 348/450 [23:19<03:40,  2.16s/it]
+  Progress: 350/450 futures done, 3150 results so far, 0 empty, 0 failed
+Running ihdp_connected:  77%|███████▋  | 348/450 [23:30<03:40,  2.16s/it]Running ihdp_connected:  78%|███████▊  | 351/450 [23:58<09:59,  6.06s/it]Running ihdp_connected:  78%|███████▊  | 353/450 [23:59<07:23,  4.57s/it]Running ihdp_connected:  79%|███████▉  | 355/450 [23:59<05:22,  3.40s/it]Running ihdp_connected:  80%|███████▉  | 358/450 [23:59<03:21,  2.19s/it]Running ihdp_connected:  80%|████████  | 360/450 [23:59<02:27,  1.64s/it]Running ihdp_connected:  80%|████████  | 360/450 [24:10<02:27,  1.64s/it]Running ihdp_connected:  80%|████████  | 361/450 [24:39<11:05,  7.47s/it]Running ihdp_connected:  80%|████████  | 362/450 [24:39<09:01,  6.16s/it]Running ihdp_connected:  81%|████████  | 365/450 [24:39<04:56,  3.48s/it]Running ihdp_connected:  82%|████████▏ | 368/450 [24:39<02:57,  2.17s/it]Running ihdp_connected:  82%|████████▏ | 368/450 [24:50<02:57,  2.17s/it]Running ihdp_connected:  82%|████████▏ | 371/450 [25:19<08:05,  6.14s/it]Running ihdp_connected:  83%|████████▎ | 373/450 [25:19<05:55,  4.61s/it]Running ihdp_connected:  83%|████████▎ | 375/450 [25:20<04:16,  3.42s/it]Running ihdp_connected:  84%|████████▍ | 378/450 [25:20<02:38,  2.20s/it]Running ihdp_connected:  84%|████████▍ | 378/450 [25:40<02:38,  2.20s/it]Running ihdp_connected:  85%|████████▍ | 381/450 [26:00<06:56,  6.04s/it]Running ihdp_connected:  85%|████████▍ | 382/450 [26:00<05:54,  5.22s/it]Running ihdp_connected:  85%|████████▌ | 384/450 [26:01<04:08,  3.77s/it]Running ihdp_connected:  86%|████████▌ | 388/450 [26:01<02:09,  2.09s/it]Running ihdp_connected:  87%|████████▋ | 390/450 [26:01<01:37,  1.62s/it]Running ihdp_connected:  87%|████████▋ | 390/450 [26:20<01:37,  1.62s/it]Running ihdp_connected:  87%|████████▋ | 391/450 [26:41<07:11,  7.31s/it]Running ihdp_connected:  88%|████████▊ | 394/450 [26:41<04:11,  4.49s/it]Running ihdp_connected:  88%|████████▊ | 396/450 [26:42<02:59,  3.31s/it]Running ihdp_connected:  88%|████████▊ | 398/450 [26:42<02:05,  2.41s/it]
+  Progress: 400/450 futures done, 3600 results so far, 0 empty, 0 failed
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.016e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 5.025e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 6.405e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 7.300e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 7.856e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.175e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.325e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 6.395e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 6.702e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 7.418e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 7.688e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 7.712e-01, tolerance: 5.882e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 62 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+Running ihdp_connected:  88%|████████▊ | 398/450 [27:00<02:05,  2.41s/it]Running ihdp_connected:  89%|████████▉ | 401/450 [27:22<05:17,  6.47s/it]Running ihdp_connected:  89%|████████▉ | 402/450 [27:22<04:25,  5.54s/it]Running ihdp_connected:  90%|█████████ | 405/450 [27:22<02:33,  3.40s/it]Running ihdp_connected:  90%|█████████ | 407/450 [27:22<01:47,  2.49s/it]Running ihdp_connected:  91%|█████████ | 410/450 [27:23<01:04,  1.62s/it]Running ihdp_connected:  91%|█████████ | 410/450 [27:40<01:04,  1.62s/it]Running ihdp_connected:  91%|█████████▏| 411/450 [28:02<04:43,  7.28s/it]Running ihdp_connected:  92%|█████████▏| 413/450 [28:02<03:10,  5.15s/it]Running ihdp_connected:  92%|█████████▏| 415/450 [28:03<02:06,  3.63s/it]Running ihdp_connected:  93%|█████████▎| 417/450 [28:03<01:24,  2.57s/it]Running ihdp_connected:  93%|█████████▎| 419/450 [28:03<00:56,  1.82s/it]Running ihdp_connected:  93%|█████████▎| 419/450 [28:20<00:56,  1.82s/it]Running ihdp_connected:  94%|█████████▎| 421/450 [28:43<03:29,  7.23s/it]Running ihdp_connected:  94%|█████████▍| 423/450 [28:43<02:17,  5.08s/it]Running ihdp_connected:  94%|█████████▍| 425/450 [28:43<01:29,  3.58s/it]Running ihdp_connected:  95%|█████████▍| 427/450 [28:43<00:58,  2.55s/it]Running ihdp_connected:  95%|█████████▌| 429/450 [28:43<00:37,  1.81s/it]Running ihdp_connected:  95%|█████████▌| 429/450 [29:00<00:37,  1.81s/it]Running ihdp_connected:  96%|█████████▌| 431/450 [29:23<02:17,  7.22s/it]Running ihdp_connected:  96%|█████████▌| 433/450 [29:23<01:26,  5.08s/it]Running ihdp_connected:  97%|█████████▋| 436/450 [29:23<00:43,  3.11s/it]Running ihdp_connected:  97%|█████████▋| 438/450 [29:24<00:27,  2.29s/it]Running ihdp_connected:  97%|█████████▋| 438/450 [29:40<00:27,  2.29s/it]Running ihdp_connected:  98%|█████████▊| 441/450 [30:03<00:56,  6.31s/it]Running ihdp_connected:  99%|█████████▊| 444/450 [30:03<00:24,  4.16s/it]Running ihdp_connected:  99%|█████████▉| 447/450 [30:04<00:08,  2.81s/it]Running ihdp_connected: 100%|█████████▉| 449/450 [30:04<00:02,  2.16s/it]
+  Progress: 450/450 futures done, 4050 results so far, 0 empty, 0 failed
+Running ihdp_connected: 100%|██████████| 450/450 [30:04<00:00,  4.01s/it]/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 69 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 93 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 93 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 54 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 42 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 64 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 62 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 48 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 48 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 54 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 54 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 79 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 67 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 63 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.998e-02, tolerance: 1.931e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 4.704e-02, tolerance: 1.931e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 8.998e-02, tolerance: 1.931e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 4.704e-02, tolerance: 1.931e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 48 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 48 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 48 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 42 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 56 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 45 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 48 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 65 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 67 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 64 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 62 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 54 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 66 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 41 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 62 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 67 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 63 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 54 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 67 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 58 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 48 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 94 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 93 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 64 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 2.602e-01, tolerance: 2.540e-01
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 2.539e-01, tolerance: 1.854e-01
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 64 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 64 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 77 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 45 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 62 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 2.794e-01, tolerance: 2.166e-01
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 38 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 68 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 63 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.565e-02, tolerance: 2.149e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.565e-02, tolerance: 2.149e-02
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 45 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 44 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 64 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 62 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 69 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 42 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 54 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.149e-01, tolerance: 1.099e-01
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 1.936e-01, tolerance: 1.099e-01
+  model = cd_fast.enet_coordinate_descent(
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 57 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 76 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 43 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 54 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 45 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 49 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 65 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 65 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 48 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 93 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 68 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 48 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 53 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/venv/lib/python3.8/site-packages/scipy/stats/_stats_py.py:4916: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  warnings.warn(stats.ConstantInputWarning(warn_msg))
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 52 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 68 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 79 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 63 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 93 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=50 but only 46 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 68 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 50 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 51 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 41 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+/home/zwang937/Sparse_TL_DR_ICHI2026/src/ihdp_multisite.py:314: UserWarning: Requested m1=100 but only 47 treated available
+  warnings.warn(f"Requested m1={m1} but only {n_treated} treated available")
+
+
+Task summary: 450 total, 450 succeeded, 0 returned empty, 0 raised exceptions
+Total results collected: 4050
+Created DataFrame: 4050 rows x 34 cols
+
+Saved raw results to: results/ihdp_connected/results_rep_ihdp_connected_sweep.csv
+Aggregating 4050 rows, columns: ['benchmark_id', 'method', 'rep_id', 'seed', 'feasible', 'runtime_seconds', 'm0', 'm1', 'n_sites', 'pehe', 'ate_hat', 'ate_abs_err', 'ate_bias', 'tau_corr', 'tau_kendall', 'topk_10_ratio', 'topk_20_ratio', 'topk_30_ratio', 'topk_10_captured', 'topk_20_captured', 'qini_auc', 'calib_slope', 'calib_intercept', 'calib_r2', 'tau_ece', 'tau_mce', 'policy_value', 'policy_regret', 'policy_value_top20', 'policy_regret_top20', 'mu0_rmse', 'mu1_rmse', 'diag_realization_id', 'diag_n_sites']
+Saved aggregated results to: results/ihdp_connected/results_agg_ihdp_connected_sweep.csv
+
+============================================================
+Sweep Status Summary:
+  ihdp_connected: OK
+============================================================
+
+>>> Generating LaTeX tables...
+Generated: P3_IHDP_Connected_PEHE.tex
+Warning: results/ihdp_connected/results_agg_ihdp_disconnected_sweep.csv not found
+
+============================================================
+IHDP experiments complete!
+============================================================
