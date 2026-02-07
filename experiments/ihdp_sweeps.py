@@ -223,16 +223,21 @@ def _aggregate_ihdp_results(df: pd.DataFrame) -> pd.DataFrame:
     Groups by (benchmark_id, method, m0, m1, n_sites) and computes
     mean/std for each metric.
     """
-    # Debug: show what columns are in the DataFrame
-    print(f"DEBUG: DataFrame columns = {list(df.columns)}")
-    print(f"DEBUG: DataFrame shape = {df.shape}")
+    # Guard: empty DataFrame
+    if df.empty or len(df) == 0:
+        print(f"WARNING: DataFrame is empty (shape={df.shape}). "
+              f"No results to aggregate — check if workers failed silently.")
+        return pd.DataFrame()
+    
+    print(f"Aggregating {len(df)} rows, columns: {list(df.columns)}")
     
     # Group columns (scenario identifiers) - only use columns that exist
     all_group_cols = ['benchmark_id', 'method', 'm0', 'm1', 'n_sites']
     group_cols = [c for c in all_group_cols if c in df.columns]
     
     if not group_cols:
-        raise ValueError(f"No group columns found in DataFrame. Columns: {list(df.columns)}")
+        print(f"WARNING: No group columns found in DataFrame. Columns: {list(df.columns)}")
+        return pd.DataFrame()
     
     # Metric columns (numeric columns to aggregate)
     metric_cols = [c for c in df.columns if c not in group_cols + 
@@ -515,24 +520,49 @@ def run_ihdp_sweep(
         print(f"Output: {output_dir}")
         print(f"{'='*60}\n")
     
-    # Prepare tasks
+    # Prepare tasks — always set verbose=True so worker errors are surfaced
     tasks = []
     for scenario in scenarios:
         for rep_id in range(n_rep):
-            tasks.append((scenario, methods, rep_id, base_seed, False))
+            tasks.append((scenario, methods, rep_id, base_seed, True))
+    
+    # Sanity check: run ONE task sequentially first to catch import/data errors early
+    if verbose:
+        print("Sanity check: running 1 task sequentially...")
+    try:
+        test_results = run_single_ihdp_replication(tasks[0])
+        if not test_results:
+            print("ERROR: Sanity check task returned 0 results! "
+                  "Data generation likely failed. Check IHDP data path.")
+            print("Aborting sweep.")
+            return pd.DataFrame()
+        else:
+            print(f"Sanity check passed: {len(test_results)} results from 1 task.")
+    except Exception as e:
+        print(f"ERROR: Sanity check failed with exception: {e}")
+        import traceback
+        traceback.print_exc()
+        return pd.DataFrame()
     
     # Run tasks
     all_results = []
+    n_empty_tasks = 0
+    n_failed_tasks = 0
     
     if n_jobs == 1:
         # Sequential execution
         for task in tqdm(tasks, desc=f"Running {sweep_name}", disable=not verbose):
             results = run_single_ihdp_replication(task)
+            if not results:
+                n_empty_tasks += 1
             all_results.extend(results)
     else:
         # Parallel execution
         if n_jobs == -1:
             n_jobs = multiprocessing.cpu_count()
+        
+        if verbose:
+            print(f"Using {n_jobs} parallel workers")
         
         with ProcessPoolExecutor(max_workers=n_jobs) as executor:
             futures = [executor.submit(run_single_ihdp_replication, task) for task in tasks]
@@ -541,10 +571,28 @@ def run_ihdp_sweep(
                              desc=f"Running {sweep_name}", disable=not verbose):
                 try:
                     results = future.result()
+                    if not results:
+                        n_empty_tasks += 1
                     all_results.extend(results)
                 except Exception as e:
-                    if verbose:
-                        print(f"Task failed: {e}")
+                    n_failed_tasks += 1
+                    # Always print task failures (not gated by verbose)
+                    print(f"\nTask FAILED: {e}")
+    
+    # Summary of task outcomes
+    n_total_tasks = len(tasks)
+    print(f"\nTask summary: {n_total_tasks} total, "
+          f"{n_total_tasks - n_empty_tasks - n_failed_tasks} succeeded, "
+          f"{n_empty_tasks} returned empty, {n_failed_tasks} raised exceptions")
+    print(f"Total results collected: {len(all_results)}")
+    
+    if len(all_results) == 0:
+        print("ERROR: No results collected! All tasks failed or returned empty.")
+        print("Common causes:")
+        print("  - IHDP data not found (check L1-TCL/dat/ihdp/csv/ exists)")
+        print("  - Import errors in worker processes")
+        print("  - Try running with --n_jobs 1 to see detailed errors")
+        return pd.DataFrame()
     
     # Convert to DataFrame
     records = []
@@ -577,12 +625,7 @@ def run_ihdp_sweep(
         records.append(record)
     
     df = pd.DataFrame(records)
-    
-    # Debug: check if DataFrame is empty or missing columns
-    print(f"DEBUG: Created DataFrame with {len(df)} rows and columns: {list(df.columns)}")
-    
-    if df.empty:
-        print("WARNING: DataFrame is empty! Check if methods ran successfully.")
+    print(f"Created DataFrame: {df.shape[0]} rows x {df.shape[1]} cols")
     
     # Save results
     os.makedirs(output_dir, exist_ok=True)

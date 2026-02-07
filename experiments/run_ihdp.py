@@ -309,9 +309,10 @@ def main():
     print(f"{'='*60}\n")
     
     # Run sweeps
+    sweep_status = {}
     for sweep in sweeps:
         print(f"\n>>> Running {sweep}...")
-        run_ihdp_sweep(
+        df = run_ihdp_sweep(
             sweep_name=sweep,
             n_rep=n_rep,
             n_jobs=args.n_jobs,
@@ -319,6 +320,14 @@ def main():
             base_seed=args.seed,
             verbose=True
         )
+        sweep_status[sweep] = 'OK' if (df is not None and len(df) > 0) else 'EMPTY/FAILED'
+    
+    # Print sweep status summary
+    print(f"\n{'='*60}")
+    print("Sweep Status Summary:")
+    for sweep, status in sweep_status.items():
+        print(f"  {sweep}: {status}")
+    print(f"{'='*60}")
     
     # Generate tables
     print("\n>>> Generating LaTeX tables...")
