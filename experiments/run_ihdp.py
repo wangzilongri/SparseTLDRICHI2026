@@ -21,6 +21,9 @@ Usage:
     #   results/IHDP connected/results_agg_ihdp_connected_sweep.csv
     #   results/IHDP disconnected/results_agg_ihdp_disconnected_sweep.csv
     python experiments/run_ihdp.py --tables_only --output results
+
+    # Run only the A6 diagnostic (no estimator fitting); writes A_IHDP_A6_Diagnostic.tex
+    python experiments/run_ihdp.py --diagnostic_only --n_rep 50
 """
 
 import os
@@ -34,7 +37,8 @@ from datetime import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from ihdp_sweeps import (
-    run_ihdp_sweep, IHDP_SWEEP_CONFIGS,
+    run_ihdp_sweep, run_ihdp_a6_diagnostic_only,
+    IHDP_SWEEP_CONFIGS,
     IHDP_METHODS_OPTION_A, IHDP_METHODS_OPTION_B
 )
 
@@ -156,6 +160,8 @@ def generate_ihdp_latex_tables(results_dir: str, output_dir: str) -> None:
     
     # Screening validity (if raw rep-level results with diagnostics exist)
     _generate_screening_validity_if_available(results_dir, output_dir)
+    # A6 diagnostic: placebo screening vs CATE transportability (disconnected)
+    _generate_a6_diagnostic_if_available(results_dir, output_dir)
 
 
 def _generate_pehe_table(
@@ -436,6 +442,54 @@ def _generate_screening_validity_if_available(results_dir: str, output_dir: str)
             pass  # Skip if columns or format differ
 
 
+def _write_a6_diagnostic_tex(mean_corr: float, sd_corr: float, n_rep: int, output_path: str) -> None:
+    """Write A_IHDP_A6_Diagnostic.tex with given summary stats."""
+    lines = [
+        '\\begin{table}[t]',
+        '\\centering',
+        '\\caption{IHDP disconnected regime: A6 diagnostic. Spearman correlation between placebo-arm screening score (MSE of source $\\mu_0$ on target placebo) and CATE transport error (PEHE of source $\\tau_c$ on target) across candidate sources. Weak correlation indicates placebo compatibility is not predictive of CATE compatibility (A6 empirically tenuous).}',
+        '\\label{tab:ihdp_a6_diagnostic}',
+        '\\scriptsize',
+        '\\begin{tabular}{lrr}',
+        '\\toprule',
+        ' & Mean $\\pm$ SD & N \\\\',
+        '\\midrule',
+        f'Spearman (placebo score vs CATE PEHE) & ${mean_corr:.3f} \\pm {sd_corr:.3f}$ & {n_rep} \\\\',
+        '\\bottomrule',
+        '\\end{tabular}',
+        '\\end{table}',
+    ]
+    with open(output_path, 'w') as f:
+        f.write('\n'.join(lines))
+
+
+def _generate_a6_diagnostic_if_available(results_dir: str, output_dir: str) -> None:
+    """
+    If disconnected rep-level results contain diag_a6_spearman_corr (placebo vs CATE
+    correlation across sources), write A_IHDP_A6_Diagnostic.tex for the appendix.
+    """
+    path = _find_ihdp_agg_file(results_dir, 'results_rep_ihdp_disconnected_sweep.csv')
+    if not os.path.exists(path):
+        return
+    try:
+        df = pd.read_csv(path)
+        if 'diag_a6_spearman_corr' not in df.columns:
+            return
+        # One value per (rep_id, m0); take first row per (rep_id, m0) to avoid weighting by method count
+        dedup = df[['rep_id', 'm0', 'diag_a6_spearman_corr']].drop_duplicates(subset=['rep_id', 'm0'])
+        vals = dedup['diag_a6_spearman_corr'].dropna()
+        if len(vals) < 2:
+            return
+        mean_corr = float(vals.mean())
+        sd_corr = float(vals.std())
+        n_rep = int(len(vals))
+        out_path = os.path.join(output_dir, 'A_IHDP_A6_Diagnostic.tex')
+        _write_a6_diagnostic_tex(mean_corr, sd_corr, n_rep, out_path)
+        print(f"Generated: A_IHDP_A6_Diagnostic.tex")
+    except Exception:
+        pass
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -456,6 +510,8 @@ def main():
                        help='Output directory (or parent of IHDP connected / IHDP disconnected folders)')
     parser.add_argument('--tables_only', action='store_true',
                        help='Generate tables from existing results')
+    parser.add_argument('--diagnostic_only', action='store_true',
+                       help='Run only A6 diagnostic (data gen + correlation, no estimators); write A_IHDP_A6_Diagnostic.tex')
     parser.add_argument('--tables_output', type=str, default=None,
                        help='Output directory for LaTeX tables')
     parser.add_argument('--seed', type=int, default=42,
@@ -472,6 +528,26 @@ def main():
             'Paper', 'Transfer-Learning-for-Individual-Patient-Data-for-Clinical-Trials', 
             'Tables'
         )
+    
+    # Diagnostic-only mode: run A6 diagnostic without any experiment results
+    if args.diagnostic_only:
+        n_rep = args.n_rep if args.n_rep is not None else 50
+        print(f"Running A6 diagnostic only (n_rep={n_rep}, seed={args.seed})...")
+        df = run_ihdp_a6_diagnostic_only(n_rep=n_rep, base_seed=args.seed, verbose=True)
+        if df.empty or len(df) < 2:
+            print("Warning: Too few diagnostic results; need at least 2.")
+            return
+        vals = df['diag_a6_spearman_corr'].dropna()
+        if len(vals) < 2:
+            print("Warning: Too few valid Spearman values.")
+            return
+        mean_corr = float(vals.mean())
+        sd_corr = float(vals.std())
+        out_path = os.path.join(tables_dir, 'A_IHDP_A6_Diagnostic.tex')
+        os.makedirs(tables_dir, exist_ok=True)
+        _write_a6_diagnostic_tex(mean_corr, sd_corr, int(len(vals)), out_path)
+        print(f"Wrote {out_path} (mean Spearman = {mean_corr:.3f} ± {sd_corr:.3f}, N = {len(vals)})")
+        return
     
     # Tables only mode
     if args.tables_only:

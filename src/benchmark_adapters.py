@@ -457,7 +457,9 @@ def create_ihdp_data_generator() -> Callable:
             'mu0_true': ihdp_data.mu0_true_target,
             'mu1_true': ihdp_data.mu1_true_target,
             'ate_true': ihdp_data.ate_true_target,
-            
+            # Source ground truth (for A6 diagnostic: per-source CATE transport)
+            'tau_true_source': ihdp_data.tau_true_source,
+
             # Propensity
             'propensity_target': np.full(len(ihdp_data.X_target), propensity),
             

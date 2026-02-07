@@ -41,6 +41,9 @@ from typing import Dict, Any
 from benchmark_adapters import (
     create_ihdp_data_generator, create_metric_computer, create_method_factories
 )
+from scipy.stats import spearmanr, pearsonr
+from sklearn.linear_model import Ridge
+from sklearn.preprocessing import StandardScaler
 
 
 # =============================================================================
@@ -318,6 +321,151 @@ def generate_ihdp_scenarios(config: dict) -> List[Scenario]:
 
 
 # =============================================================================
+# A6 DIAGNOSTIC: Placebo screening score vs CATE transportability
+# =============================================================================
+
+def compute_a6_diagnostic(data: Dict[str, Any]) -> Optional[Dict[str, float]]:
+    """
+    Compute correlation between placebo-arm compatibility and CATE compatibility
+    across sources (Assumption A6 diagnostic).
+    
+    For each source c:
+    - Placebo score: MSE of source c's mu_0 fit evaluated on target placebo.
+      (Higher = worse placebo compatibility.)
+    - CATE PEHE: PEHE when transporting source c's CATE to target.
+      (Higher = worse CATE transportability.)
+    
+    Returns Spearman and Pearson correlation between (placebo_MSE_c) and (CATE_PEHE_c).
+    Negative correlation => placebo compatibility predictive of CATE compatibility (A6 supported).
+    Weak or positive => A6 empirically tenuous.
+    
+    Requires data to contain: X_source, A_source, Y_source, c_source, X_target, A_target,
+    Y_target, tau_true (target), tau_true_source.
+    """
+    required = [
+        'X_source', 'A_source', 'Y_source', 'c_source',
+        'X_target', 'A_target', 'Y_target', 'tau_true', 'tau_true_source'
+    ]
+    if any(k not in data for k in required):
+        return None
+    
+    X_s = np.asarray(data['X_source'], dtype=np.float64)
+    A_s = np.asarray(data['A_source'], dtype=np.float64).flatten()
+    Y_s = np.asarray(data['Y_source'], dtype=np.float64).flatten()
+    c_s = np.asarray(data['c_source'], dtype=np.int64).flatten()
+    X_t = np.asarray(data['X_target'], dtype=np.float64)
+    A_t = np.asarray(data['A_target'], dtype=np.float64).flatten()
+    Y_t = np.asarray(data['Y_target'], dtype=np.float64).flatten()
+    tau_t = np.asarray(data['tau_true'], dtype=np.float64).flatten()
+    tau_s = np.asarray(data['tau_true_source'], dtype=np.float64).flatten()
+    
+    target_placebo_mask = (A_t == 0)
+    X_t_placebo = X_t[target_placebo_mask]
+    Y_t_placebo = Y_t[target_placebo_mask]
+    if X_t_placebo.shape[0] < 2:
+        return None
+    
+    scaler_X = StandardScaler()
+    X_t_scaled = scaler_X.fit_transform(X_t)
+    X_t_placebo_scaled = scaler_X.transform(X_t_placebo)
+    
+    placebo_mse_per_source = []
+    cate_pehe_per_source = []
+    unique_sources = np.unique(c_s)
+    
+    for c in unique_sources:
+        mask_c = (c_s == c)
+        X_c = X_s[mask_c]
+        A_c = A_s[mask_c]
+        Y_c = Y_s[mask_c]
+        tau_c = tau_s[mask_c]
+        
+        X_c_scaled = scaler_X.transform(X_c)
+        
+        # Placebo: fit mu_0 on source c control, MSE on target placebo
+        ctrl_c = (A_c == 0)
+        if ctrl_c.sum() < 2:
+            continue
+        X_c_0 = X_c_scaled[ctrl_c]
+        Y_c_0 = Y_c[ctrl_c]
+        model_mu0 = Ridge(alpha=1.0).fit(X_c_0, Y_c_0)
+        pred_placebo = model_mu0.predict(X_t_placebo_scaled)
+        mse_placebo = float(np.mean((pred_placebo - Y_t_placebo) ** 2))
+        placebo_mse_per_source.append(mse_placebo)
+        
+        # CATE: fit tau_c on source c (X, tau_true), predict on target, PEHE
+        model_tau = Ridge(alpha=1.0).fit(X_c_scaled, tau_c)
+        tau_pred_t = model_tau.predict(X_t_scaled)
+        pehe_c = float(np.sqrt(np.mean((tau_pred_t - tau_t) ** 2)))
+        cate_pehe_per_source.append(pehe_c)
+    
+    if len(placebo_mse_per_source) < 2:
+        return None
+    
+    placebo_mse_per_source = np.array(placebo_mse_per_source)
+    cate_pehe_per_source = np.array(cate_pehe_per_source)
+    
+    try:
+        r_spearman, _ = spearmanr(placebo_mse_per_source, cate_pehe_per_source)
+        r_pearson, _ = pearsonr(placebo_mse_per_source, cate_pehe_per_source)
+    except Exception:
+        return None
+    
+    return {
+        'diag_a6_spearman_corr': float(r_spearman) if not np.isnan(r_spearman) else np.nan,
+        'diag_a6_pearson_corr': float(r_pearson) if not np.isnan(r_pearson) else np.nan,
+        'diag_a6_n_sources': len(placebo_mse_per_source),
+    }
+
+
+def run_ihdp_a6_diagnostic_only(
+    n_rep: int = 50,
+    base_seed: int = 42,
+    verbose: bool = True,
+) -> pd.DataFrame:
+    """
+    Run only the A6 diagnostic (data generation + correlation) for IHDP disconnected
+    regime, without fitting any estimators. Uses the same scenarios and seeds as
+    the full ihdp_disconnected sweep so results are comparable.
+    
+    Returns a DataFrame with columns: rep_id, m0, diag_a6_spearman_corr,
+    diag_a6_pearson_corr, diag_a6_n_sources (one row per scenario x rep).
+    """
+    config = IHDP_SWEEP_CONFIGS['ihdp_disconnected']
+    scenarios = generate_ihdp_scenarios(config)
+    data_gen = create_ihdp_data_generator()
+    
+    rows = []
+    n_tasks = len(scenarios) * n_rep
+    for scenario in tqdm(scenarios, desc='Scenarios', disable=not verbose):
+        for rep_id in range(n_rep):
+            seed = generate_seed(scenario.scenario_id, rep_id, base_seed)
+            try:
+                data = data_gen(scenario, seed)
+            except Exception:
+                continue
+            if data.get('has_target_treated', True):
+                continue
+            if 'tau_true_source' not in data:
+                continue
+            try:
+                diag = compute_a6_diagnostic(data)
+            except Exception:
+                continue
+            if diag is None:
+                continue
+            rows.append({
+                'rep_id': rep_id,
+                'm0': scenario.m0,
+                'diag_a6_spearman_corr': diag['diag_a6_spearman_corr'],
+                'diag_a6_pearson_corr': diag['diag_a6_pearson_corr'],
+                'diag_a6_n_sources': diag['diag_a6_n_sources'],
+            })
+    
+    return pd.DataFrame(rows)
+
+
+# =============================================================================
 # SINGLE REPLICATION RUNNER
 # =============================================================================
 
@@ -358,6 +506,14 @@ def _run_single_ihdp_replication_inner(args: Tuple) -> List[IHDPRepResult]:
     
     results = []
     has_target_treated = data.get('has_target_treated', data.get('actual_m1', 0) > 0)
+    
+    # A6 diagnostic (disconnected only): placebo screening vs CATE transportability
+    a6_diag = None
+    if not has_target_treated and 'tau_true_source' in data:
+        try:
+            a6_diag = compute_a6_diagnostic(data)
+        except Exception:
+            pass
     
     for method_name in methods:
         # Check method availability
@@ -427,6 +583,9 @@ def _run_single_ihdp_replication_inner(args: Tuple) -> List[IHDPRepResult]:
             # Add IHDP-specific info
             diagnostics['realization_id'] = data.get('realization_id')
             diagnostics['n_sites'] = data.get('n_sites')
+            # A6 diagnostic (disconnected): placebo vs CATE correlation
+            if a6_diag is not None:
+                diagnostics.update(a6_diag)
             
             result = IHDPRepResult(
                 scenario=scenario,
@@ -670,9 +829,11 @@ def run_ihdp_sweep(
         
         # Add select diagnostics
         if r.diagnostics:
-            for k in ['realization_id', 'n_sites', 'sources_selected']:
+            for k in ['realization_id', 'n_sites', 'sources_selected',
+                      'diag_a6_spearman_corr', 'diag_a6_pearson_corr', 'diag_a6_n_sources']:
                 if k in r.diagnostics:
-                    record[f'diag_{k}'] = r.diagnostics[k]
+                    key = f'diag_{k}' if not k.startswith('diag_') else k
+                    record[key] = r.diagnostics[k]
         
         records.append(record)
     
