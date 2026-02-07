@@ -294,10 +294,11 @@ def _generate_appendix_full_metrics(
     use_tuples: bool = False,
     metrics: list = None,
 ) -> None:
-    """Generate appendix table: one row per (Method, Budget), columns PEHE, ATE, Corr, Regret, ECE."""
+    """Generate appendix table: one row per (Method, Budget), columns PEHE, ATE, Corr, Regret, ECE. Best per (budget, metric) is bolded."""
     if metrics is None:
         metrics = ['pehe', 'ate_abs_err', 'tau_corr', 'policy_regret', 'tau_ece']
     metric_headers = {'pehe': 'PEHE', 'ate_abs_err': 'ATE err', 'tau_corr': 'Spearman', 'policy_regret': 'Regret', 'tau_ece': 'ECE'}
+    lower_is_better = {'pehe': True, 'ate_abs_err': True, 'tau_corr': False, 'policy_regret': True, 'tau_ece': True}
     
     df = df.copy()
     if use_tuples and 'm1' in df.columns:
@@ -312,6 +313,28 @@ def _generate_appendix_full_metrics(
             return eval(x)
         return x
     budget_values = sorted(df[budget_col].unique(), key=_budget_key)
+    
+    # Compute best (method, budget) per (budget, metric) for bolding
+    best_cells = set()  # (method, budget, metric)
+    for budget in budget_values:
+        sub = df.loc[df[budget_col] == budget]
+        if len(sub) == 0:
+            continue
+        for met in metrics:
+            mean_col = f'{met}_mean' if f'{met}_mean' in sub.columns else met
+            if mean_col not in sub.columns:
+                continue
+            vals = sub.set_index('method')[mean_col]
+            vals = vals.replace([np.nan, np.inf, -np.inf], np.nan).dropna()
+            if len(vals) == 0:
+                continue
+            if lower_is_better.get(met, True):
+                best_val = vals.min()
+            else:
+                best_val = vals.max()
+            best_methods = vals[vals == best_val].index.tolist()
+            for m in best_methods:
+                best_cells.add((m, budget, met))
     
     lines = [
         '\\begin{table}[t]',
@@ -343,7 +366,10 @@ def _generate_appendix_full_metrics(
                         row.append('--')
                     else:
                         ss = f'{sv:.2f}' if not (pd.isna(sv) or np.isnan(sv)) else '--'
-                        row.append(f'{mv:.2f} $\\pm$ {ss}')
+                        cell = f'{mv:.2f} $\\pm$ {ss}'
+                        if (method, budget, met) in best_cells:
+                            cell = f'\\textbf{{{cell}}}'
+                        row.append(cell)
                 else:
                     row.append('--')
             lines.append(' & '.join(row) + ' \\\\')
