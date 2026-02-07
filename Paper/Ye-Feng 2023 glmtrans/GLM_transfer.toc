@@ -1,0 +1,47 @@
+\setcounter {tocdepth}{0}
+\contentsline {section}{\numberline {1}Introduction}{2}{section.1}% 
+\contentsline {section}{\numberline {2}Methodology}{5}{section.2}% 
+\contentsline {subsection}{\numberline {2.1}Generalized linear models (GLMs)}{6}{subsection.2.1}% 
+\contentsline {subsection}{\numberline {2.2}Target data, source data, and transferring level}{6}{subsection.2.2}% 
+\contentsline {subsection}{\numberline {2.3}Two-step GLM transfer learning}{8}{subsection.2.3}% 
+\contentsline {subsection}{\numberline {2.4}Transferable source detection}{9}{subsection.2.4}% 
+\contentsline {subsection}{\numberline {2.5}Confidence intervals}{10}{subsection.2.5}% 
+\contentsline {section}{\numberline {3}Theory}{13}{section.3}% 
+\contentsline {subsection}{\numberline {3.1}Theory on $\mathcal {A}_h$-Trans-GLM}{13}{subsection.3.1}% 
+\contentsline {subsection}{\numberline {3.2}Theory on the transferable source detection algorithm}{18}{subsection.3.2}% 
+\contentsline {subsection}{\numberline {3.3}Theory on confidence interval construction}{22}{subsection.3.3}% 
+\contentsline {section}{\numberline {4}Numerical Experiments}{25}{section.4}% 
+\contentsline {subsection}{\numberline {4.1}Simulations}{25}{subsection.4.1}% 
+\contentsline {subsubsection}{\numberline {4.1.1}Transfer learning on $\mathcal {A}_h$}{25}{subsubsection.4.1.1}% 
+\contentsline {subsubsection}{\numberline {4.1.2}Transfer learning when $\mathcal {A}_h$ is unknown}{29}{subsubsection.4.1.2}% 
+\contentsline {subsection}{\numberline {4.2}A real-data study}{31}{subsection.4.2}% 
+\contentsline {section}{\numberline {5}Discussions}{35}{section.5}% 
+\setcounter {tocdepth}{5}
+\contentsline {section}{\numberline {S.1}More details}{2}{section.1}% 
+\contentsline {subsection}{\numberline {S.1.1}A schematic to illustrate $\mathcal {A}$-Trans-GLM}{2}{subsection.1.1}% 
+\contentsline {subsection}{\numberline {S.1.2}Theory}{3}{subsection.1.2}% 
+\contentsline {subsubsection}{\numberline {S.1.2.1}Explicit forms of convergence rates in Assumption \ref {asmp: idenfity a}}{3}{subsubsection.1.2.1}% 
+\contentsline {subsubsection}{\numberline {S.1.2.2}Bound of a prediction error measure}{5}{subsubsection.1.2.2}% 
+\contentsline {subsection}{\numberline {S.1.3}Additional numerical results}{6}{subsection.1.3}% 
+\contentsline {subsubsection}{\numberline {S.1.3.1}More details about the implementation of numerical experiments}{6}{subsubsection.1.3.1}% 
+\contentsline {subsubsection}{\numberline {S.1.3.2}Transfer learning on $\mathcal {A}_h$}{7}{subsubsection.1.3.2}% 
+\contentsline {subsubsection}{\numberline {S.1.3.3}Transferable source detection}{8}{subsubsection.1.3.3}% 
+\contentsline {subsubsection}{\numberline {S.1.3.4}Additional results of real data analysis}{11}{subsubsection.1.3.4}% 
+\contentsline {section}{\numberline {S.2}Proofs}{13}{section.2}% 
+\contentsline {subsection}{\numberline {S.2.1}Some lemmas}{16}{subsection.2.1}% 
+\contentsline {subsection}{\numberline {S.2.2}Proof of lemmas}{18}{subsection.2.2}% 
+\contentsline {subsubsection}{\numberline {S.2.2.1}Proof of Lemma \ref {lem: delta a}}{18}{subsubsection.2.2.1}% 
+\contentsline {subsubsection}{\numberline {S.2.2.2}Proof of Lemma \ref {lem: re glm}}{18}{subsubsection.2.2.2}% 
+\contentsline {subsubsection}{\numberline {S.2.2.3}Proof of Lemma \ref {lem: inf lemma gamma a}}{19}{subsubsection.2.2.3}% 
+\contentsline {subsubsection}{\numberline {S.2.2.4}Proof of Lemma \ref {lem: inf lemma gamma delta}}{23}{subsubsection.2.2.4}% 
+\contentsline {subsection}{\numberline {S.2.3}Proof of theorems}{24}{subsection.2.3}% 
+\contentsline {subsubsection}{\numberline {S.2.3.1}Proof of Theorem \ref {thm: l2 with assumption}}{24}{subsubsection.2.3.1}% 
+\contentsline {subsubsection}{\numberline {S.2.3.2}Proof of Theorem \ref {thm: minimax}}{31}{subsubsection.2.3.2}% 
+\contentsline {subsubsection}{\numberline {S.2.3.3}Proof of Theorem \ref {thm: l2 without assumption}}{32}{subsubsection.2.3.3}% 
+\contentsline {subsubsection}{\numberline {S.2.3.4}Proof of Theorem \ref {thm: a detection}}{34}{subsubsection.2.3.4}% 
+\contentsline {subsubsection}{\numberline {S.2.3.5}Proof of Theorem \ref {thm: inf}}{37}{subsubsection.2.3.5}% 
+\contentsline {subsubsection}{\numberline {S.2.3.6}Proof of Theorem \ref {thm: prediction error with assumption}}{44}{subsubsection.2.3.6}% 
+\contentsline {subsubsection}{\numberline {S.2.3.7}Proof of Theorem \ref {thm: prediction error without assumption}}{44}{subsubsection.2.3.7}% 
+\contentsline {subsection}{\numberline {S.2.4}Proof of propositions}{44}{subsection.2.4}% 
+\contentsline {subsubsection}{\numberline {S.2.4.1}Proof of Proposition \ref {prop: gamma_1 gamma_2}}{44}{subsubsection.2.4.1}% 
+\contentsline {subsubsection}{\numberline {S.2.4.2}Proof of Proposition \ref {prop: gamma rate}}{53}{subsubsection.2.4.2}% 

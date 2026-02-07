@@ -96,6 +96,11 @@ class Scenario:
     # L1-TCL DGP (arXiv 2305.09126v3)
     use_l1tcl_dgp: Optional[bool] = None        # If True, use L1TCLGenerator
     
+    # IHDP Semi-Synthetic DGP
+    use_ihdp: Optional[bool] = None             # If True, use IHDP multi-site data
+    n_sites: Optional[int] = None               # Number of sites for IHDP clustering
+    realization_id: Optional[int] = None        # IHDP realization ID (1-50)
+    
     # Network knobs
     K_treatments: Optional[int] = None          # Number of treatments
     graph_type: Optional[str] = None            # GraphType value

@@ -376,6 +376,112 @@ def create_data_generator() -> Callable:
 
 
 # =============================================================================
+# IHDP Data Generator
+# =============================================================================
+
+def create_ihdp_data_generator() -> Callable:
+    """
+    Create a data generator function for IHDP semi-synthetic data.
+    
+    Uses multi-site construction via k-means clustering on covariates,
+    enabling evaluation on real covariate distributions with known
+    ground-truth treatment effects.
+    
+    Returns
+    -------
+    data_generator : callable
+        Function(scenario, seed) -> data dict
+    """
+    from ihdp_multisite import IHDPMultiSiteGenerator
+    
+    def data_generator(scenario: Scenario, seed: int) -> Dict[str, Any]:
+        """
+        Generate IHDP multi-site data based on scenario configuration.
+        
+        Scenario parameters used:
+        - realization_id: Which IHDP realization (1-50). If None, uses seed % 50 + 1.
+        - n_sites: Number of sites for clustering (default 6)
+        - m0: Target placebo budget
+        - m1: Target treated budget (0 = disconnected regime)
+        
+        Returns data dict compatible with benchmark runner.
+        """
+        # Extract IHDP-specific parameters
+        n_sites = getattr(scenario, 'n_sites', None) or 6
+        realization_id = getattr(scenario, 'realization_id', None)
+        
+        # If no realization specified, cycle through 1-50 based on seed
+        if realization_id is None:
+            realization_id = (seed % 50) + 1
+        
+        # Target budget
+        m0 = scenario.m0 if scenario.m0 is not None else 50
+        m1 = scenario.m1 if scenario.m1 is not None else 0
+        
+        # Create generator with seed for reproducibility
+        generator = IHDPMultiSiteGenerator(
+            n_sites=n_sites,
+            random_state=seed,
+        )
+        
+        # Generate multi-site data
+        ihdp_data = generator.generate(
+            realization_id=realization_id,
+            m0=m0,
+            m1=m1,
+        )
+        
+        # Check feasibility
+        has_target_treated = ihdp_data.m1 > 0
+        
+        # Compute propensity (use 0.5 for benchmark consistency)
+        propensity = 0.5
+        
+        # Package for benchmark runner (matches standard interface)
+        data = {
+            # Source data
+            'X_source': ihdp_data.X_source,
+            'A_source': ihdp_data.A_source,
+            'Y_source': ihdp_data.Y_source,
+            'c_source': ihdp_data.c_source,
+            
+            # Target estimation data
+            'X_target': ihdp_data.X_target,
+            'A_target': ihdp_data.A_target,
+            'Y_target': ihdp_data.Y_target,
+            
+            # Target evaluation data (use same target data for IHDP)
+            # Since we have ground truth for all target subjects
+            'X_target_eval': ihdp_data.X_target,
+            'tau_true': ihdp_data.tau_true_target,
+            'mu0_true': ihdp_data.mu0_true_target,
+            'mu1_true': ihdp_data.mu1_true_target,
+            'ate_true': ihdp_data.ate_true_target,
+            
+            # Propensity
+            'propensity_target': np.full(len(ihdp_data.X_target), propensity),
+            
+            # Feasibility flags
+            'has_target_treated': has_target_treated,
+            'actual_m0': ihdp_data.m0,
+            'actual_m1': ihdp_data.m1,
+            
+            # IHDP-specific metadata
+            'dgp_type': 'ihdp',
+            'realization_id': realization_id,
+            'n_sites': n_sites,
+            'site_sizes': ihdp_data.site_sizes,
+            
+            # Generator for diagnostics
+            'generator': generator,
+        }
+        
+        return data
+    
+    return data_generator
+
+
+# =============================================================================
 # Metric Computer Adapter
 # =============================================================================
 
