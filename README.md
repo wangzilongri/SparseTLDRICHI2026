@@ -1,356 +1,189 @@
-# Placebo-Anchored DR-Learner for Transfer Learning
+# Transfer Learning for Meta-analysis Under Covariate Shift
 
-**Status**: Fresh start after diagnostic phase  
-**Date**: January 30, 2026
+Code for the paper **"Transfer Learning for Meta-analysis Under Covariate Shift"**, accepted at IEEE ICHI 2026.
 
 ---
 
 ## Overview
 
-Three-stage doubly robust learner for transferring treatment effect estimates from multiple source RCTs to a target population under covariate shift.
+This repository implements a **placebo-anchored transport framework** for estimating patient-level heterogeneous treatment effects (CATE) across heterogeneous randomized controlled trials (RCTs) under covariate shift.
+
+The core idea is to treat source-trial outcomes as abundant but potentially miscalibrated *proxy* signals, and target-trial placebo outcomes as scarce but high-fidelity *gold* labels for baseline risk calibration. Source transfer uses `glmtrans` (ℓ₁-penalized GLM with automatic source detection); CATE estimation uses doubly robust (DR) cross-fitting.
+
+Three estimator variants are provided:
+
+| Estimator | Description |
+|-----------|-------------|
+| **Proposed** | Plug-in CATE: `glmtrans` per arm → `τ̂(x) = μ̂₁(x) − μ̂₀(x)` |
+| **Proposed-CF** | Cross-fitted doubly robust CATE on top of `glmtrans` outcome models |
+| **Proposed-B** | Disconnected targets (placebo-only): source detection via target placebo, source-DR CATE transported to target |
 
 ---
 
-## Quick Start
+## Requirements
 
-### Installation
+### Python
 
-**Option 1: Quick Setup (Recommended)**
 ```bash
-# Run the setup script (handles Python + R)
-./setup.sh
-
-# Activate environment
-source activate.sh
-```
-
-**Option 2: Manual Setup**
-```bash
-# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate  # On Unix/Mac
-# or: venv\Scripts\activate  # On Windows
-
-# Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### R/glmtrans Setup (Optional but Recommended)
+Dependencies: `numpy`, `scipy`, `pandas`, `scikit-learn`, `matplotlib`, `seaborn`, `tqdm`.
 
-The `glmtrans` R package (Tian & Feng, JASA 2023) provides state-of-the-art transfer learning methods. **Requires R 4.4+**.
+### R and glmtrans (required for proposed methods)
 
-**Check status:**
-```bash
-cd src && python -m glmtrans_wrapper --status
-```
+The proposed methods use the [`glmtrans`](https://cran.r-project.org/package=glmtrans) R package (Tian & Feng, JASA 2023). **Requires R 4.4+.**
 
-**If R 4.4+ is not installed:**
-```bash
-# Option A: Let setup.sh install R locally (no root needed)
-./setup.sh  # Will prompt to install R 4.4.2
-
-# Option B: Install R locally manually
-mkdir -p ~/local && cd ~/local
-wget https://cran.r-project.org/src/base/R-4/R-4.4.2.tar.gz
-tar -xzf R-4.4.2.tar.gz && cd R-4.4.2
-./configure --prefix=$HOME/local/R-4.4.2 --enable-R-shlib
-make -j 4 && make install
-export PATH=$HOME/local/R-4.4.2/bin:$PATH
-
-# Option C: Use conda
-conda create -n r44 r-base=4.4 -c conda-forge
-conda activate r44
-```
-
-**Install glmtrans package:**
 ```bash
 Rscript -e 'install.packages("glmtrans", repos="https://cloud.r-project.org")'
 ```
 
-**Using a custom R library path:**
-```bash
-# If glmtrans is installed elsewhere
-export GLMTRANS_R_LIBS=/path/to/R/library
-# or
-export R_LIBS_USER=/path/to/R/library
-```
-
-**Note:** If R/glmtrans is not available, the benchmark will automatically use Python-only fallback methods (`ProposedA_FullyDirect`, `ProposedB_SourceDR`).
-
-### Run Experiments
+Or use the setup script (handles Python + R):
 
 ```bash
-# Quick test of all estimators
-python experiments/test_estimators.py
-
-# Full ablation study (20 runs)
-python experiments/ablation_study.py
-
-# Run benchmark sweeps
-python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 20 --output results/my_sweep
-
-# Run all fair sweeps
-python -m experiments.core_sweeps --sweep all_fair --n_rep 20 --output results/fair_sweeps
-
-# See all available sweeps
-python -m experiments.core_sweeps --help
+./setup.sh
+source activate.sh
 ```
 
----
-
-## Available Benchmark Sweeps
-
-### Fair DGP Sweeps (Recommended)
-
-These sweeps use a **fair DGP** designed for honest method comparison with controlled assumptions.
-
-| Sweep | Command | Grid | Description |
-|-------|---------|------|-------------|
-| **gold_fair_dim** | `--sweep gold_fair_dim` | 5×4 (m₁×p) | Target budget × Dimensionality. Varies m₁∈{0,50,100,200,500} with m₀=m₁+50, p∈{10,20,50,100}. Generates heatmaps with (m₀,m₁) tuples. |
-| **gold_fair_sources** | `--sweep gold_fair_sources` | 5×5 (C×m₁) | Source sites × Target budget. Varies C∈{2,5,10,20,50} sites (1000 samples each), m₁∈{0,50,100,200,500}. Tests multi-site heterogeneity value. |
-| **gold_fair** | `--sweep gold_fair` | 4×4 (m₀×m₁) | Classic target budget grid. Varies m₀∈{50,100,200,500}, m₁∈{0,50,100,200}. |
-| **snr_ladder** | `--sweep snr_ladder` | 1D (6 pts) | SNR stress test. Varies nontransfer_scale∈{0,0.05,0.1,0.2,0.3,0.4}. Tests where cross-arm transfer breaks down. |
-| **overlap_ladder** | `--sweep overlap_ladder` | 1D (5 pts) | Overlap stress test. Varies overlap_λ∈{0,0.25,0.5,0.75,1.0}. Tests covariate shift sensitivity. |
-| **drift_ladder** | `--sweep drift_ladder` | 1D (5 pts) | Intercept drift stress. Varies drift_scale∈{0,0.5,1.0,2.0,4.0}. Tests arm baseline variance. |
-| **all_fair** | `--sweep all_fair` | All above | Runs all fair sweeps sequentially. |
-
-### L1-TCL Sweeps (Alternative DGP)
-
-Based on arXiv 2305.09126v3. Uses constant ATE with propensity score transfer.
-
-| Sweep | Command | Grid | Description |
-|-------|---------|------|-------------|
-| **l1tcl** | `--sweep l1tcl` | 1D (5 pts) | Basic L1-TCL. Varies target size m∈{50,100,200,500,1000}. |
-| **l1tcl_dim** | `--sweep l1tcl_dim` | 1D (4 pts) | Dimensionality. Varies p∈{10,20,50,100}. |
-| **l1tcl_sparsity** | `--sweep l1tcl_sparsity` | 1D (5 pts) | PS sparsity. Varies s/p∈{0.02,0.06,0.1,0.14,0.2}. |
-| **l1tcl_gold** | `--sweep l1tcl_gold` | 2D (5×4) | Target budget × m₁ grid. |
-| **l1tcl_gold_dim** | `--sweep l1tcl_gold_dim` | 2D (5×4) | Target budget × Dimensionality. |
-| **l1tcl_full** | `--sweep l1tcl_full` | 2D (4×4) | Full d×s grid for paper replication. |
-
-### Legacy Sweeps
-
-| Sweep | Command | Description |
-|-------|---------|-------------|
-| **gold** | `--sweep gold` | Original target budget grid (no fair DGP). |
-| **gold_option_a** | `--sweep gold_option_a` | Option A specific sweep. |
-| **proxy** | `--sweep proxy` | Proxy sample size sweep. |
-| **imbalance** | `--sweep imbalance` | Site imbalance sweep. |
-
-### Example Commands
+To verify the glmtrans wrapper is working:
 
 ```bash
-# Run the main 2D heatmap sweep (recommended first experiment)
-python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 20 --n_jobs 10 \
-    --output results/gold_fair_dim
-
-# Run source site scaling experiment
-python -m experiments.core_sweeps --sweep gold_fair_sources --n_rep 20 --n_jobs 10 \
-    --output results/gold_fair_sources
-
-# Run stress tests (SNR, overlap, drift)
-python -m experiments.core_sweeps --sweep snr_ladder --n_rep 50 --output results/snr_stress
-python -m experiments.core_sweeps --sweep overlap_ladder --n_rep 50 --output results/overlap_stress
-python -m experiments.core_sweeps --sweep drift_ladder --n_rep 50 --output results/drift_stress
-
-# Run on remote cluster with more parallelism
-python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 100 --n_jobs 40 \
-    --output results/gold_fair_dim_production
+python -m src.glmtrans_wrapper --status
 ```
-
-### A5 Violation Sweeps (Sensitivity Analysis)
-
-For testing robustness when Assumption A5 (sparse linear correction) is violated. **See full documentation: [`docs/A5_VIOLATION_SWEEPS.md`](docs/A5_VIOLATION_SWEEPS.md)**
-
-**Integrated sweep (recommended):**
-
-```bash
-# Run the 2D heatmap sweep: Sparsity × Nonlinearity
-python -m experiments.core_sweeps --sweep a5_violation --n_rep 50 --output results/a5_violation
-```
-
-| Axis | Values | Meaning |
-|------|--------|---------|
-| Sparsity (s/p) | `{0.05, 0.20, 1.0}` | Sparse → Dense coefficients |
-| Nonlinearity (λ) | `{0.0, 0.5, 1.0}` | Linear → Nonlinear correction |
-
-**Expected outcome:**
-- Strong at (0.05, 0): A5 holds
-- Graceful degradation as violations increase
-- Convergence toward TargetOnlyDR at (1.0, 1.0)
-
-**Manual sweeps** (for more fine-grained control):
-
-| Config | Varies | Tests |
-|--------|--------|-------|
-| `a5_sparsity` | s/p ratio | Dense vs sparse coefficients |
-| `a5_decay` | Decay α | Approximate sparsity |
-| `a5_dense_residual` | η ratio | Dense noise injection |
-| `a5_nonlinear_additive` | λ | Smooth nonlinear violations |
-
-### Basic Usage
-
-```python
-from src.estimator import PlaceboAnchoredDRLearner
-
-# Initialize
-model = PlaceboAnchoredDRLearner(option='A', verbose=True)
-
-# Fit (Option A: both arms in target)
-model.fit(X_source, A_source, Y_source, c_source,
-          X_target, A_target, Y_target)
-
-# Predict
-tau_hat = model.predict(X_target)  # Stage-3 DR estimate
-```
-
----
-
-## Key Findings (from Diagnostic Phase)
-
-### ✅ Success Regime
-
-**Option A (both arms in target), ρ ≥ 0.8, n ≥ 2000**:
-- +60% improvement at ρ=1.0 (vs Proxy-Only)
-- +6% improvement at ρ=0.8 (vs Proxy-Only)
-- +15-35% improvement over Anchor-Only
-
-### ⚠️ Limitations
-
-- **Low correlation (ρ < 0.5)**: Use Proxy-Only (variance explosion)
-- **Option B (shared bias)**: Corrections cancel in CATE predictions
-- **Disconnected target**: No DR signal, use Anchor-Only
 
 ---
 
 ## Project Structure
 
 ```
-├── src/                          # Source code
-│   ├── scratch_estimator_fixed.py    # FIXED implementation (use this!)
-│   ├── scratch_estimator.py          # Original implementation
-│   ├── baselines.py                  # Baseline methods (RF)
-│   ├── improved_*.py                 # Linear model variants
-│   ├── data_generator.py             # Multi-site simulator
-│   └── evaluation.py                 # Metrics
+├── src/
+│   ├── synthetic_data_v2_fair.py   # Fair DGP (FairSyntheticRCTGenerator)
+│   ├── ihdp_data.py                # IHDP data loader
+│   ├── ihdp_multisite.py           # IHDP multi-site construction (k-means)
+│   ├── glmtrans_wrapper.py         # Python–R bridge for glmtrans
+│   ├── estimator_fixed.py          # Proposed / Proposed-CF / Proposed-B
+│   ├── transport_baselines.py      # IPW-Transport, OM-Transport, EntropyBal
+│   ├── metrics.py                  # PEHE, ATE error, Spearman, regret, ECE
+│   ├── benchmark_runner.py         # Monte Carlo sweep runner
+│   ├── benchmark_schema.py         # Method registry, scenario definitions
+│   ├── benchmark_aggregation.py    # Results aggregation and LaTeX table export
+│   └── benchmark_adapters.py       # Data / method factory wrappers
 │
-├── archive/                      # Previous diagnostic work
-│   └── 2026-01-30_diagnostic_phase/
-│       ├── README_ARCHIVE.md         # Complete diagnostic summary
-│       ├── experiments/              # All diagnostic experiments
-│       ├── docs/                     # Analysis documents
-│       └── *.md                      # Findings and reports
+├── experiments/
+│   ├── core_sweeps.py              # Synthetic sweeps (dim, sources, A5, disconnected)
+│   ├── ihdp_sweeps.py              # IHDP connected / disconnected sweeps
+│   ├── run_ihdp.py                 # IHDP entry point (run + table generation)
+│   ├── fair_optionb_sweeps.py      # Disconnected-regime sensitivity sweeps
+│   └── sensitivity_analysis.py     # Additional robustness checks
 │
-├── requirements.txt              # Python dependencies
-└── README.md                     # This file
+├── scripts/
+│   ├── generate_avg_rank_summary.py
+│   └── run_ablation_report.sh
+│
+├── results/                        # Output directory (created at runtime)
+├── requirements.txt
+└── setup.sh
 ```
 
 ---
 
-## Implementation Details
+## Reproducing Paper Experiments
 
-### Three-Stage Estimator
+All experiments use **R = 100 Monte Carlo replicates** and are parallelized via `--n_jobs`.
 
-**Stage 1**: Fit proxy outcome models on source data
-```python
-μ̂₀^proxy(x), μ̂₁^proxy(x) ← RandomForest(X_source, Y_source | A)
+### Synthetic Experiments (§4)
+
+**Table 1 — Average rank summary across metrics:**
+```bash
+python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 100 --n_jobs -1 \
+    --output results/dim_sweep
 ```
 
-**Stage 2**: Estimate sparse transport bias corrections using target placebo data
-```python
-δ̂₀ ← LassoCV(X_target[A=0], Y_target - μ̂₀^proxy)
-δ̂₁ ← LassoCV(X_target[A=1], Y_target - μ̂₁^proxy)  # Option A only
+**Table 2 — Target budget × Dimensionality (PEHE):**
+```bash
+python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 100 --n_jobs -1 \
+    --output results/dim_sweep
 ```
 
-**Stage 3**: Doubly robust CATE estimation with cross-fitting
-```python
-ψᵢ = τ̂(Xᵢ) + [(Aᵢ - e(Xᵢ)) / (e(Xᵢ)(1 - e(Xᵢ)))] * (Yᵢ - μ̂_{Aᵢ}^anch(Xᵢ))
-τ̂_DR(x) ← RandomForest(X_target, ψ)
+**Table 3 — Source site scaling (PEHE):**
+```bash
+python -m experiments.core_sweeps --sweep gold_fair_sources --n_rep 100 --n_jobs -1 \
+    --output results/sources_sweep
 ```
 
-### Fixed Implementation Features
+**Table 4 — Sensitivity to A5 violations (PEHE):**
+```bash
+python -m experiments.core_sweeps --sweep a5_violation --n_rep 100 --n_jobs -1 \
+    --output results/a5_sweep
+```
 
-1. **Disconnected target detection**: Skips DR noise injection when A=0 only
-2. **Adaptive CV**: Uses KFold for single-arm target (not StratifiedKFold)
-3. **Plug-in tau**: Exposes `predict_tau_plugin()` for comparison
-4. **Diagnostics**: `get_correction_vectors()` for inspection
+**Table 5 — Disconnected regime (placebo-only target):**
+```bash
+python -m experiments.core_sweeps --sweep gold_fair_dim --n_rep 100 --n_jobs -1 \
+    --output results/dim_sweep
+# The m₁=0 column of the dim sweep corresponds to the disconnected regime.
+```
+
+**Run all synthetic sweeps at once:**
+```bash
+python -m experiments.core_sweeps --sweep all_fair --n_rep 100 --n_jobs -1 \
+    --output results/fair_sweeps
+```
+
+### IHDP Semi-Synthetic Experiments (§5)
+
+```bash
+# Full run (50 IHDP realizations, connected + disconnected)
+python experiments/run_ihdp.py --full --n_jobs -1
+
+# Quick test (5 realizations)
+python experiments/run_ihdp.py --quick
+
+# Generate LaTeX tables from existing results
+python experiments/run_ihdp.py --tables_only --output results/ihdp
+```
 
 ---
 
-## Key Results Reference
+## Methods
 
-### Option A Performance (RF models, n=2000, 50 runs)
+### Proposed Methods
 
-| ρ | Proxy | Anchor | **Proposed** | Winner |
-|---|-------|--------|--------------|--------|
-| 1.0 | 0.667 | 0.408 | **0.264** | **Proposed (+60%)** ✓✓✓ |
-| 0.8 | 0.759 | 0.874 | **0.713** | **Proposed (+6%)** ✓ |
-| 0.5 | **0.895** | 1.298 | 1.104 | Proxy |
+| Name | Class | Notes |
+|------|-------|-------|
+| `Proposed` | `Glmtrans_Auto` | Plug-in CATE via glmtrans (Option A) |
+| `Proposed-CF` | `Glmtrans_DR_CrossFit` | DR cross-fitted CATE (Option A) |
+| `Proposed-B` | `Glmtrans_OptionB` | Disconnected target (Option B, m₁ = 0) |
 
-**Variance Mechanism**: 9x cancellation at ρ=1.0, 2-3x explosion at ρ=0.3
+### Baselines
 
----
-
-## When to Use This Method
-
-### ✅ Use Proposed (Full DR)
-- Both treatment arms in target (Option A)
-- High correlation (ρ ≥ 0.8, shared bias regime)
-- Large sample size (n ≥ 2000)
-
-### ⚠️ Use Anchor-Only (Stages 1+2)
-- Disconnected target (placebo-only)
-- Option B with shared bias assumption
-- Moderate sample size (n = 1000-2000)
-
-### ⚠️ Use Proxy-Only (Stage 1)
-- Low correlation (ρ < 0.5)
-- Small sample size (n < 1000)
-- No target data available
+| Name | Description |
+|------|-------------|
+| `TargetOnly` | DR learner on target data only (no transfer) |
+| `ProxyOnly` | Pooled source outcome models, no anchoring |
+| `IPW-Transport` | Inverse probability weighting transportability estimator |
+| `OM-Transport` | Outcome model transport estimator |
+| `EntropyBal` | Entropy balancing for covariate shift |
+| `AnchorOnly` | Placebo-anchored outcome models without DR cross-fitting |
 
 ---
 
-## Diagnostic Phase Archive
+## Evaluation Metrics
 
-All diagnostic work from January 2026 is archived in:
-```
-archive/2026-01-30_diagnostic_phase/
-```
-
-**Key documents**:
-- `README_ARCHIVE.md` - Complete summary of findings
-- `FINAL_STATUS.md` - Detailed status and results
-- `ADVISOR_FIXES_SUMMARY.md` - Implementation fixes
-- `QUICK_REFERENCE.md` - One-page decision guide
-
-**Accomplishments**:
-- ✅ 5 comprehensive diagnostic checks completed
-- ✅ Variance mechanism confirmed (covariance loss)
-- ✅ Option B cancellation proven mathematically
-- ✅ Advisor feedback implemented and tested
-- ✅ RF vs Linear model comparison completed
+| Metric | Description |
+|--------|-------------|
+| PEHE | √(mean squared error of individual CATE estimates); lower is better |
+| ATE error | Absolute error of marginal ATE estimate; lower is better |
+| Spearman | Rank correlation between estimated and true CATE; higher is better |
+| Policy regret | Value loss of threshold policy vs. oracle; lower is better |
+| ECE | Expected calibration error of CATE predictions; lower is better |
 
 ---
 
 ## Citation
 
-Based on: "Transfer Learning for Meta-analysis Under Covariate Shift" (IEEE)
+> Wang, Z., Abdeen, A., & Ayer, T. (2026). Transfer Learning for Meta-analysis Under Covariate Shift. *IEEE International Conference on Health Informatics (ICHI).*
 
-See `archive/2026-01-30_diagnostic_phase/docs/` for original paper and reviewer responses.
-
----
-
-## Next Steps
-
-1. Focus on Option A experiments (both arms in target)
-2. Use RF models for main results (shows method value)
-3. Create publication-ready figures from diagnostic phase
-4. Write methods section based on working implementation
-5. Prepare honest limitations section
-
----
-
-## Contact
-
-For questions about the diagnostic phase, see archived documents in `archive/2026-01-30_diagnostic_phase/`.
-
-**Status**: ✅ Ready for fresh implementation phase focused on publication
+BibTeX entry will be added upon publication.
