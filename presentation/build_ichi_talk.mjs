@@ -314,24 +314,14 @@ function addTalkHeader(slide, title, time, size = 38) {
 {
   const slide = slides[3];
   addTalkHeader(slide, "Core idea: target placebo is the gold calibration signal", "3:00-4:15", 37);
-  const replacements = [
-    ["01", "01"],
-    ["Data", "Proxy signal"],
-    ["Describe the cohort, records, devices, or multimodal sources.", "Source-trial IPD gives abundant but miscalibrated outcome models."],
-    ["02", "02"],
-    ["Method", "Gold anchor"],
-    ["Summarize modeling, evaluation, or intervention design.", "Target placebo outcomes directly reveal local baseline risk."],
-    ["03", "03"],
-    ["Validation", "Sparse correction"],
-    ["Explain benchmarks, comparison groups, or review procedures.", "A low-complexity adjustment calibrates proxy models to the target."],
-    ["04", "04"],
-    ["Impact", "DR learner"],
-    ["Connect the workflow to outcomes, deployment, or next steps.", "Cross-fitted pseudo-outcomes stabilize CATE estimation and policy use."],
-  ];
-  for (const [oldText, newText] of replacements) {
-    const shape = findByText(slide, oldText);
-    if (shape) setText(shape, newText, { fontSize: oldText.length <= 2 ? 19 : undefined, color: oldText.length <= 2 ? MAROON : undefined, bold: oldText.length <= 2 || ["Proxy signal", "Gold anchor", "Sparse correction", "DR learner"].includes(newText) });
-  }
+  clearContentPlaceholder(slide);
+  claim(slide, "Source data is abundant but miscalibrated for the target; target placebo is scarce but perfectly calibrated — sparse correction bridges the two.");
+  await ctx.addImage(slide, {
+    path: "/Users/zilongwang/Sparse_TL_DR_ICHI2026/presentation/figures/proxy-gold-paradigm.png",
+    left: 72, top: 200, width: 1136, height: 460,
+    fit: "contain",
+    alt: "Proxy-gold paradigm: source sites have low-variance biased estimates; target placebo has high-variance unbiased labels; anchoring yields low-variance unbiased CATE",
+  });
 }
 
 // Slide 5
