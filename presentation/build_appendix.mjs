@@ -42,7 +42,7 @@ for (let i = 0; i < 12; i++) presentation.slides.getItem(0).delete();
 
 // Add 17 blank slides
 const S = [];
-for (let i = 0; i < 24; i++) S.push(presentation.slides.add({}));
+for (let i = 0; i < 30; i++) S.push(presentation.slides.add({}));
 
 // ─── Helper functions ────────────────────────────────────────────────────────
 
@@ -755,6 +755,157 @@ function step(slide, x, y, w, h, num, title, body, color = BLUE) {
     GREEN);
   insight(slide, 632, 566, 576, 114,
     "Theorem 1 (connected target):\nμ̂₀^anchor is identified. ψ_i is Neyman-orthogonal → τ̂ achieves the identified CATE rate. Theorem 2 (disconnected — target placebo only):\nμ̂₀^anchor is working-model transport (A6). ψ_i remains well-calibrated for ranking and regret under the transport condition.",
+    MAROON);
+}
+
+// ─── Slide 24 — Our paper section divider ────────────────────────────────────
+{
+  const slide = S[24];
+  ctx.addShape(slide, {
+    left: 0, top: 0, width: 1280, height: 720,
+    fill: MAROON, line: ctx.line("#00000000", 0),
+  });
+  ctx.addText(slide, {
+    left: 80, top: 210, width: 1120, height: 80,
+    text: "Our Estimator: Rate Statements and Proof Sketches",
+    fontSize: 40, color: "#FFFFFF", bold: true, align: "center", typeface: "Aptos Display",
+  });
+  ctx.addText(slide, {
+    left: 80, top: 308, width: 1120, height: 36,
+    text: "Theorems 1–2 from the companion appendix, with full intuition",
+    fontSize: 20, color: GOLD, bold: false, align: "center",
+  });
+  // Two theorem summary boxes
+  ctx.addShape(slide, {
+    left: 152, top: 368, width: 430, height: 90, geometry: "roundRect",
+    fill: "#FFFFFF22", line: ctx.line(GOLD, 1.5),
+  });
+  ctx.addText(slide, {
+    left: 166, top: 378, width: 402, height: 70,
+    text: "Theorem 1 (connected target)\n√n₀(τ̂_DR(x) − τ₀(x)) ⇒ N(0, V(x))\nIdentified CATE with √n₀ rate",
+    fontSize: 14, color: "#FFFFFF", align: "center",
+  });
+  ctx.addShape(slide, {
+    left: 700, top: 368, width: 430, height: 90, geometry: "roundRect",
+    fill: "#FFFFFF22", line: ctx.line(BLUE, 1.5),
+  });
+  ctx.addText(slide, {
+    left: 714, top: 378, width: 402, height: 70,
+    text: "Theorem 2 (disconnected target)\n‖τ̂_B − τ₀‖ ≤ est. error + ε_τ + O_p(η^{1/2})\nTransport error decomposition",
+    fontSize: 14, color: "#FFFFFF", align: "center",
+  });
+  ctx.addText(slide, {
+    left: 80, top: 476, width: 1120, height: 30,
+    text: "Full proofs in Appendix A of the companion repository",
+    fontSize: 15, color: "#FFFFFF99", align: "center",
+  });
+}
+
+// ─── Slide 25 — Lemma 1: nuisance rate via glmtrans ──────────────────────────
+{
+  const slide = S[25];
+  H(slide, "Stage 1 nuisance rates via glmtrans (Lemma 1)", "OUR PAPER — Appendix A, Lemma 1");
+  ctx.addText(slide, {
+    left: 72, top: 152, width: 1136, height: 32,
+    text: "Before the DR theorem we need an L₂(P₀) prediction rate for the glmtrans outcome regressions — the bridge from Tian & Feng to Stage 2.",
+    fontSize: 15, color: TEXT, bold: true,
+  });
+  mathBox(slide, 72, 192, 760, 50, "L₂(P₀) norm (target-site covariate distribution)",
+    "‖f‖_{L₂(P₀)} := (E[f(X)² | S=0])^{1/2}     [root-mean-squared error over target covariates]");
+  mathBox(slide, 72, 252, 760, 120, "Lemma 1 — glmtrans prediction error rate (per arm a ∈ {0,1})",
+    "‖μ̂_{a,0} − μ_{a,0}‖_{L₂(P₀)}  ≲\n\n    (s log p / (n_{a,0} + n_{a,Aₐ}))^{1/2}      +      (log p / n_{a,0})^{1/4} · h^{1/2}\n         [transfer: variance reduction]                    [target debiasing term]");
+  mathBox(slide, 72, 382, 760, 68, "DML sufficient condition (used in Theorem 1)",
+    "‖μ̂_{a,0} − μ_{a,0}‖_{L₂(P₀)} = o_p(n₀^{−1/4})     →    need both Lemma 1 terms = o(n₀^{−1/4})");
+  insight(slide, 854, 192, 354, 90,
+    "Term 1 (transfer):\nReplaces n_{a,0} by n_{a,0} + n_{a,Aₐ}.\nMore informative sources → smaller rate.\nRatio improvement ≈ √(n_{a,Aₐ}/n_{a,0}).",
+    BLUE);
+  insight(slide, 854, 294, 354, 90,
+    "Term 2 (debiasing):\nTarget-only data estimates contrast.\nShrinks as h → 0 (sources closer to target).\nControls bias introduced by pooling sources.",
+    GOLD);
+  insight(slide, 854, 396, 354, 56,
+    "Source detection:\nÂ_a = A_{a,h} with prob ≥ 1−δ\n(Tian & Feng Theorem 4).",
+    GREEN);
+  sCard(slide, 72, 460, 1136, 162, MAROON, "Sufficient condition for Theorem 1 (explicit in source and target sizes)",
+    "Transfer term = o(n₀^{−1/4}):   s log p / (n_{a,0} + n_{a,Aₐ}) = o(n₀^{−1/2})\nDebiasing term = o(n₀^{−1/4}):   (log p / n_{a,0})^{1/4} · h^{1/2} = o(n₀^{−1/4})\n\nWeaker condition for consistency only: both Lemma 1 terms = o(1). This is the condition stated in Theorem 1 — substantially weaker than the standard DML n^{−1/4} requirement.", 14);
+}
+
+// ─── Slide 26 — Theorem 1: statement + intuition ─────────────────────────────
+{
+  const slide = S[26];
+  H(slide, "Theorem 1: asymptotic linearity for connected target (Proposed-CF)", "OUR PAPER — Theorem 1");
+  mathBox(slide, 72, 152, 1136, 160, "Theorem 1 — Asymptotic linearity (full statement)",
+    "Assume: (i) A1–A3; (ii) finite fourth moments of Y, bounded propensities ε ≤ e₀(x) ≤ 1−ε; (iii) cross-fitting of nuisances;\n(iv) ‖μ̂_{a,0} − μ_{a,0}‖_{L₂(P₀)} = o_p(1) for a ∈ {0,1}; (v) stable Gram matrix G₀ = E[Z_i Z_iᵀ | S=0].\n\nThen:    τ̂_DR(x) − τ₀(x)  =  (1/n₀) Σᵢ φ(Oᵢ; x)  +  o_p(n₀^{−1/2})\n\nwhere φ(Oᵢ; x) = b(x)ᵀ G₀⁻¹ Zᵢ · (Aᵢ − e₀(Xᵢ)) / (e₀(Xᵢ){1−e₀(Xᵢ)}) · (Yᵢ − μ_{Aᵢ,0}(Xᵢ))\n\nConsequently:     √n₀ (τ̂_DR(x) − τ₀(x))  ⇒  N(0, V(x)),     V(x) = Var(φ(O; x) | S=0)");
+
+  sCard(slide, 72, 322, 540, 190, GREEN, "What the theorem says",
+    "1. τ̂_DR(x) is √n₀-consistent and asymptotically normal at every fixed x\n\n2. The influence function φ(O; x) involves only KNOWN propensity e₀(x) — no propensity estimation error\n\n3. Nuisance errors (μ̂) enter only at second order → o_p(n₀^{−1/2}) remainder");
+  sCard(slide, 652, 322, 556, 190, BLUE, "Key conditions explained",
+    "Condition (iv): only o_p(1) consistency needed — weaker than standard DML o_p(n₀^{−1/4})\n\nWhy? Propensity known by design → no cross-term ‖Δμ‖·‖Δê‖ error from propensity; only ‖Δμ‖/√n₀ → 0\n\nCondition (v): identifies linear projection at x in finite samples");
+  insight(slide, 72, 522, 540, 88,
+    "Source data contribution:\nLemma 1 shows nuisance condition (iv) holds when n_{a,Aₐ} is large — more transferable source data makes Term 1 = (s log p / n_{a,Aₐ})^{1/2} smaller, pulling nuisances to zero faster and shrinking the second-order remainder.",
+    GOLD);
+  insight(slide, 652, 522, 556, 88,
+    "RCT bonus (propensity known):\nThe influence function φ uses the EXACT e₀(x). In observational studies, ê(x) would add a cross-term error O(‖Δμ‖·‖Δê‖). Here that term is 0, giving exactly the semiparametric efficiency bound.",
+    MAROON);
+}
+
+// ─── Slide 27 — Proof sketch: Theorem 1 ──────────────────────────────────────
+{
+  const slide = S[27];
+  H(slide, "Proof sketch: three-step asymptotic linearity argument", "OUR PAPER — Proof of Theorem 1");
+  step(slide, 72, 152, 1136, 148, "1", "Oracle pseudo-outcome: E[ψ⁰_i | X_i, S_i=0] = τ₀(X_i)",
+    "Define ψ⁰_i = μ_{1,0}(Xᵢ) − μ_{0,0}(Xᵢ)  +  (Aᵢ − e₀(Xᵢ))/(e₀(Xᵢ){1−e₀(Xᵢ)}) · (Yᵢ − μ_{Aᵢ,0}(Xᵢ))\n\nBy randomization (A1–A2): E[Yᵢ − μ_{Aᵢ,0}(Xᵢ) | Xᵢ, Aᵢ, S=0] = 0 → centered residual → E[ψ⁰_i | Xᵢ] = τ₀(Xᵢ)\n\nTherefore E[Zᵢ(ψ⁰_i − Zᵢᵀθ₀) | S=0] = 0 → oracle score is unbiased at true CATE parameter θ₀",
+    BLUE);
+  step(slide, 72, 308, 1136, 148, "2", "Decompose θ̂ − θ₀ = T₁ₙ (oracle) + T₂ₙ (nuisance remainder) → show T₂ₙ = o_p(n₀^{−1/2})",
+    "θ̂ − θ₀ = Ĝ⁻¹[(1/n₀)Σ Zᵢ(ψ̂ᵢ − ψ⁰ᵢ)] + Ĝ⁻¹[(1/n₀)Σ Zᵢ(ψ⁰ᵢ − Zᵢᵀθ₀)]  =: T₂ₙ + T₁ₙ\n\nFor T₂ₙ: by CROSS-FITTING, Δ_a^{(−k)}(Xᵢ) ⊥ fold-k evaluation obs. → E[ψ̂ᵢ−ψ⁰ᵢ | Xᵢ, training] = 0\n\nE‖(1/n₀)Σ Zᵢ(ψ̂ᵢ−ψ⁰ᵢ)‖² ≲ (‖Δμ₀‖² + ‖Δμ₁‖²)/n₀  →  ‖T₂ₙ‖ = O_p((Aₙ/√n₀)) = o_p(n₀^{−1/2})  since Aₙ = o_p(1)",
+    GOLD);
+  step(slide, 72, 464, 1136, 148, "3", "CLT on oracle term T₁ₙ → asymptotic normality",
+    "T₁ₙ = Ĝ⁻¹(1/n₀)Σ Zᵢ · (Aᵢ−e₀(Xᵢ))/(e₀(Xᵢ){1−e₀(Xᵢ)}) · (Yᵢ−μ_{Aᵢ,0}(Xᵢ))\n\nĜ⁻¹ = G₀⁻¹ + o_p(1)  →  evaluating at fixed x:  b(x)ᵀ T₁ₙ = (1/n₀) Σ φ(Oᵢ;x) + o_p(n₀^{−1/2})\n\nφ(O;x) has mean 0 and finite variance V(x) by A3 + bounded propensities → CLT gives √n₀ · (1/n₀)Σ φ(Oᵢ;x) ⇒ N(0,V(x))",
+    GREEN);
+  insight(slide, 72, 620, 1136, 60,
+    "Key move in Step 2: cross-fitting ensures the nuisance error Δ_a^{(−k)} is INDEPENDENT of the held-out pseudo-outcome (Oᵢ, i ∈ I_k). Without independence, E[Zᵢ(ψ̂ᵢ−ψ⁰ᵢ)] could be O(‖Δμ‖) — first-order, not o_p(n₀^{−1/2}).",
+    MAROON);
+}
+
+// ─── Slide 28 — Theorem 2: statement + intuition ─────────────────────────────
+{
+  const slide = S[28];
+  H(slide, "Theorem 2: transport error decomposition for disconnected target (Proposed-B)", "OUR PAPER — Theorem 2");
+  mathBox(slide, 72, 152, 1136, 120, "Theorem 2 — Transport error decomposition (full statement)",
+    "Assume A1–A3 and A6. In the disconnected regime, τ₀ is not identified from target data alone. Compare τ̂_B to the oracle transported target τ*(x) := E[τ_S(x) | S ∈ C₀*].\n\n‖τ̂_B − τ₀‖_{L₂(P₀)}  ≤  ‖τ̂_B − τ*‖_{L₂(P₀)}  +  ‖τ* − τ₀‖_{L₂(P₀)}  +  Δ_sel\n                                  [estimation error]          [structural transport bias ≤ ε_τ]       [screening error = O_p(η^{1/2})]\n\nIf P(Ĉ₀ ⊆ C₀*) ≥ 1−η and E‖τ̂_B − τ*‖² < ∞, then Δ_sel = O_p(η^{1/2}).");
+  sCard(slide, 72, 282, 338, 290, BLUE, "Term 1: estimation error",
+    "‖τ̂_B − τ*‖_{L₂(P₀)}\n\nHow well the source-DR learner (trained on Ĉ₀) predicts the oracle-transported target CATE τ* on target covariates.\n\nControlled by:\n• Source sample sizes n_{a,c} for c ∈ Ĉ₀\n• Complexity of CATE learner\n• Transfer variance reduction from pooling");
+  sCard(slide, 430, 282, 370, 290, RED, "Term 2: structural transport bias",
+    "‖τ* − τ₀‖_{L₂(P₀)} ≤ ε_τ\n\nIrreducible mismatch between oracle selected sources and true target CATE on target support.\n\nThis term is ZERO only if:\n• Selected sources have τ_c(x) = τ₀(x) a.s.\nOtherwise bounded by ε_τ from A6.\n\nNot reducible by more data from sources — fundamental structural gap.");
+  sCard(slide, 820, 282, 388, 290, GOLD, "Term 3: screening error",
+    "Δ_sel = ‖(τ̂_B−τ*)·1_{E^c}‖_{L₂(P₀)}\n\nActive only when Ĉ₀ ⊄ C₀* (screening admits a bad source). Controlled by η = P(Ĉ₀ ⊄ C₀*).\n\nΔ_sel = O_p(η^{1/2})  [via Cauchy-Schwarz]\n\nη → 0 as placebo sample n_{0,0} → ∞ by Tian & Feng detection consistency.");
+  insight(slide, 72, 582, 1136, 70,
+    "What A6 provides: (a) the oracle good-source set C₀* exists with ‖τ_S − τ₀‖_{L₂(P₀)} ≤ ε_τ for S ∈ C₀*; (b) placebo screening achieves Ĉ₀ ⊆ C₀* with prob ≥ 1−η. The theorem says: if A6 holds and screening works, total error ≈ source estimation error + ε_τ.",
+    GREEN);
+  insight(slide, 72, 660, 1136, 44,
+    "Remark: when ε_τ is large (sources far from target), Term 2 dominates — adding source data cannot help. This is the fundamental limit of non-identified transport.",
+    MUTED);
+}
+
+// ─── Slide 29 — Proof sketch: Theorem 2 + cross-arm degradation ──────────────
+{
+  const slide = S[29];
+  H(slide, "Proof sketch: auxiliary predictor trick + cross-arm degradation", "OUR PAPER — Proofs of Theorem 2 and Proposition 1");
+  step(slide, 72, 152, 640, 156, "1", "Auxiliary predictor + triangle inequality",
+    "Define: τ̃_B = τ̂_B · 1_E + τ* · 1_{E^c}   (replace by oracle on screening failure event E^c)\n\nTriangle inequality:  ‖τ̂_B − τ₀‖ ≤ ‖τ̂_B − τ̃_B‖ + ‖τ̃_B − τ*‖ + ‖τ* − τ₀‖\n                                           =: Δ_sel              = ‖(τ̂_B−τ*)·1_E‖     ≤ ε_τ\n\n1_E multiplication only reduces norm → identification of screening-only cost",
+    BLUE);
+  step(slide, 72, 318, 640, 148, "2", "Structural bias ≤ ε_τ via Jensen's inequality",
+    "τ*(x) − τ₀(x) = E[τ_S(x) − τ₀(x) | S ∈ C₀*] = E[g_S(x) | S ∈ C₀*]\n\n‖τ* − τ₀‖_{L₂(P₀)} = ‖E[g_S | S ∈ C₀*]‖ ≤ E[‖g_S‖_{L₂(P₀)} | S ∈ C₀*]   [Minkowski]\n\nA6(b): ‖τ_S − τ₀‖_{L₂(P₀)} ≤ ε_τ for S ∈ C₀*  →  ‖τ* − τ₀‖_{L₂(P₀)} ≤ ε_τ  ✓",
+    GOLD);
+  step(slide, 72, 476, 640, 134, "3", "Screening error = O_p(η^{1/2}) via Cauchy-Schwarz",
+    "E[Δ_sel] = E[‖τ̂_B − τ*‖_{L₂(P₀)} · 1_{E^c}]  ≤  (E‖τ̂_B−τ*‖²)^{1/2} · P(E^c)^{1/2}  ≤  M₂^{1/2} · η^{1/2}\n\nMarkov → P(Δ_sel > t·η^{1/2}) ≤ M₂^{1/2}/t   for any t > 0\n\n→  Δ_sel = O_p(η^{1/2}).  η → 0 as n_{0,0} → ∞ by Tian & Feng Theorem 4.",
+    GREEN);
+  mathBox(slide, 728, 152, 480, 238, "Proposition 1 — Cross-arm degradation",
+    "Model: δ₁*(x) = ρ·δ₀*(x) + ζ*(x)\n       (coupling placebo-to-treated correction)\n\nStructural bias (ρ_alg = 1 heuristic):\n‖τ* − τ₀‖_{L₂(P₀)} ≤\n\n  |1−ρ|·‖δ₀*‖_{L₂(P₀)} + ‖ζ*‖_{L₂(P₀)} + ‖r₁‖_{L₂(P₀)}\n    [coupling gap]       [unexplained]      [approx error]");
+  insight(slide, 728, 402, 480, 110,
+    "Intuition: imperfect cross-arm transfer (ρ < 1) enters the BIAS term — it shifts the centering of τ̂ around τ₀, not the √n₀ CLT fluctuation. More placebo data cannot reduce |1−ρ|·‖δ₀*‖; only stronger A6 (smaller ε_τ, closer sources) can.",
+    BLUE);
+  insight(slide, 728, 524, 480, 86,
+    "Combined:\n‖τ̂ − τ₀‖ ≤ ‖τ̂ − τ*‖ + ε_τ\nFirst term: √N CLT + second-order nuisance.\nSecond term: controlled by A6 + Prop. 1.",
     MAROON);
 }
 
