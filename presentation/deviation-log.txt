@@ -1,0 +1,5 @@
+Deviation log
+
+- Added editable charts, callout cards, and small timing labels inside inherited content areas. Reason: the template has no chart-specific source slide, and the talk needs evidence-led result slides.
+- Omitted a standalone acknowledgments slide from the main 15-minute flow. Reason: the available time is better used for claims, method, and validation; acknowledgments can be spoken on the questions slide if needed.
+- Used "Research Paper" for the session/track label. Reason: the exact ICHI session/track is not provided.

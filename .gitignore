@@ -30,10 +30,10 @@ build/
 *.h5
 *.pkl
 
-# Results
-results/
-figures/
-outputs/
+# Results (top-level only — presentation/figures/ and presentation/output/ are tracked)
+/results/
+/figures/
+/outputs/
 
 # Setup markers
 .setup_complete
@@ -45,3 +45,6 @@ R_libs/
 Paper/*
 !Paper/Transfer_Learning_for_Individual_Patient_Data_for_Clinical_Trials.pdf
 !Paper/arxiv_submission.zip
+
+# Node.js
+node_modules/
