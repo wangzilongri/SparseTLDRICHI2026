@@ -13,7 +13,7 @@ const workspace =
 const starterPath = path.join(workspace, "template-starter.pptx");
 const outputDir = path.join(workspace, "output");
 const previewDir = path.join(workspace, "preview-appendix");
-const finalPptx = path.join(outputDir, "appendix-lecture-bastani-tian-feng.pptx");
+const finalPptx = path.join(outputDir, "appendix-lecture-method-foundations.pptx");
 
 const MAROON = "#8A0020";
 const GOLD = "#D5A834";
@@ -42,7 +42,7 @@ for (let i = 0; i < 12; i++) presentation.slides.getItem(0).delete();
 
 // Add 17 blank slides
 const S = [];
-for (let i = 0; i < 17; i++) S.push(presentation.slides.add({}));
+for (let i = 0; i < 24; i++) S.push(presentation.slides.add({}));
 
 // ─── Helper functions ────────────────────────────────────────────────────────
 
@@ -152,7 +152,7 @@ function step(slide, x, y, w, h, num, title, body, color = BLUE) {
   });
   ctx.addText(slide, {
     left: 80, top: 338, width: 1120, height: 36,
-    text: "Bastani (2021) and Tian & Feng (2023) — sparse transfer learning theory",
+    text: "Bastani (2021)  ·  Tian & Feng (2023)  ·  Kennedy (2023)",
     fontSize: 20, color: GOLD, bold: false, align: "center",
   });
   ctx.addText(slide, {
@@ -560,6 +560,202 @@ function step(slide, x, y, w, h, num, title, body, color = BLUE) {
   insight(slide, 72, 618, 1136, 74,
     "The full estimator = Tian & Feng baseline risk correction (multi-source GLM pooling with debiasing) + Kennedy (2023) doubly robust CATE learner with cross-fitting. Each layer has its own theoretical guarantee; our paper proves the joint guarantee under Assumptions A1–A6.",
     GREEN);
+}
+
+// ─── Slide 17 — Kennedy section divider ─────────────────────────────────────
+{
+  const slide = S[17];
+  ctx.addShape(slide, {
+    left: 0, top: 0, width: 1280, height: 720,
+    fill: MAROON, line: ctx.line("#00000000", 0),
+  });
+  ctx.addText(slide, {
+    left: 80, top: 220, width: 1120, height: 80,
+    text: "Kennedy (2023): Doubly Robust CATE Estimation",
+    fontSize: 40, color: "#FFFFFF", bold: true, align: "center", typeface: "Aptos Display",
+  });
+  ctx.addText(slide, {
+    left: 80, top: 316, width: 1120, height: 36,
+    text: "The final layer: from corrected baseline risk to heterogeneous treatment effects",
+    fontSize: 20, color: GOLD, bold: false, align: "center",
+  });
+  ctx.addText(slide, {
+    left: 80, top: 368, width: 1120, height: 40,
+    text: "Kennedy (2023), Electronic Journal of Statistics 17(2): 3008–3049  ·  DOI: 10.1214/23-EJS2157",
+    fontSize: 15, color: "#FFFFFF", bold: false, align: "center",
+  });
+}
+
+// ─── Slide 18 — Setup: CATE and causal assumptions ───────────────────────────
+{
+  const slide = S[18];
+  H(slide, "Setup: estimating heterogeneous treatment effects", "KENNEDY (2023) — Setup");
+  ctx.addText(slide, {
+    left: 72, top: 152, width: 1136, height: 36,
+    text: "Goal: estimate CATE τ(x) = E[Y(1)−Y(0)|X=x] from experimental data using flexible ML for nuisance functions.",
+    fontSize: 16, color: TEXT, bold: true,
+  });
+  mathBox(slide, 72, 196, 556, 90, "Observed data",
+    "Z_i = (Y_i, A_i, X_i)  i.i.d.  i = 1,...,n\nY_i = outcome,  A_i ∈ {0,1} = treatment assigned\nX_i ∈ R^d = pre-treatment covariates");
+  mathBox(slide, 72, 298, 556, 70, "Target estimand",
+    "τ(x) = E[Y(1) − Y(0) | X = x]     (CATE)\nATE = E[τ(X)],    GATE = E[τ(X) | X ∈ G]");
+  insight(slide, 648, 196, 560, 172,
+    "In our clinical trial setting:\n• A_i = treatment indicator (active vs. placebo)\n• e(x) = P(treated|x) is KNOWN by randomization\n• Overlap guaranteed by design\n• Unconfoundedness holds by construction\n\nKnown propensity removes one estimation step — a structural advantage Kennedy's framework exploits via exact IPW weighting.",
+    MAROON);
+  sCard(slide, 72, 380, 340, 210, BLUE, "A1: Unconfoundedness",
+    "Y(0), Y(1) ⊥ A | X\n\nNo unmeasured confounders.\nConditioning on X removes\nall treatment assignment bias.\nAutomatic in RCTs.");
+  sCard(slide, 432, 380, 340, 210, GOLD, "A2: Overlap",
+    "0 < e(x) < 1  ∀x\ne(x) = P(A=1|X=x)\n\nBoth arms observed at\nevery covariate value.\nCritical for IPW weighting.");
+  sCard(slide, 792, 380, 416, 210, GREEN, "A3: SUTVA",
+    "Y_i(a) = Y_i  when A_i = a\n\nNo interference between\nunits. Single version of\ntreatment. Standard in\nindividual-level trials.");
+}
+
+// ─── Slide 19 — The DR pseudo-outcome ────────────────────────────────────────
+{
+  const slide = S[19];
+  H(slide, "The DR pseudo-outcome: efficient influence function for CATE", "KENNEDY (2023) — Eq. (2.3)");
+  mathBox(slide, 72, 152, 1136, 104, "DR pseudo-outcome (Kennedy 2023, Eq. 2.3)",
+    "φ̂(Z_i) =  (μ̂₁(X_i) − μ̂₀(X_i))   +   A_i(Y_i − μ̂₁(X_i)) / ê(X_i)   −   (1−A_i)(Y_i − μ̂₀(X_i)) / (1−ê(X_i))\n           [direct plug-in term]             [treated residual / propensity]         [control residual / (1−propensity)]");
+  sCard(slide, 72, 268, 340, 180, GREEN, "Direct term",
+    "μ̂₁(x) − μ̂₀(x)\n\nPlug-in outcome model\ndifference. Fast when μ̂\nis close to μ. Biased when\nML models overfit training data.");
+  sCard(slide, 432, 268, 340, 180, BLUE, "Treated IPW residual",
+    "A_i(Y_i − μ̂₁(X_i)) / ê(X_i)\n\nResidual of treated\nobservations re-weighted\nby propensity.\nCorrects bias in direct term.");
+  sCard(slide, 792, 268, 416, 180, GOLD, "Control IPW residual",
+    "−(1−A_i)(Y_i − μ̂₀(X_i)) / (1−ê(X_i))\n\nResidual of control obs.\nweighted by 1−propensity.\nCompletes double correction.");
+  insight(slide, 72, 460, 556, 90,
+    "Key property: E[φ̂(Z_i) | X_i] = τ(X_i)\n\nThe pseudo-outcome is an unbiased pointwise proxy for the true CATE at each x — under A1–A3, regardless of how μ̂ and ê are estimated.",
+    GREEN);
+  insight(slide, 648, 460, 560, 90,
+    "Double robustness:\nConsistent if μ̂ correct (direct term dominates)\nOR if ê correct (IPW residuals unbiased)\nBoth wrong → product error: O(||μ̂−μ||·||ê−e||)",
+    BLUE);
+  mathBox(slide, 72, 562, 1136, 66, "Final CATE estimate",
+    "τ̂(x) = argmin_f  Σᵢ (φ̂(Z_i) − f(X_i))²    →   regress pseudo-outcomes on covariates; f can be any ML estimator");
+}
+
+// ─── Slide 20 — Cross-fitting algorithm ──────────────────────────────────────
+{
+  const slide = S[20];
+  H(slide, "Cross-fitting: separating nuisance training from CATE regression", "KENNEDY (2023) — Algorithm");
+  insight(slide, 72, 152, 1136, 48,
+    "Problem: estimating μ̂ and ê on the same data used to compute φ̂ introduces first-order bias — nuisances 'memorize' training data, inflating pseudo-outcomes. Cross-fitting removes this bias via sample splitting.",
+    RED);
+  step(slide, 72, 208, 326, 200, "1", "Partition data",
+    "Split {Z_i}ⁿ into K folds:\nI₁, I₂, ..., I_K\n(K = 3 is standard)\n\nFor fold k: use Iₖᶜ\n(complement) to train\nnuisances, apply on Iₖ",
+    BLUE);
+  step(slide, 416, 208, 392, 200, "2", "Estimate nuisances (out-of-fold)",
+    "For each fold k ∈ {1,...,K}:\n\nFit μ̂₁^{−k}(·) on Iₖᶜ\nFit μ̂₀^{−k}(·) on Iₖᶜ\nFit ê^{−k}(·)  on Iₖᶜ\n\n← use any ML method",
+    GOLD);
+  step(slide, 826, 208, 382, 200, "3", "Compute pseudo-outcomes",
+    "For i ∈ I_k (held-out fold):\nφ̂_i = (μ̂₁^{-k}(X_i) − μ̂₀^{-k}(X_i))\n  + A_i(Y_i−μ̂₁^{-k}(X_i))/ê^{-k}(X_i)\n  − (1−A_i)(Y_i−μ̂₀^{-k}(X_i))/(1−ê^{-k}(X_i))",
+    GREEN);
+  step(slide, 72, 420, 530, 170, "4", "Final CATE regression (all n obs)",
+    "τ̂(x) = argmin_f Σᵢ (φ̂_i − f(X_i))²\n\nChoice of f:\n• Linear — interpretable coefficients\n• Random forest/boosting — flexible\n• Lasso — sparse effect modifiers\n• In our paper: random forest",
+    MAROON);
+  step(slide, 620, 420, 588, 170, "5", "Optional: Best Linear Projection",
+    "γ̂ = argmin_γ Σᵢ (φ̂_i − γ₀ − γᵀX_i)²\n\nInterpretable summary of CATE heterogeneity.\nWald test on γ_j: does covariate j drive\neffect modification?\nOur paper: ranking and regret evaluation",
+    MUTED);
+  mathBox(slide, 72, 602, 1136, 68, "Why cross-fitting removes bias",
+    "φ̂_i is computed from nuisances trained on Iₖᶜ and evaluated on held-out Iₖ → (nuisance, pseudo-outcome) pairs are independent → first-order remainder E[Δμ̂·Δê] ≈ 0");
+}
+
+// ─── Slide 21 — Main theorem: convergence rates ───────────────────────────────
+{
+  const slide = S[21];
+  H(slide, "Main theorem: product error structure and optimal rates", "KENNEDY (2023) — Theorem 2");
+  mathBox(slide, 72, 152, 1136, 96, "Theorem 2 (Kennedy 2023) — mean-squared error of DR-Learner",
+    "E||τ̂ − τ||² ≤ C · { ||μ̂₁−μ₁||₂·||ê−e||₂  +  ||μ̂₀−μ₀||₂·||ê−e||₂  +  r_n² }\n\nr_n = excess risk of the final regression (depends on smoothness of τ and choice of f)");
+  sCard(slide, 72, 260, 560, 100, GREEN, "Optimal rate — β-smooth CATE, dim d",
+    "Optimal CATE rate: n^{−2β/(2β+d)}\nNuisance requirement: ||μ̂−μ||₂, ||ê−e||₂ = o(n^{−β/(2β+d)})\nDR-Learner achieves oracle CATE rate when nuisances are fast enough");
+  sCard(slide, 652, 260, 556, 100, BLUE, "Double robustness in practice",
+    "Product structure: total error = O(||μ̂−μ||·||ê−e||)\nIf one nuisance converges at O(n^{−α}), the other at O(n^{−γ}):\nbias = O(n^{−α−γ}) — diminishing even for slow estimators");
+
+  ctx.addShape(slide, { left: 72, top: 372, width: 1136, height: 40, fill: MAROON + "22", line: ctx.line(LINE, 1) });
+  ctx.addText(slide, { left: 80, top: 382, width: 360, height: 24, text: "Method", fontSize: 13, color: MAROON, bold: true });
+  ctx.addText(slide, { left: 460, top: 382, width: 380, height: 24, text: "Bias structure", fontSize: 13, color: MAROON, bold: true });
+  ctx.addText(slide, { left: 860, top: 382, width: 340, height: 24, text: "Requirement for consistency", fontSize: 13, color: MAROON, bold: true });
+
+  const cmpRows = [
+    ["Plug-in (μ̂₁−μ̂₀ only)", "O(||μ̂₁−μ₁|| + ||μ̂₀−μ₀||)", "Both outcome models correct"],
+    ["IPW-only (no outcome model)", "O(||ê−e|| / e(1−e)²)", "Propensity correct + strong overlap"],
+    ["DR-Learner — Kennedy (2023)", "O(||μ̂−μ||·||ê−e||)", "Only ONE nuisance needs to be correct"],
+  ];
+  cmpRows.forEach(([method, bias, req], idx) => {
+    const y = 412 + idx * 50;
+    const bg = idx === 2 ? GREEN + "22" : (idx % 2 === 0 ? "#FFFFFF" : SOFT);
+    const border = idx === 2 ? ctx.line(GREEN, 1.5) : ctx.line(LINE, 0.5);
+    ctx.addShape(slide, { left: 72, top: y, width: 1136, height: 50, fill: bg, line: border });
+    ctx.addText(slide, { left: 80, top: y + 10, width: 360, height: 30, text: method, fontSize: 12, color: TEXT, bold: idx === 2 });
+    ctx.addText(slide, { left: 460, top: y + 10, width: 380, height: 30, text: bias, fontSize: 12, color: TEXT, typeface: "Courier New" });
+    ctx.addText(slide, { left: 860, top: y + 10, width: 340, height: 30, text: req, fontSize: 12, color: idx === 2 ? GREEN : TEXT, bold: idx === 2 });
+  });
+
+  insight(slide, 72, 564, 1136, 80,
+    "RCT bonus: e(x) is KNOWN → ||ê−e||₂ = 0 → bias = 0 regardless of outcome model quality. In our paper, propensity is known by randomization, so the DR-Learner achieves the oracle CATE rate with only the outcome model estimated from data.",
+    GREEN);
+}
+
+// ─── Slide 22 — Neyman orthogonality ─────────────────────────────────────────
+{
+  const slide = S[22];
+  H(slide, "Why it works: Neyman orthogonality and the influence function", "KENNEDY (2023) — Theory");
+  ctx.addText(slide, {
+    left: 72, top: 152, width: 1136, height: 36,
+    text: "The DR pseudo-outcome is the efficient influence function (EIF) of the CATE functional — this is what makes cross-fitting and ML nuisances compatible with √n inference on τ.",
+    fontSize: 16, color: TEXT, bold: true,
+  });
+  mathBox(slide, 72, 196, 556, 100, "Efficient influence function (EIF)",
+    "ψ(Z; τ, e, μ₀, μ₁) = [A/e(X) − (1−A)/(1−e(X))](Y−μ_A(X))  +  [μ₁(X) − μ₀(X) − τ(X)]\n\nφ̂_i = empirical analog with plug-in (μ̂₀, μ̂₁, ê) for (μ₀, μ₁, e)");
+  mathBox(slide, 72, 308, 556, 68, "Neyman orthogonality condition",
+    "∂/∂η  E[ψ(Z; τ, η)] |_{η=η₀} = 0     (η = (e, μ₀, μ₁))\n\nFirst-order sensitivity to nuisance errors vanishes at truth η₀");
+  insight(slide, 648, 196, 560, 180,
+    "What orthogonality buys:\n\n1. Nuisance errors enter only at SECOND ORDER — O(||Δμ||·||Δê||), not O(||Δμ||)\n\n2. Allows ML nuisances at slow nonparametric rates while τ̂ achieves √n consistency on smooth CATE subproblems\n\n3. Enables valid inference on τ without Donsker conditions on nuisance function classes",
+    BLUE);
+  sCard(slide, 72, 388, 540, 196, GOLD, "Without orthogonality (naive plug-in)",
+    "τ̂_plugin(x) = μ̂₁(x) − μ̂₀(x)  directly:\n• Bias = E[μ̂₁−μ₁] − E[μ̂₀−μ₀]\n• This is O(||μ̂−μ||) — FIRST-ORDER\n• If ||μ̂−μ|| = n^{-1/4}, bias = n^{-1/4}\n  >> n^{-1/2} threshold for √n-consistency\n• No √n rate without exact model spec.");
+  sCard(slide, 632, 388, 576, 196, GREEN, "With orthogonality (DR pseudo-outcome)",
+    "Using φ̂_i with cross-fitting:\n• Bias = O(||μ̂−μ||·||ê−e||) — SECOND-ORDER\n• If ||μ̂−μ|| = ||ê−e|| = n^{-1/4}:\n  bias = n^{-1/2} ✓ (√n-consistent)\n• RCT: ê = e known → bias = 0 exactly\n• Flexible ML for nuisances → valid inference");
+  insight(slide, 72, 594, 1136, 72,
+    "Practical summary: the EIF construction converts nuisance estimation errors from additive (first-order, unavoidable) into multiplicative (second-order, negligible when either nuisance is accurate). Cross-fitting ensures independence so sample splitting does not lose efficiency.",
+    MAROON);
+}
+
+// ─── Slide 23 — Connection to our estimator ──────────────────────────────────
+{
+  const slide = S[23];
+  H(slide, "Kennedy (2023) in our estimator: the anchored DR learner", "KENNEDY (2023) — Connection to our paper");
+  ctx.addText(slide, {
+    left: 72, top: 152, width: 1136, height: 36,
+    text: "We apply Kennedy's DR learner on top of the Bastani/Tian&Feng corrected baseline risk — replacing μ̂₀ with μ̂₀^anchor, the sparse-corrected estimate.",
+    fontSize: 16, color: TEXT, bold: true,
+  });
+  mathBox(slide, 72, 196, 1136, 88, "Full pipeline pseudo-outcome (our Eq. 5)",
+    "ψ_i = (μ̂₁(X_i) − μ̂₀^anchor(X_i))  +  A_i(Y_i − μ̂₁(X_i)) / e(X_i)  −  (1−A_i)(Y_i − μ̂₀^anchor(X_i)) / (1−e(X_i))\n          [anchored direct term]               [treated residual IPW]                    [control residual — uses sparse-corrected μ̂₀^anchor]");
+
+  ctx.addShape(slide, { left: 72, top: 294, width: 1136, height: 40, fill: MAROON + "22", line: ctx.line(LINE, 1) });
+  ctx.addText(slide, { left: 80, top: 304, width: 510, height: 24, text: "Kennedy (2023) — generic DR learner", fontSize: 13, color: MAROON, bold: true });
+  ctx.addText(slide, { left: 630, top: 304, width: 560, height: 24, text: "Our estimator (Proposed / Proposed-CF)", fontSize: 13, color: MAROON, bold: true });
+
+  const mapK = [
+    ["μ̂₀(x)  — any ML outcome model for control", "μ̂₀^anchor(x)  — Tian&Feng corrected (K sources + target placebo)"],
+    ["μ̂₁(x)  — any ML outcome model for treatment", "μ̂₁(x)  — estimated from target treated arm only"],
+    ["ê(x)  — estimated propensity score", "e(x)  — KNOWN exactly (randomized, by design)"],
+    ["Final: τ̂(x) = E[φ̂|X=x], any ML method", "Final: τ̂(x) = random forest on ψ_i"],
+    ["Proposed-CF: cross-fit φ̂_i across 3 folds", "Cross-fitting improves calibration → ECE rank 1.3"],
+  ];
+  mapK.forEach(([left, right], idx) => {
+    const y = 334 + idx * 46;
+    const bg = idx % 2 === 0 ? "#FFFFFF" : SOFT;
+    ctx.addShape(slide, { left: 72, top: y, width: 1136, height: 46, fill: bg, line: ctx.line(LINE, 0.5) });
+    ctx.addText(slide, { left: 80, top: y + 8, width: 510, height: 30, text: left, fontSize: 12, color: TEXT, typeface: "Courier New" });
+    ctx.addText(slide, { left: 630, top: y + 8, width: 560, height: 30, text: right, fontSize: 12, color: TEXT });
+  });
+
+  insight(slide, 72, 566, 540, 114,
+    "Why anchoring μ̂₀^anchor matters:\nStandard TargetOnly uses μ̂₀ from target data only — scarce, high variance. Our μ̂₀^anchor pools K source RCTs via sparse correction → lower variance → lower variance pseudo-outcomes ψ_i → more precise CATE τ̂(x). This is the key empirical improvement over Kennedy's generic DR learner.",
+    GREEN);
+  insight(slide, 632, 566, 576, 114,
+    "Theorem 1 (connected target):\nμ̂₀^anchor is identified. ψ_i is Neyman-orthogonal → τ̂ achieves the identified CATE rate. Theorem 2 (disconnected — target placebo only):\nμ̂₀^anchor is working-model transport (A6). ψ_i remains well-calibrated for ranking and regret under the transport condition.",
+    MAROON);
 }
 
 // ─── Export ──────────────────────────────────────────────────────────────────
