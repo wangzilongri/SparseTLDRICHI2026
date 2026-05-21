@@ -1,6 +1,6 @@
 # Transfer Learning for Meta-analysis Under Covariate Shift
 
-Code for the paper **"Transfer Learning for Meta-analysis Under Covariate Shift"**, accepted at IEEE ICHI 2026.
+Code for the paper **"[Transfer Learning for Meta-analysis Under Covariate Shift](https://github.com/wangzilongri/SparseTLDRICHI2026/blob/main/Paper/Transfer_Learning_for_Individual_Patient_Data_for_Clinical_Trials.pdf)"**, accepted at IEEE ICHI 2026.
 
 ---
 
