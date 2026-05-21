@@ -41,6 +41,7 @@ outputs/
 # R libraries (local install)
 R_libs/
 
-# Paper directory: keep only the compiled full paper PDF
+# Paper directory: keep only the compiled full paper PDF and arXiv source zip
 Paper/*
 !Paper/Transfer_Learning_for_Individual_Patient_Data_for_Clinical_Trials.pdf
+!Paper/arxiv_submission.zip
