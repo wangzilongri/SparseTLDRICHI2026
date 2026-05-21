@@ -228,7 +228,19 @@ function addTalkHeader(slide, title, time, size = 38) {
   timePill(slide, time);
 }
 
-// Slide 1
+// Slide transition helper — gracefully degrades if the artifact tool does not
+// expose a transition API (PPTX will still build; set manually in PowerPoint
+// using the design described in SLIDE_RATIONALE.md).
+function setTransition(slide, type, durationMs = 700) {
+  try {
+    if (slide.transition !== undefined) {
+      slide.transition.type = type;
+      slide.transition.duration = durationMs;
+    }
+  } catch (_) { /* API does not expose transitions on this version — set manually */ }
+}
+
+// Slide 1 — no incoming transition (first slide)
 {
   const slide = slides[0];
   setText(findByText(slide, "Session / Track"), "Research Paper", { fontSize: 18, color: MAROON, bold: true, align: "center" });
@@ -249,12 +261,14 @@ function addTalkHeader(slide, title, time, size = 38) {
     { fontSize: 18, color: "#FFFFFF" },
   );
   timePill(slide, "0:00-0:30");
+  setTransition(slide, "none", 0);
 }
 
-// Slide 2
+// Slide 2 — fade (700ms) from title; act break. Pill adjusted +1s: 0:31
 {
   const slide = slides[1];
-  addTalkHeader(slide, "Clinical trial evidence rarely lands in the target population", "0:30-1:45", 37);
+  addTalkHeader(slide, "Clinical trial evidence rarely lands in the target population", "0:31-1:45", 37);
+  setTransition(slide, "fade", 700);
   clearContentPlaceholder(slide);
   claim(slide, "The decision target is patient-level and local; the available evidence is multi-site and shifted.");
   card(slide, {
@@ -295,10 +309,11 @@ function addTalkHeader(slide, title, time, size = 38) {
   });
 }
 
-// Slide 3
+// Slide 3 — cut (0ms) from slide 2; within same problem-setup act
 {
   const slide = slides[2];
   addTalkHeader(slide, "The gap: standard transport needs conditions the target lacks", "1:45-3:00", 37);
+  setTransition(slide, "none", 0);
   clearContentPlaceholder(slide);
   claim(slide, "The hard case is weakly connected or disconnected target evidence under covariate shift.");
   ctx.addShape(slide, { left: 72, top: 190, width: 1136, height: 406, geometry: "roundRect", fill: "#FFFFFF", line: ctx.line(LINE, 1) });
@@ -310,10 +325,11 @@ function addTalkHeader(slide, title, time, size = 38) {
   comparisonRow(slide, 478, "Average effect is enough", "NMA or transport reports a marginal target estimand.", "Individualized decisions", "The task is calibrated patient-level CATE and targeting.");
 }
 
-// Slide 4
+// Slide 4 — cover-right (500ms); major argument pivot: problem → answer
 {
   const slide = slides[3];
   addTalkHeader(slide, "Core idea: target placebo is the gold calibration signal", "3:00-4:15", 37);
+  setTransition(slide, "cover", 500);
   clearContentPlaceholder(slide);
   claim(slide, "Source data is abundant but miscalibrated for the target; target placebo is scarce but perfectly calibrated — sparse correction bridges the two.");
   await ctx.addImage(slide, {
@@ -324,10 +340,11 @@ function addTalkHeader(slide, title, time, size = 38) {
   });
 }
 
-// Slide 5
+// Slide 5 — cut (0ms); zoom-in: same four-step frame, higher resolution
 {
   const slide = slides[4];
   addTalkHeader(slide, "Estimator pipeline: anchor first, orthogonalize second", "4:15-6:00", 37);
+  setTransition(slide, "none", 0);
   const replacements = [
     ["Data", "Fit source models"],
     ["Describe the cohort, records, devices, or multimodal sources.", "Learn mu0 and mu1 from source IPD; randomized propensities are known."],
@@ -355,10 +372,11 @@ function addTalkHeader(slide, title, time, size = 38) {
   });
 }
 
-// Slide 6
+// Slide 6 — fade (700ms); section break: pipeline → regime distinction. Pill adjusted +1s: 6:01
 {
   const slide = slides[5];
-  addTalkHeader(slide, "Two target regimes, two interpretations", "6:00-7:15");
+  addTalkHeader(slide, "Two target regimes, two interpretations", "6:01-7:15");
+  setTransition(slide, "fade", 700);
   const title = findContains(slide, "Acknowledgments");
   setText(title, "Two target regimes, two interpretations", { fontSize: 41, color: MAROON, bold: true, typeface: "Aptos Display" });
   const pairs = [
@@ -375,10 +393,11 @@ function addTalkHeader(slide, title, time, size = 38) {
   }
 }
 
-// Slide 7
+// Slide 7 — push-left (500ms); major pivot: method act → evidence act
 {
   const slide = slides[6];
   addTalkHeader(slide, "Evaluation: accuracy, targeting, regret, and calibration", "7:15-8:30", 37);
+  setTransition(slide, "push", 500);
   const replacements = [
     ["Data", "Synthetic RCTs"],
     ["Describe the cohort, records, devices, or multimodal sources.", "Controlled covariate shift, known potential outcomes, 100 Monte Carlo replicates."],
@@ -395,10 +414,11 @@ function addTalkHeader(slide, title, time, size = 38) {
   }
 }
 
-// Slide 8
+// Slide 8 — cut (0ms); within evidence act, aggregate results
 {
   const slide = slides[7];
   addTalkHeader(slide, "Synthetic summary: proposed methods dominate the ranking table", "8:30-10:00", 36);
+  setTransition(slide, "none", 0);
   clearContentPlaceholder(slide);
   claim(slide, "Across synthetic sweeps, Proposed is rank 1 on PEHE, ATE, Spearman, and regret; Proposed-CF leads calibration.");
   ctx.addText(slide, { left: 110, top: 192, width: 500, height: 24, text: "Average rank across performance metrics (lower is better)", fontSize: 19, color: TEXT, bold: true });
@@ -420,10 +440,11 @@ function addTalkHeader(slide, title, time, size = 38) {
   });
 }
 
-// Slide 9
+// Slide 9 — cut (0ms); within evidence act, zooming into finite-sample regime
 {
   const slide = slides[8];
   addTalkHeader(slide, "Small target samples are where transfer pays off", "10:00-11:15", 37);
+  setTransition(slide, "none", 0);
   clearContentPlaceholder(slide);
   claim(slide, "When p is large and target labels are scarce, target-only learning deteriorates while anchored transfer stays usable.");
   statCard(slide, 82, 218, 310, "p=100, target 150/100", "7.57 -> 1.71", "TargetOnly PEHE to Proposed", GREEN);
@@ -442,10 +463,11 @@ function addTalkHeader(slide, title, time, size = 38) {
   });
 }
 
-// Slide 10
+// Slide 10 — fade (500ms); argument pivot: connected → disconnected regime
 {
   const slide = slides[9];
   addTalkHeader(slide, "Disconnected targets: useful, but label the assumption", "11:15-12:30", 37);
+  setTransition(slide, "fade", 500);
   clearContentPlaceholder(slide);
   claim(slide, "With m1=0, Proposed-B is best or near-best on PEHE, but the estimand is transported rather than identified.");
   groupedBars(
@@ -474,10 +496,11 @@ function addTalkHeader(slide, title, time, size = 38) {
   });
 }
 
-// Slide 11
+// Slide 11 — fade (500ms); validation pivot: synthetic → real-data evidence
 {
   const slide = slides[10];
   addTalkHeader(slide, "IHDP benchmark: real covariate shift tells the same story", "12:30-13:45", 36);
+  setTransition(slide, "fade", 500);
   clearContentPlaceholder(slide);
   claim(slide, "On real IHDP covariates with known counterfactuals, the method remains best or competitive across connected and disconnected regimes.");
   card(slide, {
@@ -503,7 +526,7 @@ function addTalkHeader(slide, title, time, size = 38) {
   });
 }
 
-// Slide 12
+// Slide 12 — fade (700ms); act break: evidence → takeaways. Pill adjusted +1s: 13:46
 {
   const slide = slides[11];
   setText(findByText(slide, "Thank you"), "Takeaways", { fontSize: 42, color: "#FFFFFF", bold: true, typeface: "Aptos Display" });
@@ -519,7 +542,8 @@ function addTalkHeader(slide, title, time, size = 38) {
     color: "#FFFFFF",
     bold: true,
   });
-  timePill(slide, "13:45-15:00", 322, 626);
+  timePill(slide, "13:46-15:00", 322, 626);
+  setTransition(slide, "fade", 700);
 }
 
 await fs.mkdir(outputDir, { recursive: true });
