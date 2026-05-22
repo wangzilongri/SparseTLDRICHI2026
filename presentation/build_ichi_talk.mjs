@@ -314,6 +314,15 @@ function addTalkHeader(slide, title, time, size = 38) {
   const slide = slides[3];
   addTalkHeader(slide, "Core idea: target placebo is the gold calibration signal", "3:00-4:15", 37);
   clearContentPlaceholder(slide);
+  // Delete the four workflow step shapes inherited from the template before placing the figure.
+  for (const shape of textShapes(slide)) {
+    const t = textOf(shape).trim();
+    if (["01","02","03","04","Data","Method","Validation","Impact"].includes(t) ||
+        t.startsWith("Describe the cohort") || t.startsWith("Summarize modeling") ||
+        t.startsWith("Explain benchmarks") || t.startsWith("Connect the workflow")) {
+      shape.delete();
+    }
+  }
   claim(slide, "Source data is abundant but miscalibrated for the target; target placebo is scarce but perfectly calibrated — sparse correction bridges the two.");
   await ctx.addImage(slide, {
     path: "/Users/zilongwang/Sparse_TL_DR_ICHI2026/presentation/figures/proxy-gold-paradigm.png",
@@ -345,12 +354,6 @@ function addTalkHeader(slide, title, time, size = 38) {
       });
     }
   }
-  await ctx.addImage(slide, {
-    path: "/Users/zilongwang/Sparse_TL_DR_ICHI2026/presentation/figures/method-pipeline.png",
-    left: 72, top: 155, width: 1136, height: 470,
-    fit: "contain",
-    alt: "Method pipeline: proxy estimate → gold anchor → sparse correction → DR learner",
-  });
 }
 
 {
@@ -363,12 +366,12 @@ function addTalkHeader(slide, title, time, size = 38) {
     ["List co-authors, labs, institutions, health systems, or deployment partners here.", "Target has treated and placebo outcomes. The estimator targets an identified target-site CATE and admits a Neyman-orthogonal expansion."],
     ["Funding", "Disconnected target"],
     ["Grant support, sponsorship, contracts, or infrastructure acknowledgments.", "Target has placebo only. The output is a screen-then-transport working-model estimate under explicit A6 transport assumptions."],
-    ["Disclosure", "What to say"],
-    ["State relevant conflicts of interest, industry affiliations, or product relationships.", "The talk should separate what is identified from what is transported; that distinction is the methodological honesty."],
+    ["Disclosure", "Key distinction"],
+    ["State relevant conflicts of interest, industry affiliations, or product relationships.", "Theorem 1 gives √n₀ guarantees on an identified estimand. Theorem 2 decomposes error into estimation + structural transport bias ε_τ. These are not interchangeable — label them separately."],
   ];
   for (const [oldText, newText] of pairs) {
     const shape = findByText(slide, oldText);
-    if (shape) setText(shape, newText, { bold: ["Connected target", "Disconnected target", "What to say"].includes(newText), color: ["Connected target", "Disconnected target", "What to say"].includes(newText) ? MAROON : MUTED });
+    if (shape) setText(shape, newText, { bold: ["Connected target", "Disconnected target", "Key distinction"].includes(newText), color: ["Connected target", "Disconnected target", "Key distinction"].includes(newText) ? MAROON : MUTED });
   }
 }
 
@@ -423,17 +426,6 @@ function addTalkHeader(slide, title, time, size = 38) {
   statCard(slide, 82, 218, 310, "p=100, target 150/100", "7.57 -> 1.71", "TargetOnly PEHE to Proposed", GREEN);
   statCard(slide, 430, 218, 310, "p=50, target 150/100", "4.75 -> 0.73", "TargetOnly PEHE to Proposed", GREEN);
   statCard(slide, 778, 218, 310, "p=20, target 150/100", "2.60 -> 0.50", "TargetOnly PEHE to Proposed-CF", BLUE);
-  ctx.addShape(slide, { left: 82, top: 398, width: 1006, height: 112, geometry: "roundRect", fill: SOFT, line: ctx.line(LINE, 1) });
-  ctx.addText(slide, {
-    left: 112,
-    top: 424,
-    width: 946,
-    height: 58,
-    text: "Talk move: show this slide as the finite-sample reason for the method. The estimator is not just theoretically neat; it is strongest where target IPD is most expensive.",
-    fontSize: 21,
-    color: TEXT,
-    bold: true,
-  });
 }
 
 {
