@@ -131,7 +131,7 @@ if not has_date_in_body:
     tf = tb.text_frame
     p  = tf.paragraphs[0]
     r  = p.add_run()
-    r.text = 'June 1–3, 2026  ·  Minneapolis, MN  ·  IEEE ICHI 2026'
+    r.text = 'Wednesday, June 3, 2026  ·  Minneapolis, MN  ·  IEEE ICHI 2026'
     r.font.size    = Pt(11)
     r.font.color.rgb = MUTED
     r.font.name    = 'Aptos'
