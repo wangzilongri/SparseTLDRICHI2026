@@ -2,17 +2,23 @@ import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-import {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "..");
+const defaultPresentationSkillDir =
+  "C:/Users/wrait/.codex/plugins/cache/openai-primary-runtime/presentations/26.430.10722/skills/presentations";
+const presentationSkillDir = process.env.PRESENTATIONS_SKILL_DIR || defaultPresentationSkillDir;
+const {
   createSlideContext,
   ensureArtifactToolWorkspace,
   importArtifactTool,
   padSlideNumber,
   saveBlobToFile,
-} from "/Users/zilongwang/.codex/plugins/cache/openai-primary-runtime/presentations/26.521.10419/skills/presentations/scripts/artifact_tool_utils.mjs";
+} = await import(pathToFileURL(path.join(presentationSkillDir, "scripts", "artifact_tool_utils.mjs")).href);
 
-const workspace = "/Users/zilongwang/Transfer-Learning-for-Individual-Patient-Data-for-Clinical-Trials/outputs/manual-20260521-ichi-talk/presentations/ichi-2026-talk";
-const starterPath = path.join(workspace, "template-starter.pptx");
+const workspace = process.env.PRESENTATION_WORKSPACE || path.join(repoRoot, "presentation");
+const starterPath = process.env.PRESENTATION_TEMPLATE_PPTX || path.join(workspace, "template-starter.pptx");
 const outputDir = path.join(workspace, "output");
 const previewDir = path.join(workspace, "preview");
 const layoutDir = path.join(workspace, "layout");
@@ -204,6 +210,14 @@ function statCard(slide, x, y, w, label, value, sub, color = MAROON) {
   ctx.addText(slide, { left: x + 20, top: y + 94, width: w - 40, height: 26, text: sub, fontSize: 14, color: MUTED });
 }
 
+function compactBadge(slide, x, y, w, label, value, sub, color = MAROON) {
+  ctx.addShape(slide, { left: x, top: y, width: w, height: 104, geometry: "roundRect", fill: "#FFFFFF", line: ctx.line(LINE, 1) });
+  ctx.addShape(slide, { left: x, top: y, width: 6, height: 104, fill: color, line: ctx.line("#00000000", 0) });
+  ctx.addText(slide, { left: x + 18, top: y + 16, width: w - 34, height: 22, text: label, fontSize: 15, color: MUTED, bold: true });
+  ctx.addText(slide, { left: x + 18, top: y + 42, width: w - 34, height: 24, text: value, fontSize: 19, color, bold: true });
+  ctx.addText(slide, { left: x + 18, top: y + 70, width: w - 34, height: 22, text: sub, fontSize: 13, color: MUTED });
+}
+
 function groupedBars(slide, data, x, y, w, h) {
   const max = Math.max(...data.flatMap((d) => [d.proxy, d.proposed]));
   const groupW = w / data.length;
@@ -289,7 +303,7 @@ function addTalkHeader(slide, title, time, size = 38) {
     accent: GREEN,
   });
   await ctx.addImage(slide, {
-    path: "/Users/zilongwang/Sparse_TL_DR_ICHI2026/presentation/figures/covariate-shift.png",
+    path: path.join(workspace, "figures", "covariate-shift.png"),
     left: 82, top: 418, width: 1006, height: 192,
     fit: "contain",
     alt: "Source and target covariate distributions illustrating shift",
@@ -323,9 +337,9 @@ function addTalkHeader(slide, title, time, size = 38) {
       shape.delete();
     }
   }
-  claim(slide, "Source data is abundant but miscalibrated for the target; target placebo is scarce but perfectly calibrated — sparse correction bridges the two.");
+  claim(slide, "Source data is abundant but biased for the target; target placebo is scarce but calibrated. Sparse correction bridges the two.");
   await ctx.addImage(slide, {
-    path: "/Users/zilongwang/Sparse_TL_DR_ICHI2026/presentation/figures/proxy-gold-paradigm.png",
+    path: path.join(workspace, "figures", "proxy-gold-paradigm.png"),
     left: 72, top: 200, width: 1136, height: 460,
     fit: "contain",
     alt: "Proxy-gold paradigm: source sites have low-variance biased estimates; target placebo has high-variance unbiased labels; anchoring yields low-variance unbiased CATE",
@@ -335,25 +349,63 @@ function addTalkHeader(slide, title, time, size = 38) {
 {
   const slide = slides[4];
   addTalkHeader(slide, "Estimator pipeline: anchor first, orthogonalize second", "4:15-6:00", 37);
-  const replacements = [
-    ["Data", "Fit source models"],
-    ["Describe the cohort, records, devices, or multimodal sources.", "Learn mu0 and mu1 from source IPD; randomized propensities are known."],
-    ["Method", "Anchor baseline"],
-    ["Summarize modeling, evaluation, or intervention design.", "Use target placebo gold labels to correct target baseline risk."],
-    ["Validation", "Build pseudo-outcomes"],
-    ["Explain benchmarks, comparison groups, or review procedures.", "Form DR pseudo-outcomes with cross-fitting when target treated data exist."],
-    ["Impact", "Estimate CATE"],
-    ["Connect the workflow to outcomes, deployment, or next steps.", "Predict tau(x), evaluate ranking, calibration, and treatment policy regret."],
-  ];
-  for (const [oldText, newText] of replacements) {
-    const shape = findByText(slide, oldText);
-    if (shape) {
-      setText(shape, newText, {
-        bold: ["Fit source models", "Anchor baseline", "Build pseudo-outcomes", "Estimate CATE"].includes(newText),
-        fontSize: newText === "Build pseudo-outcomes" ? 19 : undefined,
-      });
+  clearContentPlaceholder(slide);
+  ctx.addShape(slide, { left: 60, top: 146, width: 1160, height: 468, fill: "#FFFFFF", line: ctx.line("#00000000", 0) });
+  claim(slide, "Two layers do the work: sparse baseline anchoring first, then doubly robust CATE learning.", 150);
+  [
+    {
+      x: 72,
+      color: BLUE,
+      step: "1",
+      title: "Source proxy",
+      formula: "μ̂₀ᵖʳᵒˣʸ(x), μ̂₁ᵖʳᵒˣʸ(x)",
+      body: "Fit source outcome models from abundant source IPD.",
+    },
+    {
+      x: 360,
+      color: GOLD,
+      step: "2",
+      title: "Target anchor",
+      formula: "Y₀ − μ̂₀ᵖʳᵒˣʸ(X)",
+      body: "Use target placebo outcomes as gold residual labels.",
+    },
+    {
+      x: 648,
+      color: MAROON,
+      step: "3",
+      title: "Sparse correction",
+      formula: "μ̂₀ᵃⁿᶜʰᵒʳ = μ̂₀ᵖʳᵒˣʸ + δ̂",
+      body: "Debias target baseline risk with a low-complexity correction.",
+    },
+    {
+      x: 936,
+      color: GREEN,
+      step: "4",
+      title: "DR learner",
+      formula: "ψ = μ̂₁ − μ̂₀ᵃⁿᶜʰᵒʳ + IPW residual",
+      body: "Fit τ̂(x) = E[ψ | x] for targeting and regret.",
+    },
+  ].forEach((d, i) => {
+    ctx.addShape(slide, { left: d.x, top: 232, width: 238, height: 246, geometry: "roundRect", fill: d.color, line: ctx.line("#00000000", 0) });
+    ctx.addText(slide, { left: d.x + 22, top: 260, width: 194, height: 22, text: `${d.step} ${d.title}`, fontSize: 16, color: "#FFFFFF", bold: true });
+    ctx.addText(slide, { left: d.x + 22, top: 326, width: 194, height: 34, text: d.formula, fontSize: 14, color: "#FFFFFF", bold: true, typeface: "Courier New" });
+    ctx.addText(slide, { left: d.x + 22, top: 402, width: 194, height: 54, text: d.body, fontSize: 14, color: "#FFFFFF" });
+    if (i < 3) {
+      ctx.addText(slide, { left: d.x + 246, top: 338, width: 30, height: 24, text: "->", fontSize: 24, color: MUTED, bold: true, align: "center" });
     }
-  }
+  });
+  ctx.addShape(slide, { left: 174, top: 510, width: 930, height: 62, geometry: "roundRect", fill: SOFT, line: ctx.line(LINE, 1) });
+  ctx.addText(slide, {
+    left: 198,
+    top: 526,
+    width: 882,
+    height: 30,
+    text: "Bastani/Tian-Feng supply the sparse anchor; Kennedy supplies the orthogonal DR learner.",
+    fontSize: 18,
+    color: TEXT,
+    bold: true,
+    align: "center",
+  });
 }
 
 {
@@ -367,7 +419,7 @@ function addTalkHeader(slide, title, time, size = 38) {
     ["Funding", "Disconnected target"],
     ["Grant support, sponsorship, contracts, or infrastructure acknowledgments.", "Target has placebo only. The output is a screen-then-transport working-model estimate under explicit A6 transport assumptions."],
     ["Disclosure", "Key distinction"],
-    ["State relevant conflicts of interest, industry affiliations, or product relationships.", "Theorem 1 gives √n₀ guarantees on an identified estimand. Theorem 2 decomposes error into estimation + structural transport bias ε_τ. These are not interchangeable — label them separately."],
+    ["State relevant conflicts of interest, industry affiliations, or product relationships.", "Theorem 1: identified target-site CATE with √n₀ asymptotics. Theorem 2: transported estimate with estimation error + ετ + screening error. These are different claims."],
   ];
   for (const [oldText, newText] of pairs) {
     const shape = findByText(slide, oldText);
@@ -403,17 +455,17 @@ function addTalkHeader(slide, title, time, size = 38) {
   [
     ["Proposed", 1.3, GREEN],
     ["Proposed-CF", 1.8, BLUE],
-    ["Proposed-B†", 3.3, GOLD],
+    ["Proposed-B*", 3.3, GOLD],
     ["OM-Transport", 4.2, "#9A9A9A"],
     ["IPW-Transport", 5.0, "#B9B9B9"],
     ["TargetOnly", 6.0, "#D0D0D0"],
     ["ProxyOnly", 8.5, RED],
   ].forEach(([label, value, color], i) => metricRow(slide, 246 + i * 44, label, value, 9, color));
   statCard(slide, 980, 238, 190, "Proposed avg rank", "1.3", "PEHE/ATE/rank/regret", GREEN);
-  statCard(slide, 980, 394, 190, "Proposed-CF", "1.3", "ECE rank (calibration)", BLUE);
+  compactBadge(slide, 980, 404, 190, "Calibration leader", "Proposed-CF", "best ECE rank", BLUE);
   ctx.addText(slide, {
     left: 110, top: 548, width: 860, height: 18,
-    text: "† AnchorOnly (avg rank ≈6.5, ablation) and EntropyBal (≈5.5) omitted for space — full 9-method comparison in Table I",
+    text: "* AnchorOnly (avg rank about 6.5, ablation) and EntropyBal (about 5.5) omitted for space; full 9-method comparison in Table I",
     fontSize: 12, color: MUTED,
   });
 }
@@ -432,7 +484,7 @@ function addTalkHeader(slide, title, time, size = 38) {
   const slide = slides[9];
   addTalkHeader(slide, "Disconnected targets: useful, but label the assumption", "11:15-12:30", 37);
   clearContentPlaceholder(slide);
-  claim(slide, "With m1=0, Proposed-B is best or near-best on PEHE, but the estimand is transported rather than identified.");
+  claim(slide, "With m1=0, screen compatible sources and transport under A6; useful for ranking, not identification.");
   groupedBars(
     slide,
     [
@@ -491,14 +543,15 @@ function addTalkHeader(slide, title, time, size = 38) {
   const slide = slides[11];
   setText(findByText(slide, "Thank you"), "Takeaways", { fontSize: 42, color: "#FFFFFF", bold: true, typeface: "Aptos Display" });
   setText(findByText(slide, "Questions?"), "Questions?", { fontSize: 34, color: GOLD, bold: true, typeface: "Aptos Display" });
-  setText(findContains(slide, "Presenter name"), "Zilong Wang\nGeorgia Institute of Technology\nzwang937@gatech.edu", { fontSize: 23, color: "#FFFFFF" });
+  setText(findContains(slide, "Presenter name"), "Zilong Wang\nGeorgia Institute of Technology\nzwang937@gatech.edu", { fontSize: 20, color: "#FFFFFF" });
+  ctx.addShape(slide, { left: 50, top: 396, width: 450, height: 160, fill: MAROON, line: ctx.line("#00000000", 0) });
   ctx.addText(slide, {
     left: 72,
-    top: 410,
-    width: 480,
-    height: 175,
-    text: "Anchor to the target placebo arm.\nSeparate identified from transported claims.\nEvaluate decisions, not only error.",
-    fontSize: 24,
+    top: 406,
+    width: 360,
+    height: 136,
+    text: "Anchor to target placebo.\nSeparate identified from\ntransported claims.\nEvaluate decisions, not only error.",
+    fontSize: 21,
     color: "#FFFFFF",
     bold: true,
   });
