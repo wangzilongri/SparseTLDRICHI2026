@@ -535,6 +535,19 @@ async function injectPptxTransitions(pptxPath, transitions) {
       fsSync.writeFileSync(slidePath, xml);
     }
 
+    // Clear template authoring notes inherited from the starter PPTX.
+    // These are generic layout hints ("Use this as the cover slide…") that are
+    // not speaker notes for this talk — wipe all text runs in every notes slide.
+    const notesDir = `${tmpDir}/ppt/notesSlides`;
+    if (fsSync.existsSync(notesDir)) {
+      for (const notesFile of fsSync.readdirSync(notesDir).filter((f) => f.endsWith(".xml"))) {
+        const notesPath = `${notesDir}/${notesFile}`;
+        let notesXml = fsSync.readFileSync(notesPath, "utf8");
+        notesXml = notesXml.replace(/<a:t>[^<]*<\/a:t>/g, "<a:t/>");
+        fsSync.writeFileSync(notesPath, notesXml);
+      }
+    }
+
     // Delete and recreate the PPTX as a fresh zip from the modified directory
     execSync(`rm -f "${pptxPath}" && cd "${tmpDir}" && zip -qr "${pptxPath}" . -x "*.DS_Store" -x "__MACOSX/*"`);
   } finally {
