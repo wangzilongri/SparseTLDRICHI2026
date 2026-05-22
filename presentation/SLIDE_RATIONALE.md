@@ -255,6 +255,106 @@ Both major issues from PEER_REVIEW.md have been resolved in the current build:
 
 ---
 
+## Appendix integration
+
+The appendix deck (`appendix-lecture-method-foundations.pptx`, built by `build_appendix.mjs`) contains 25+ slides across four sections. The 12 main slides never reference the appendix directly. This section documents how to navigate between them during Q&A and what, if anything, to promote into the main file.
+
+### Appendix slide inventory
+
+Slides are numbered here as they appear in `preview-appendix/` (1-based). Build-script array indices are S[n] (0-based, so preview slide 1 = S[0]).
+
+| Preview # | S[n] | Section | Title |
+|-----------|-------|---------|-------|
+| 01 | S[0] | Divider | "Appendix: Method Foundations" (Bastani · Tian & Feng · Kennedy) |
+| 02 | S[1] | Bastani | Bastani (2021): Predicting with Proxies — overview |
+| 03 | S[2] | Bastani | Formal model: shared features, sparse correction |
+| 04 | S[3] | Bastani | The joint estimator: two-step LASSO |
+| 05 | S[4] | Bastani | Main result: bias sparsity s replaces dimension d |
+| 06 | S[5] | Bastani | When the proxy-gold correction works / failure modes |
+| 07 | S[6] | Bastani | **How Bastani maps to our estimator** (proxy → μ̂₀^anchor) |
+| 08 | S[7] | Bridge | Beyond one proxy: K sources — bridge to Tian & Feng |
+| 09 | S[8] | T&F | Tian & Feng (2023): Transfer Learning under High-dimensional GLMs |
+| 10 | S[9] | T&F | Setup: K source GLMs + 1 target in high dimension |
+| 11 | S[10] | T&F | A-Trans-GLM: two-step algorithm with known A_h |
+| 12 | S[11] | T&F | Trans-GLM: data-driven source selection (CV, Theorem 4) |
+| 13 | S[12] | T&F | Main theorem: transfer replaces n₀ by n_{A_h} + n₀ |
+| 14 | S[13] | T&F | Negative transfer: uninformative sources hurt |
+| 15 | S[14] | T&F | Bastani vs Tian & Feng: key differences (comparison table) |
+| 16 | S[15] | T&F | **How T&F maps to our multi-source clinical trial setting** |
+| 17 | S[16] | Summary | Two papers, one estimator pipeline |
+| — | S[17] | Divider | Kennedy (2023): Doubly Robust CATE Estimation |
+| — | S[18] | Kennedy | Setup: estimating heterogeneous treatment effects |
+| — | S[19] | Kennedy | **The DR pseudo-outcome: efficient influence function for CATE** |
+| — | S[20] | Kennedy | **Cross-fitting: separating nuisance training from CATE regression** |
+| — | S[21] | Kennedy | Main theorem: product error and optimal rates |
+| — | S[22] | Kennedy | Why it works: Neyman orthogonality and the influence function |
+| — | S[23] | Kennedy | **Kennedy in our estimator: the anchored DR learner** |
+| — | S[24] | Divider | Our Estimator: Rate Statements and Proof Sketches |
+
+**Bolded rows** are the highest-value Q&A targets — they provide the direct "how exactly does X work in your paper?" answer.
+
+Preview images for S[17]–S[24+] (Kennedy + theorems) are not yet generated; they exist in the build script but were not rendered in the last `build_appendix.mjs` run.
+
+---
+
+### Cross-reference: main slides → appendix backup
+
+| Main slide | Likeliest follow-up question | Appendix slides to jump to |
+|------------|------------------------------|---------------------------|
+| **04** — Core idea (proxy-gold) | "What exactly is the sparse correction step?" | A02–A04 (Bastani overview, formal model, two-step LASSO) |
+| **04** — Core idea | "How does Bastani's framework connect to your CATE estimator?" | A07 (Bastani → our estimator mapping) |
+| **05** — Estimator pipeline | "What are the pseudo-outcomes? How does cross-fitting work?" | A19 (DR pseudo-outcome), A20 (cross-fitting algorithm) |
+| **05** — Estimator pipeline | "Why does the sparse correction help baseline risk estimation?" | A03–A04 (joint estimator, main theorem), A07 |
+| **05** — Estimator pipeline | "How do you handle K source trials, not just one?" | A08–A10 (bridge + T&F setup + A-Trans-GLM) |
+| **06** — Two regimes | "What is the actual statement of Theorem 1?" | A24+ (our theorems divider + Theorem 1 slide) |
+| **06** — Two regimes | "What is A6 (screening-valid transportability)?" | A24+ (Theorem 2 / disconnected proof sketch) |
+| **08** — Ranking table | "Why exclude AnchorOnly from the chart?" | No appendix slide; use the on-slide footnote (added via M2 fix) + verbal: "AnchorOnly ranks ~6.5, Table I" |
+| **09** — Finite-sample gap | "Is this advantage just because you have more data?" | A12–A13 (T&F main theorem showing exact n_{A_h} improvement; negative transfer slide) |
+| **10** — Disconnected | "What is the formal Theorem 2 statement?" | A24+ (Theorem 2 proof sketch) |
+| **10** — Disconnected | "How do you detect whether a source is informative?" | A11 (Trans-GLM CV detection algorithm) + A12 (detection consistency Theorem 4) |
+| **11** — IHDP | "IHDP is semi-synthetic — does this generalize?" | No appendix slide; handle verbally (cite Hill 2011, Dorie 2019 for IHDP protocol) |
+
+---
+
+### Q&A navigation guide
+
+Print or keep on a tablet beside the laptop during the talk. Jump directly by clicking the thumbnail bar in PowerPoint or pressing slide number + Enter.
+
+| If asked… | Say | Go to appendix slide # |
+|-----------|-----|------------------------|
+| "How does the sparse correction actually work?" | "Great to dive in — the formal two-step LASSO is in the appendix." | **04** (two-step LASSO) |
+| "What's your theoretical guarantee for the connected case?" | "Theorem 1 is in the appendix — let me show the rate." | **S[24+]** (Our theorems section) |
+| "Why not just pool all source trials without the selection step?" | "Negative transfer is the reason — here's the formal result." | **14** (negative transfer) |
+| "What are pseudo-outcomes?" | "That's the DR pseudo-outcome from Kennedy 2023 — appendix covers it." | **A19** (Kennedy pseudo-outcome) |
+| "Does cross-fitting matter in practice?" | "Yes — it's what separates Proposed-CF's ECE advantage. The algorithm is here." | **A20** (cross-fitting) |
+| "How does your estimator relate to Bastani?" | "Direct mapping — every term corresponds." | **07** (Bastani → our mapping) |
+| "And how does it relate to Tian & Feng?" | "Same slide structure — K-source extension." | **16** (T&F → our mapping) |
+
+---
+
+### Promotion candidates: slides worth inserting into the main deck
+
+These appendix slides are candidates for promotion into an optional **"Extended Methods" block** (slides 13–15, after the current takeaways) if the speaker has 3–5 minutes of buffer or expects a technically sophisticated audience:
+
+| Priority | Appendix slide | Rationale for promotion |
+|----------|---------------|------------------------|
+| 1 (highest) | **A07 — Bastani → our estimator mapping** | Directly bridges the gap between slide 05's four-step pipeline description and the formal sparse correction. The row-by-row correspondence table (β*_proxy → μ̂₀^proxy, δ̂ → sparse correction, etc.) answers the single most frequent question a statistical methods audience will have. |
+| 2 | **A23 — Kennedy in our estimator (anchored DR learner)** | The pseudo-outcome comparison table (standard Kennedy vs. our anchored variant) makes the contribution of the anchoring step concrete. Directly supports slide 05's Step 2 and the Theorem 1 guarantee on slide 06. |
+| 3 | **A16 — T&F → our multi-source mapping** | For audiences familiar with glmtrans or the T&F paper; shows exactly how our K-source pooling step inherits the A-Trans-GLM structure. Less critical if the audience is clinically rather than statistically focused. |
+
+**Implementation note:** Do NOT insert these into slides 01–12. The timing pills and transitions are calibrated for the 12-slide structure. Add any promoted slides as new slides 13, 14, 15 with their own timing pills (no transition constraints apply). Label each with a corner tag "(Extended)" so the speaker can skip them cleanly if time is short.
+
+---
+
+### What not to do
+
+- **Do not reorder the appendix.** The Bastani → T&F → Kennedy → Theorems sequence mirrors the paper's theoretical dependency chain and is the correct reading order for a deep-dive audience.
+- **Do not merge the two appendix PPTX files.** `appendix-lecture-bastani-tian-feng.pptx` (82 KB) and `appendix-lecture-method-foundations.pptx` (140 KB) serve different audiences (quick background vs. full foundations). Keep them separate.
+- **Do not add "see appendix" annotations to slides 01–12.** Visual clutter hurts pacing; navigate verbally during Q&A instead using the table above.
+- **Do not generate Kennedy + theorems previews mid-session.** The build is expensive; only rebuild if those slides change. The existing build covers the 17 most-asked-about slides.
+
+---
+
 ## Decisions from the deviation log
 
 | Deviation | Reason | Implication for reuse |
